@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Turn Navigator",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "ChatGPTの画面にナビとショートカット。ユーザー/アシスタントの発言へ先頭・前・次・末尾に移動します。",
   "icons": {
     "16": "icon16.png",
