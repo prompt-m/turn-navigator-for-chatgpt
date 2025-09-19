@@ -169,7 +169,7 @@
       <div class="row indent"><label for="keyRoleAll">ロール: 全体</label>           <select id="keyRoleAll"></select></div>
     </div>
   </div>
-  <script defer src="shared.js"></script>
+
   <script defer src="options.js"></script>
 </body>
 </html>
