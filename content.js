@@ -118,25 +118,32 @@ function headNodeOf(article) {
   }
 
   if (isUser) {
-    // ユーザー：右寄せコンテナを起点に、画像/添付ブロックをスキップ
+    // 右寄せのラッパ
     const wrap =
       pick(article, 'div.flex.justify-end') ||
       pick(article, 'div.items-end') || article;
 
-    // 1) まず “テキストの吹き出し” らしい要素を優先的に検索
+    // 1) “本文バブル”を最優先（:scope で直下も取りやすく）
     const bubble =
-      pick(wrap, 'div.user-message-bubble-color') ||                 // 今回サンプルに該当
-      pick(wrap, 'div.text-token-text-primary')   ||
-      pick(wrap, 'div[class*="message-bubble"]')  ||
-      pick(wrap, 'div.prose, div.markdown');
+      pick(wrap, ':scope > div > div.user-message-bubble-color') ||
+      pick(wrap, ':scope > div.user-message-bubble-color')       ||
+      pick(wrap, ':scope > div > div.text-token-text-primary')   ||
+      pick(wrap, ':scope > div.text-token-text-primary')         ||
+      pick(wrap, ':scope > div > div[class*="message-bubble"]')  ||
+      pick(wrap, ':scope > div[class*="message-bubble"]')        ||
+      pick(wrap, ':scope > div > div.prose, :scope > div > div.markdown') ||
+      pick(wrap, ':scope > div.prose, :scope > div.markdown');
     if (bubble) return bubble;
 
-    // 2) 先頭から子を順に見て、img/figure/プレビューボタン等を含む“添付ブロック”は飛ばす
+    // 2) 直下の子を左から見る。添付系（自身 or 子孫）を除外して最初のDIVを返す
     const children = Array.from(wrap.children).filter(isVisible);
     for (const el of children) {
-      const looksLikeAttachment =
-        el.querySelector('img, video, canvas, figure, [aria-haspopup="dialog"], [data-radix-popper-content-wrapper]'); // 画像グリッドやプレビューUI
-      if (!looksLikeAttachment) return el;
+      const isAttachmentSelf =
+        el.matches('button, figure, canvas, svg, [aria-haspopup="dialog"], [data-radix-popper-content-wrapper]');
+      const isAttachmentDesc =
+        el.querySelector('img, video, canvas, figure, [aria-haspopup="dialog"], [data-radix-popper-content-wrapper]');
+      if (isAttachmentSelf || isAttachmentDesc) continue;   // ❌ 添付は飛ばす
+      return el.tagName === 'DIV' ? el : (el.querySelector('div') || el);
     }
 
     // 3) 最後の保険（幅依存しない中央カラム交差）
@@ -165,8 +172,10 @@ function headNodeOf(article) {
     const node = headNodeOf(article);
 
   // ★デバッグ：返されたノードを一瞬ハイライト
-  node.style.outline = '2px solid red';
-  setTimeout(() => { node.style.outline = ''; }, 600);
+try {
+  node.style.setProperty('outline', '2px solid red', 'important');
+  setTimeout(() => node && node.style && node.style.removeProperty('outline'), 2000);
+} catch {}
 
     const scR = scroller.getBoundingClientRect();
     const r = node.getBoundingClientRect();
