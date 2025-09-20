@@ -107,64 +107,33 @@ function headNodeOf(article) {
   const isUser      = article.matches('[data-message-author-role="user"]')
                    || !!article.querySelector('[data-message-author-role="user"]');
 
-  // アシスタント：本文全体のラッパを素直に掴む
+  // --- Assistant: ---
   if (isAssistant) {
     return (
-      pick(article, 'article > div') ||
+      pick(article, ':scope > div') ||
       pick(article, 'div.text-base') ||
       pick(article, 'div.markdown')  ||
       article
     );
   }
 
+  // --- User: ---
   if (isUser) {
-    // 右寄せのラッパ
+    // 右寄せコンテナ（外枠）
     const wrap =
       pick(article, 'div.flex.justify-end') ||
       pick(article, 'div.items-end') || article;
 
-    // 1) “本文バブル”を最優先（:scope で直下も取りやすく）
-    const bubble =
-      pick(wrap, ':scope > div > div.user-message-bubble-color') ||
-      pick(wrap, ':scope > div.user-message-bubble-color')       ||
-      pick(wrap, ':scope > div > div.text-token-text-primary')   ||
-      pick(wrap, ':scope > div.text-token-text-primary')         ||
-      pick(wrap, ':scope > div > div[class*="message-bubble"]')  ||
-      pick(wrap, ':scope > div[class*="message-bubble"]')        ||
-      pick(wrap, ':scope > div > div.prose, :scope > div > div.markdown') ||
-      pick(wrap, ':scope > div.prose, :scope > div.markdown');
-    if (bubble) return bubble;
+    // 仕様：先頭の可視子要素にスナップ（＝添付が先頭なら添付、本文が先頭なら本文）
+    const firstVisibleChild = Array.from(wrap.children).find(isVisible);
+    if (firstVisibleChild) return firstVisibleChild;
 
-    // 2) 直下の子を左から見る。添付系（自身 or 子孫）を除外して最初のDIVを返す
-    const children = Array.from(wrap.children).filter(isVisible);
-    for (const el of children) {
-      const isAttachmentSelf =
-        el.matches('button, figure, canvas, svg, [aria-haspopup="dialog"], [data-radix-popper-content-wrapper]');
-      const isAttachmentDesc =
-        el.querySelector('img, video, canvas, figure, [aria-haspopup="dialog"], [data-radix-popper-content-wrapper]');
-      if (isAttachmentSelf || isAttachmentDesc) continue;   // ❌ 添付は飛ばす
-      return el.tagName === 'DIV' ? el : (el.querySelector('div') || el);
-    }
-
-    // 3) 最後の保険（幅依存しない中央カラム交差）
-    const centerX = (document.documentElement.clientWidth || window.innerWidth) / 2;
-    let best = null, score = Infinity;
-    for (const el of article.querySelectorAll('p,pre,blockquote,ul,ol,code,div')) {
-      if (!isVisible(el)) continue;
-      const r = el.getBoundingClientRect();
-      if (r.left <= centerX && r.right >= centerX) {
-        const tooWide = r.width > Math.min(900, (document.documentElement.clientWidth || window.innerWidth) * 0.95);
-        const tooNarrow = r.width < 120;
-        if (tooWide || tooNarrow) continue;
-        const sc = Math.abs((r.left + r.width / 2) - centerX);
-        if (sc < score) { score = sc; best = el; }
-      }
-    }
-    return best || article;
+    // フォールバック（念のため）
+    return article;
   }
-
   return article;
 }
+
 
 
   // PRIMARY座標で記事先頭の絶対Y（③の土台）
@@ -526,6 +495,25 @@ try {
     return { cur, prev, next };
   }
 
+  // アンカー基準の厳密な 前/次 ピッカー
+  function pickNextAfter(list, yStar, eps=0) {
+    const sc = getTrueScroller();
+    for (const el of list) {
+      if (articleTop(sc, el) > yStar + eps) return el;
+    }
+    return null;
+  }
+
+  function pickPrevBefore(list, yStar, eps=0) {
+    const sc = getTrueScroller();
+    for (let i=list.length-1; i>=0; i--) {
+      if (articleTop(sc, list[i]) < yStar - eps) return list[i];
+    }
+    return null;
+  }
+
+
+  // ナビ本体
   function makeNav(role) {
     const getList = () => state[role];
     const scrollToAbsoluteBottom = () => {
@@ -533,13 +521,54 @@ try {
       lockFor(CFG.lockMs);
       s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
     };
+  
     return {
-      goTop(){ const L=getList(); if (L.length) scrollToHead(L[0]); },
-      goBottom(){ const L=getList(); if (!L.length) return; if (role==='all') scrollToAbsoluteBottom(); else scrollToHead(L[L.length-1]); },
-      goPrev(){ const L=getList(); if (!L.length) return; const idx=indexByAnchor(L); if (idx.prev>=0) scrollToHead(L[idx.prev]); },
-      goNext(){ const L=getList(); if (!L.length) return; const idx=indexByAnchor(L); if (idx.next>=0) scrollToHead(L[idx.next]); }
+      goTop(){
+        const L=getList(); if (!L.length) return;
+        scrollToHead(L[0]);
+      },
+      goBottom(){
+        const L=getList(); if (!L.length) return;
+        if (role==='all') { scrollToAbsoluteBottom(); }
+        else { scrollToHead(L[L.length-1]); } // 最後の“実体”
+      },
+      goPrev(){
+        const L=getList(); if (!L.length) return;
+        const sc = getTrueScroller();
+        const yStar = sc.scrollTop + currentAnchor();
+        const prev = pickPrevBefore(L, yStar, Number(CFG.eps)||0);
+        if (prev) scrollToHead(prev);
+      },
+      goNext(){
+        const L=getList(); if (!L.length) return;
+        const sc = getTrueScroller();
+        const yStar = sc.scrollTop + currentAnchor();
+        const next = pickNextAfter(L, yStar, Number(CFG.eps)||0);
+        if (next) scrollToHead(next);
+      }
     };
   }
+
+
+  // 追加：そのターンが“実体のある発言”かを判定
+  function isRealTurn(article) {
+    const head = headNodeOf(article);
+    if (!head) return false;
+  
+    const r = head.getBoundingClientRect();
+    if (r.height < 8 || !isVisible(head)) return false;
+  
+    // 文章 or メディアが何かしらあるか？
+    const txt = (head.textContent || head.innerText || '').trim();
+    const hasText  = txt.length > 0;
+    const hasMedia = !!head.querySelector('img,video,canvas,figure');
+  
+    // “描画中/プレースホルダー”的なものを保険で除外
+    const looksBusy = head.getAttribute?.('aria-busy') === 'true';
+  
+    return (hasText || hasMedia) && !looksBusy;
+  }
+
 
   const nav = { user: makeNav('user'), assistant: makeNav('assistant'), all: makeNav('all') };
 
@@ -547,7 +576,7 @@ try {
   function rebuild() {
     if (isLocked()) return; // smooth中は揺れるので抑止（③）
     TRUE_SCROLLER = getTrueScroller();
-    const allRaw = pickAllArticles();
+    const allRaw = pickAllArticles().filter(isRealTurn);
     state.all = sortByY(allRaw, TRUE_SCROLLER);
     state.user = pickArticlesByRole('user', state.all);
     state.assistant = pickArticlesByRole('assistant', state.all);
