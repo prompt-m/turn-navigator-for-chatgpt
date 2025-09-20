@@ -35,9 +35,10 @@
       if (!el) {
         el = document.createElement('div');
         el.id = id;
-        Object.assign(el.style, css);
         document.body.appendChild(el);
       }
+      // 既存要素にも毎回スタイルを上書き（古い版の残骸対策）
+      Object.assign(el.style, css, { pointerEvents: 'none' });
       return el;
     };
 

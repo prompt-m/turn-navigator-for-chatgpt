@@ -89,38 +89,85 @@
     return Math.round(window.innerHeight * CFG.centerBias - CFG.headerPx);
   }
 
-  function headNodeOf(article) {
-    const pick = (sel) => {
-      const n = article.querySelector(sel);
-      return n && isVisible(n) ? n : null;
-    };
-    const isAssistant = article.matches('[data-message-author-role="assistant"]')
-                      || !!article.querySelector('[data-message-author-role="assistant"]');
-    const isUser      = article.matches('[data-message-author-role="user"]')
-                      || !!article.querySelector('[data-message-author-role="user"]');
+function headNodeOf(article) {
+  const isVisible = (el) => {
+    if (!el) return false;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden') return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const pick = (root, sel) => {
+    const n = (root || article).querySelector(sel);
+    return n && isVisible(n) ? n : null;
+  };
 
-    if (isAssistant) {
-      // アシスタント：markdown本文を最優先（②浅掴み対策）
-      return pick('div.markdown')
-          || pick('div.text-base')
-          || pick('div.prose')
-          || pick('article > div')
-          || article;
-    }
-    if (isUser) {
-      // ユーザー：外枠でなく“内側バブル”
-      return pick('div.text-token-text-primary')
-          || pick('div[class*="message-bubble"]')
-          || pick('div.items-end > div')
-          || pick('div.items-end')
-          || article;
-    }
-    return article;
+  const isAssistant = article.matches('[data-message-author-role="assistant"]')
+                   || !!article.querySelector('[data-message-author-role="assistant"]');
+  const isUser      = article.matches('[data-message-author-role="user"]')
+                   || !!article.querySelector('[data-message-author-role="user"]');
+
+  // アシスタント：本文全体のラッパを素直に掴む
+  if (isAssistant) {
+    return (
+      pick(article, 'article > div') ||
+      pick(article, 'div.text-base') ||
+      pick(article, 'div.markdown')  ||
+      article
+    );
   }
+
+  if (isUser) {
+    // ユーザー：右寄せコンテナを起点に、画像/添付ブロックをスキップ
+    const wrap =
+      pick(article, 'div.flex.justify-end') ||
+      pick(article, 'div.items-end') || article;
+
+    // 1) まず “テキストの吹き出し” らしい要素を優先的に検索
+    const bubble =
+      pick(wrap, 'div.user-message-bubble-color') ||                 // 今回サンプルに該当
+      pick(wrap, 'div.text-token-text-primary')   ||
+      pick(wrap, 'div[class*="message-bubble"]')  ||
+      pick(wrap, 'div.prose, div.markdown');
+    if (bubble) return bubble;
+
+    // 2) 先頭から子を順に見て、img/figure/プレビューボタン等を含む“添付ブロック”は飛ばす
+    const children = Array.from(wrap.children).filter(isVisible);
+    for (const el of children) {
+      const looksLikeAttachment =
+        el.querySelector('img, video, canvas, figure, [aria-haspopup="dialog"], [data-radix-popper-content-wrapper]'); // 画像グリッドやプレビューUI
+      if (!looksLikeAttachment) return el;
+    }
+
+    // 3) 最後の保険（幅依存しない中央カラム交差）
+    const centerX = (document.documentElement.clientWidth || window.innerWidth) / 2;
+    let best = null, score = Infinity;
+    for (const el of article.querySelectorAll('p,pre,blockquote,ul,ol,code,div')) {
+      if (!isVisible(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.left <= centerX && r.right >= centerX) {
+        const tooWide = r.width > Math.min(900, (document.documentElement.clientWidth || window.innerWidth) * 0.95);
+        const tooNarrow = r.width < 120;
+        if (tooWide || tooNarrow) continue;
+        const sc = Math.abs((r.left + r.width / 2) - centerX);
+        if (sc < score) { score = sc; best = el; }
+      }
+    }
+    return best || article;
+  }
+
+  return article;
+}
+
 
   // PRIMARY座標で記事先頭の絶対Y（③の土台）
   function articleTop(scroller, article) {
     const node = headNodeOf(article);
+
+  // ★デバッグ：返されたノードを一瞬ハイライト
+  node.style.outline = '2px solid red';
+  setTimeout(() => { node.style.outline = ''; }, 600);
+
     const scR = scroller.getBoundingClientRect();
     const r = node.getBoundingClientRect();
     return scroller.scrollTop + (r.top - scR.top);
@@ -149,52 +196,158 @@
     const style = document.createElement('style');
     style.textContent = css;
     document.head.appendChild(style);
-  })(`#cgpt-nav{position:fixed;right:12px;bottom:140px;display:flex;flex-direction:column;gap:12px;z-index:2147483647;touch-action:none}
-#cgpt-drag{width:92px;height:12px;cursor:grab;border-radius:10px;background:linear-gradient(90deg,#aaa 20%,#ccc 50%,#aaa 80%);opacity:.55;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
-#cgpt-drag:active{cursor:grabbing}
-.cgpt-nav-group{position:relative;width:92px;border-radius:14px;padding:10px;border:1px solid rgba(0,0,0,.12);background:linear-gradient(0deg,var(--role-tint,transparent),var(--role-tint,transparent)),rgba(255,255,255,.95);box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:6px;align-items:stretch}
-.cgpt-nav-group[data-role="user"]{--role-tint:rgba(88,133,255,.12)}
-.cgpt-nav-group[data-role="assistant"]{--role-tint:rgba(64,200,150,.14)}
-.cgpt-nav-group[data-role="all"]{--role-tint:rgba(128,128,128,.08)}
-.cgpt-nav-label{text-align:center;font-weight:600;opacity:.9;margin-bottom:2px;font-size:12px}
-#cgpt-nav button{all:unset;height:34px;border-radius:10px;font:12px/1.1 system-ui,-apple-system,sans-serif;display:grid;place-items:center;cursor:pointer;user-select:none;background:#f2f2f7;color:#111;border:1px solid rgba(0,0,0,.08);transition:background .15s ease,transform .03s ease}
-#cgpt-nav button:hover{background:#fff}
-#cgpt-nav button:active{transform:translateY(1px)}
-.cgpt-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-#cgpt-nav .cgpt-lang-btn{height:28px;margin-top:4px}
-@media (prefers-color-scheme:dark){
-  .cgpt-nav-group{border-color:#3a3a3f;background:linear-gradient(0deg,var(--role-tint,transparent),var(--role-tint,transparent)),#2a2a2d}
-  #cgpt-nav button{background:#3a3a40;color:#e7e7ea;border-color:#3a3a3f}
-  #cgpt-nav button:hover{background:#4a4a52}
-}`);
+  })(`
+    #cgpt-nav {
+      position: fixed;
+      right: 12px;
+      bottom: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 2147483647;
+      touch-action: none;
+    }
+
+    #cgpt-drag {
+      width: 92px;
+      height: 12px;
+      cursor: grab;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #aaa 20%, #ccc 50%, #aaa 80%);
+      opacity: .55;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+    }
+
+    #cgpt-drag:active { cursor: grabbing; }
+
+    .cgpt-nav-group {
+      position: relative;
+      width: 92px;
+      border-radius: 14px;
+      padding: 10px;
+      border: 1px solid rgba(0,0,0,.12);
+      background: linear-gradient(
+          0deg,
+          var(--role-tint, transparent),
+          var(--role-tint, transparent)
+        ),
+        rgba(255,255,255,.95);
+      box-shadow: 0 6px 24px rgba(0,0,0,.18);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+    }
+
+    .cgpt-nav-group[data-role="user"]       { --role-tint: rgba(88,133,255,.12); }
+    .cgpt-nav-group[data-role="assistant"]  { --role-tint: rgba(64,200,150,.14); }
+    .cgpt-nav-group[data-role="all"]        { --role-tint: rgba(128,128,128,.08); }
+
+    .cgpt-nav-label {
+      text-align: center;
+      font-weight: 600;
+      opacity: .9;
+      margin-bottom: 2px;
+      font-size: 12px;
+    }
+
+    #cgpt-nav button {
+      all: unset;
+      height: 34px;
+      border-radius: 10px;
+      font: 12px/1.1 system-ui, -apple-system, sans-serif;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      user-select: none;
+      background: #f2f2f7;
+      color: #111;
+      border: 1px solid rgba(0,0,0,.08);
+      transition: background .15s ease, transform .03s ease;
+    }
+    #cgpt-nav button:hover { background: #fff; }
+    #cgpt-nav button:active { transform: translateY(1px); }
+
+    .cgpt-grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    #cgpt-nav .cgpt-lang-btn { height: 28px; margin-top: 4px; }
+
+    /* 追加: バイアス線/帯は必ずクリックを透過（念のため二段構え） */
+    #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
+
+    @media (prefers-color-scheme: dark) {
+      .cgpt-nav-group {
+        border-color: #3a3a3f;
+        background: linear-gradient(
+            0deg,
+            var(--role-tint, transparent),
+            var(--role-tint, transparent)
+          ),
+          #2a2a2d;
+      }
+      #cgpt-nav button {
+        background: #3a3a40;
+        color: #e7e7ea;
+        border-color: #3a3a3f;
+      }
+      #cgpt-nav button:hover { background: #4a4a52; }
+
+      /* === パネルのフォーカス/選択を全面オフ === */
+      #cgpt-nav, #cgpt-nav * {
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        caret-color: transparent;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* グリップは最低高さを確保して“0px化”を防ぐ */
+      #cgpt-drag { min-height: 12px; }
+
+      /* バイアス線/帯は必ずクリック透過（二段構え） */
+      #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
+      #cgpt-nav { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+    }
+  `);
 
   const box = document.createElement('div');
   box.id = 'cgpt-nav';
   box.innerHTML = `
-  <div id="cgpt-drag" title=""></div>
-  <div class="cgpt-nav-group" data-role="user">
-    <div class="cgpt-nav-label" data-i18n="user"></div>
-    <button data-act="top" data-i18n="top"></button>
-    <button data-act="prev" data-i18n="prev"></button>
-    <button data-act="next" data-i18n="next"></button>
-    <button data-act="bottom" data-i18n="bottom"></button>
-  </div>
-  <div class="cgpt-nav-group" data-role="assistant">
-    <div class="cgpt-nav-label" data-i18n="assistant"></div>
-    <button data-act="top" data-i18n="top"></button>
-    <button data-act="prev" data-i18n="prev"></button>
-    <button data-act="next" data-i18n="next"></button>
-    <button data-act="bottom" data-i18n="bottom"></button>
-  </div>
-  <div class="cgpt-nav-group" data-role="all">
-    <div class="cgpt-nav-label" data-i18n="all"></div>
-    <div class="cgpt-grid2">
-      <button data-act="top">▲</button>
-      <button data-act="bottom">▼</button>
+    <div id="cgpt-drag" title=""></div>
+    <div class="cgpt-nav-group" data-role="user">
+      <div class="cgpt-nav-label" data-i18n="user"></div>
+      <button data-act="top" data-i18n="top"></button>
+      <button data-act="prev" data-i18n="prev"></button>
+      <button data-act="next" data-i18n="next"></button>
+      <button data-act="bottom" data-i18n="bottom"></button>
     </div>
-    <button class="cgpt-lang-btn"></button>
-  </div>`;
+    <div class="cgpt-nav-group" data-role="assistant">
+      <div class="cgpt-nav-label" data-i18n="assistant"></div>
+      <button data-act="top" data-i18n="top"></button>
+      <button data-act="prev" data-i18n="prev"></button>
+      <button data-act="next" data-i18n="next"></button>
+      <button data-act="bottom" data-i18n="bottom"></button>
+    </div>
+    <div class="cgpt-nav-group" data-role="all">
+      <div class="cgpt-nav-label" data-i18n="all"></div>
+      <div class="cgpt-grid2">
+        <button data-act="top">▲</button>
+        <button data-act="bottom">▼</button>
+      </div>
+      <button class="cgpt-lang-btn"></button>
+    </div>`;
   document.body.appendChild(box);
+
+  // パネル内のフォーカスを奪わない（Tab移動やクリックでフォーカスさせない）
+  box.querySelectorAll('button, .cgpt-nav-label, .cgpt-nav-group, #cgpt-drag')
+    .forEach(el => {
+      el.setAttribute('tabindex', '-1');
+      el.addEventListener('mousedown', e => { e.preventDefault(); }, true);
+  });
 
   const I18N = {
     ja: { user:'ユーザー', assistant:'アシスタント', all:'全体', top:'先頭', prev:'前へ', next:'次へ', bottom:'末尾', langBtn:'English', dragTitle:'ドラッグで移動' },
@@ -212,13 +365,49 @@
     box.querySelector('.cgpt-lang-btn').textContent = t.langBtn;
   }
 
+  // ---------------- Panel clamp (GLOBAL) ----------------
+  function clampPanelWithinViewport() {
+    const margin = 8;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = document.documentElement.clientHeight || window.innerHeight;
+    const r = box.getBoundingClientRect();
+    // 位置は left/top を常用。right/bottom が残っていると箱の寸法が歪むことがあるので無効化
+    box.style.right = 'auto';
+    box.style.bottom = 'auto';
+    let x = Number.isFinite(r.left) ? r.left : vw - r.width - 12;
+    let y = Number.isFinite(r.top)  ? r.top  : vh - r.height - 140;
+    x = Math.min(vw - r.width - margin, Math.max(margin, x));
+    y = Math.min(vh - r.height - margin, Math.max(margin, y));
+    box.style.left = `${x}px`;
+    box.style.top  = `${y}px`;
+  }
+
   // ---------------- Panel: drag & settings ----------------
   (function enableDragging() {
     const grip = box.querySelector('#cgpt-drag');
     let dragging = false, offX = 0, offY = 0;
-    function onDown(e){ dragging = true; const r = box.getBoundingClientRect(); offX = e.clientX - r.left; offY = e.clientY - r.top; grip.setPointerCapture(e.pointerId); }
-    function onMove(e){ if (!dragging) return; box.style.left = `${e.clientX - offX}px`; box.style.top = `${e.clientY - offY}px`; }
-    function onUp(e){ if (!dragging) return; dragging = false; grip.releasePointerCapture(e.pointerId); const r = box.getBoundingClientRect(); saveSettingsPatch({ panel:{ x:r.left, y:r.top } }); }
+
+    function onDown(e){
+      dragging = true;
+      const r = box.getBoundingClientRect();
+      offX = e.clientX - r.left;
+      offY = e.clientY - r.top;
+      grip.setPointerCapture(e.pointerId);
+    }
+    function onMove(e){
+      if (!dragging) return;
+      box.style.left = `${e.clientX - offX}px`;
+      box.style.top  = `${e.clientY - offY}px`;
+    }
+    function onUp(e){
+      if (!dragging) return;
+      dragging = false;
+      grip.releasePointerCapture(e.pointerId);
+      clampPanelWithinViewport(); // 画面内に押し戻す
+      const r = box.getBoundingClientRect();
+      saveSettingsPatch({ panel:{ x:r.left, y:r.top } });
+    }
+
     grip.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove, { passive: true });
     window.addEventListener('pointerup', onUp);
@@ -236,14 +425,66 @@
     const getter = chrome?.storage?.sync?.get;
     if (typeof getter !== 'function') { CFG = structuredClone(DEFAULTS); cb?.(); return; }
     try {
-      getter('cgNavSettings', ({ cgNavSettings }) => { CFG = deepMerge(structuredClone(DEFAULTS), cgNavSettings || {}); cb?.(); });
+      getter('cgNavSettings', ({ cgNavSettings }) => {
+        // 1) defaults をコピー → 2) 保存値で上書き（ユーザー値が勝つ）
+        CFG = structuredClone(DEFAULTS);
+        if (cgNavSettings) deepMerge(CFG, cgNavSettings);
+        cb?.();
+      });
     } catch { CFG = structuredClone(DEFAULTS); cb?.(); }
   }
-  function saveSettingsPatch(patch) {
-    loadSettings(() => {
-      deepMerge(CFG, patch);
-      try { chrome?.storage?.sync?.set?.({ cgNavSettings: CFG }); } catch {}
+
+  // ---- 追加：設定変更のサブスクライブ（Center Bias 等の即時反映）----
+  try {
+    chrome?.storage?.onChanged?.addListener?.((changes, area) => {
+      if (area !== 'sync' || !changes.cgNavSettings) return;
+      const next = changes.cgNavSettings.newValue || {};
+      CFG = (function deepMerge(dst, src) {
+        for (const k in src) {
+          if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) {
+            dst[k] = deepMerge(dst[k] || {}, src[k]);
+          } else {
+            dst[k] = src[k];
+          }
+        }
+        return dst;
+      })(structuredClone(DEFAULTS), next);
+  
+      // アンカーの可視ガイドも即更新
+      try { window.CGTN?.renderViz?.(CFG, true); } catch {}
+      // 位置決めに使う幾何も更新
+      requestAnimationFrame(() => { 
+        // スクロール中の揺れを避けるなら isLocked() で弾いてもよい
+        // 今回は即時反映を優先
+        // （必要なら if(isLocked()) return; を入れてください）
+        // リスト再構築
+        typeof rebuild === 'function' && rebuild();
+      });
     });
+  } catch {}
+
+  function saveSettingsPatch(patch) {
+    // いまの保存値を読んでから patch を上書きマージして保存
+    const getter = chrome?.storage?.sync?.get;
+    const setter = chrome?.storage?.sync?.set;
+    if (typeof getter !== 'function' || typeof setter !== 'function') {
+      // 退避先が無い環境でも、少なくともローカルの CFG は壊さない
+      deepMerge(CFG, patch);
+      return;
+    }
+    try {
+      getter('cgNavSettings', ({ cgNavSettings }) => {
+        const next = structuredClone(DEFAULTS);
+        if (cgNavSettings) deepMerge(next, cgNavSettings); // 既存ユーザー値
+        deepMerge(next, patch);                            // → patch で上書き
+        CFG = next;                                       // ローカルも即更新
+        try { setter({ cgNavSettings: next }); } catch {}
+      });
+    } catch {
+      // 読み出し失敗時も手元の CFG だけは更新
+      deepMerge(CFG, patch);
+      try { setter?.({ cgNavSettings: CFG }); } catch {}
+    }
   }
 
   // ---------------- State / Rebuild ----------------
@@ -309,6 +550,19 @@
     }
   }
 
+  /* === 他タブの保存を即反映（options で保存→即反映） === */
+  try {
+    chrome?.storage?.onChanged?.addListener?.((changes, area) => {
+      if (area !== 'sync' || !changes.cgNavSettings) return;
+      const newVal = changes.cgNavSettings.newValue || {};
+      const next = structuredClone(DEFAULTS);
+      deepMerge(next, newVal);   // 既存の deepMerge を使用
+      CFG = next;
+      try { CG?.renderViz?.(CFG, true); } catch {}
+      rebuild();
+    });
+  } catch {}
+
   // ---------------- Wire UI ----------------
   box.addEventListener('click', (e) => {
     const langBtn = e.target.closest('.cgpt-lang-btn');
@@ -325,12 +579,34 @@
   function initialize() {
     loadSettings(() => {
       const { x, y } = CFG.panel || {};
-      if (Number.isFinite(x) && Number.isFinite(y)) { box.style.left = x + 'px'; box.style.top = y + 'px'; }
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        box.style.left = x + 'px';
+        box.style.top  = y + 'px';
+      }
+      // 初期表示でもはみ出しを矯正
+      requestAnimationFrame(() => {
+        clampPanelWithinViewport();
+      });
       applyLang();
       rebuild();
       mo.observe(document.body, { childList:true, subtree:true, attributes:false });
     });
   }
+
+  // 画面幅変化に追随（デバウンス）
+  let resizeT = 0;
+  function onResize() {
+    cancelAnimationFrame(resizeT);
+    resizeT = requestAnimationFrame(() => {
+      // アンカーは shared.js に従う（可視ガイドも描画更新）
+      try { CG?.renderViz?.(CFG, true); } catch {}
+      rebuild();
+      // リサイズでつまみが画面外に出たら戻す
+      clampPanelWithinViewport();
+    });
+  }
+  window.addEventListener('resize', onResize, { passive: true });
+  window.addEventListener('orientationchange', onResize);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize, { once: true });
