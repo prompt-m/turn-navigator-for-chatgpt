@@ -11,9 +11,10 @@
     headerPx: 0,
     lockMs: 700,
     eps: 20,
+    showViz: false,
     panel: { x: null, y: null },
     hotkeys: {
-      enabled: true,
+      enabled: false,
       targetRole: 'assistant',
       modifier: 'Alt',
       allowInInputs: false,
@@ -317,6 +318,10 @@ function headNodeOf(article) {
         <button data-act="bottom">▼</button>
       </div>
       <button class="cgpt-lang-btn"></button>
+      <label class="cgpt-viz-toggle" style="margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">
+       <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
+       <span>基準線</span>
+      </label>
     </div>`;
   document.body.appendChild(box);
 
@@ -605,7 +610,17 @@ function headNodeOf(article) {
   box.addEventListener('click', (e) => {
     const langBtn = e.target.closest('.cgpt-lang-btn');
     if (langBtn) { LANG = LANG === 'ja' ? 'en' : 'ja'; applyLang(); return; }
-    const btn = e.target.closest('button[data-act]'); if (!btn) return;
+    const btn = e.target.closest('button[data-act]'); 
+    if (!btn) {
+      // ガイド線トグル
+      const chk = e.target.closest('#cgpt-viz');
+      if (chk) {
+        const on = chk.checked;
+        try { CG?.toggleViz?.(on, CFG); } catch {}
+        saveSettingsPatch({ showViz: !!on });
+      }
+      return;
+    }
     const act = btn.dataset.act;
     const role = btn.closest('.cgpt-nav-group')?.dataset.role;
     const m = `go${act[0].toUpperCase()}${act.slice(1)}`;
@@ -626,6 +641,8 @@ function headNodeOf(article) {
         clampPanelWithinViewport();
       });
       applyLang();
+      // 初期トグル状態をUIに反映。ロード時は表示しない仕様なので描画は呼ばない
+      try { box.querySelector('#cgpt-viz').checked = !!CFG.showViz; } catch {}
       rebuild();
       mo.observe(document.body, { childList:true, subtree:true, attributes:false });
     });

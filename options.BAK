@@ -1,175 +1,97 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <title>ChatGPT Turn Navigator - オプション</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChatGPT Turn Navigator 設定</title>
   <style>
-    :root{--fg:#111;--muted:#666;--bd:#ddd;--bg:#fff;--acc:#3b82f6;--ok:#16a34a}
+    :root { --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8; }
     @media (prefers-color-scheme: dark){
-      :root{--fg:#e7e7ea;--muted:#a5a5ad;--bd:#3a3a3f;--bg:#202124;--acc:#60a5fa;--ok:#22c55e}
-      body{color-scheme:dark}
+      :root { --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
     }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",Meiryo,sans-serif}
-    .wrap{max-width:880px;margin:24px auto 48px;padding:0 16px}
-    h1{font-size:20px;margin:0 0 16px}
-    h2{font-size:16px;margin:24px 0 8px}
-    p.lead{color:var(--muted);margin-top:4px}
-    .block{
-      border:1px solid var(--bd);
-      border-radius:12px;
-      padding:16px;
-      background:rgba(127,127,127,.03);
-      margin-bottom:24px
+    body{ margin:24px; font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"; color:var(--fg); background:var(--bg); }
+    h1{ font-size:28px; margin:0 0 6px; }
+    .desc{ color:var(--muted); margin:0 0 18px; }
+    .card{ border:1px solid var(--bd); border-radius:14px; padding:16px; background:var(--pill); }
+    .group{ margin:18px 0 0; }
+    .row{ display:grid; grid-template-columns: 280px 1fr; gap:14px; align-items:center; padding:10px 0; border-top:1px dashed var(--bd);}
+    .row:first-child{ border-top:none; padding-top:0; }
+    label b{ font-weight:700; }
+    input[type="number"]{
+      width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg);
     }
-    label{
-      font-weight:600;
-      padding-top: 2px;             /* なくてもOK。1–3px で微調整 */
-      line-height: 1.3;
-    }
-    /* ラベル幅を少し広げ、入力側の最小幅も確保 */
-    .row{
-      display:grid;
-      grid-template-columns: 240px minmax(420px, 1fr);  /* ← 200px → 240px に、右列は最低420px */
-      gap:12px;
-      align-items:start;
-      margin:10px 0; 
-    }
-
-
-    .block h2 {
-      margin: 0 0 10px;             /* 上0で“上寄せ感”を一致させる */
-      line-height: 1.2;
-    }
-/*
-    .block .row:first-of-type {
-      margin-top: 6px; 
-    }  /* お好みで 0–8px */
-    input[type="number"],select{
-      width:100%;
-      box-sizing:border-box;
-      padding:8px 10px;
-      border-radius:10px;
-      border:1px solid var(--bd);
-      background:var(--bg);
-      color:var(--fg);
-      font:14px/1.2 inherit
-    }
-*/
-
-    /* 入力UIの幅と高さを統一（number / select 共通） */
-    input[type="number"], select{
-      width:100%;
-      min-width: 360px;      /* ← 小さくならない下限（お好みで 360–520px） */
-      box-sizing:border-box;
-      padding:10px 12px;     /* ← 高さを合わせる */
-      height: 40px;          /* ← 明示で同じ高さに */
-      border-radius:10px;
-      border:1px solid var(--bd);
-      background:var(--bg);
-      color:var(--fg);
-      font:14px/1.2 inherit;
-    }
-
-    .row > div{
-        max-width: 640px; 
-    }  /* 480–720px の間で調整が気持ちよい */
-
-    small{
-      display:block;
-      color:var(--muted);
-      margin-top:4px
-    }
-    .hint{color:var(--muted)}
-    .btns{display:flex;gap:12px;align-items:center;margin-top:16px}
-    button{all:unset;display:inline-grid;place-items:center;padding:10px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--bd);background:#f3f4f6;color:#111;transition:background .15s,transform .03s}
-    button:hover{background:#fff}
-    button:active{transform:translateY(1px)}
-    @media (prefers-color-scheme: dark){
-      button{background:#2f3033;color:#e7e7ea;border-color:#3a3a3f}
-      button:hover{background:#3a3a40}
-    }
-    #status{margin-left:8px;color:var(--ok);font-weight:600}
-    .indent{padding-left:20px}
+    .hint{ color:var(--muted); font-size:14px; }
+    .actions{ display:flex; gap:10px; margin-top:18px; }
+    button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }
+    @media (prefers-color-scheme: dark){ button{ background:#3a3a40; } }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>ChatGPT Turn Navigator 設定</h1>
-    <p class="lead">数値は <b>min/max/step</b> に基づき <b>即保存</b>、不正値は保存せず blur 時に補正（丸め／クランプ）。「保存」は心理的セーフティとして残しています。</p>
+  <h1>ChatGPT Turn Navigator 設定</h1>
+  <p class="desc">
+    入力した数値は自動で保存されます。<br>
+    範囲外の値などは、入力後に自動で修正されます。<br>
+    ※「保存」ボタンは念のため設置しており、押す必要はありません。
+  </p>
 
-    <!-- スクロール挙動 -->
-    <div class="block">
-      <h2>スクロール挙動</h2>
-
-      <div class="row indent">
-        <label for="centerBias">表示位置の基準 (Center Bias)</label>
+  <form id="cgtn-options" class="card" autocomplete="off">
+    <div class="group">
+      <div class="row">
+        <label for="centerBias"><b>表示位置の基準 (Center Bias)</b></label>
         <div>
-          <input id="centerBias" type="number" min="0" max="1" step="0.01" inputmode="decimal">
-          <small>記事の頭を画面のどこに揃えるか。<b>0=上端 / 0.5=中央</b>。通常は <b>0.40–0.55</b>。</small>
+          <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
+          <div class="hint">記事の頭を画面のどこに揃えるか。0=上端 / 0.5=中央。通常は <b>0.40–0.55</b>。</div>
         </div>
       </div>
-
-      <div class="row indent">
-        <label for="headerPx">ヘッダー補正 (Header Offset px)</label>
+      <div class="row">
+        <label><b>ガイドライン</b></label>
         <div>
-          <input id="headerPx" type="number" min="0" max="300" step="1" inputmode="numeric">
-          <small>固定ヘッダー補正。大きいほど<b>表示位置は上に寄る</b>。例: 0 / 48 / 96 / 200。</small>
+          <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
+            <input id="showViz" name="showViz" type="checkbox" />
+            <span>表示/非表示を切替（押した時だけ表示・ロード時は非表示）</span>
+          </label>
         </div>
       </div>
-
-      <div class="row indent">
-        <label for="eps">ゆらぎ幅 (EPS Hysteresis)</label>
+      <div class="row">
+        <label for="eps"><b>ゆらぎ幅 (EPS Hysteresis)</b></label>
         <div>
-          <input id="eps" type="number" min="1" max="120" step="1" inputmode="numeric">
-          <small>「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。<b>5–50</b> が目安。</small>
+          <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
+          <div class="hint">「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。<b>5–50</b> が目安。</div>
         </div>
       </div>
-
-      <div class="row indent">
-        <label for="lockMs">操作ロック時間 (Scroll Lock ms)</label>
-        <div>
-          <input id="lockMs" type="number" min="0" max="3000" step="50" inputmode="numeric">
-          <small>自動スクロール直後に操作を無視する時間（ms）。<b>0–1500</b> が目安。</small>
-        </div>
+      <div class="row">
+        <details>
+          <summary style="cursor:pointer;">詳細設定（通常は変更不要）</summary>
+          <div style="padding-top:10px;display:grid;gap:10px;">
+            <div class="row" style="border-top:none;padding:0;">
+              <label for="headerPx"><b>ヘッダー補正 (Header Offset px)</b></label>
+              <div>
+                <input id="headerPx" name="headerPx" type="number" step="1" min="0" max="2000" />
+                <div class="hint">固定ヘッダー分の補正。今のUIでは通常 0 のままでOK。</div>
+              </div>
+            </div>
+            <div class="row" style="border-top:none;padding:0;">
+              <label for="lockMs"><b>操作ロック時間 (Scroll Lock ms)</b></label>
+              <div>
+                <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
+                <div class="hint">自動スクロール後の入力を一時無視する時間。既定で安定動作します。</div>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
 
-      <div class="btns">
-        <button id="save">保存</button>
-        <button id="reset" title="既定値に戻す（パネル位置は保持）">既定に戻す</button>
-        <span id="status" hidden>保存しました</span>
-      </div>
-      <small class="hint">保存は入力ごとに自動で行われます。上の「保存」は明示保存したいとき用。</small>
-      <small class="hint">Ctrl+Alt+Shift+V で基準線の表示/非表示を切替可能。基準線を確認するときは「既定に戻す」でリセットしてから行ってください。</small>
+    <div class="actions">
+      <button id="saveBtn" type="submit">保存</button>
+      <button id="resetBtn" type="button">既定に戻す</button>
     </div>
 
-    <!-- ホットキー -->
-    <div class="block">
-      <h2>ホットキー</h2>
+    <p class="hint" style="margin-top:10px;">
+      Ctrl+Alt+Shift+V で基準線の表示/非表示を切替可能。オプション画面では入力中にプレビューが表示されます。
+    </p>
+  </form>
 
-      <div class="row indent"><label for="enableHotkeys">有効化</label>
-        <select id="enableHotkeys"><option value="true">有効</option><option value="false">無効</option></select>
-      </div>
-      <div class="row indent"><label for="targetRole">ターゲットロール</label>
-        <select id="targetRole"><option value="user">ユーザー</option><option value="assistant">アシスタント</option><option value="all">全体</option></select>
-      </div>
-      <div class="row indent"><label for="modifier">修飾キー</label>
-        <select id="modifier"><option>Alt</option><option>Ctrl</option><option>Shift</option><option>Meta</option><option>None</option></select>
-      </div>
-      <div class="row indent"><label for="allowInInputs">入力中も有効</label>
-        <select id="allowInInputs"><option value="false">いいえ</option><option value="true">はい</option></select>
-      </div>
-
-      <div class="row indent"><label for="keyPrev">前へ</label>        <select id="keyPrev"></select></div>
-      <div class="row indent"><label for="keyNext">次へ</label>        <select id="keyNext"></select></div>
-      <div class="row indent"><label for="keyTop">先頭</label>         <select id="keyTop"></select></div>
-      <div class="row indent"><label for="keyBottom">末尾</label>      <select id="keyBottom"></select></div>
-      <div class="row indent"><label for="keyRoleUser">ロール: ユーザー</label>      <select id="keyRoleUser"></select></div>
-      <div class="row indent"><label for="keyRoleAssistant">ロール: アシスタント</label><select id="keyRoleAssistant"></select></div>
-      <div class="row indent"><label for="keyRoleAll">ロール: 全体</label>           <select id="keyRoleAll"></select></div>
-    </div>
-  </div>
-
-  <script defer src="options.js"></script>
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
 </body>
 </html>
