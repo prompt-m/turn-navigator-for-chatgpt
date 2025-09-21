@@ -141,10 +141,10 @@ function headNodeOf(article) {
     const node = headNodeOf(article);
 
   // ★デバッグ：返されたノードを一瞬ハイライト
-try {
-  node.style.setProperty('outline', '2px solid red', 'important');
-  setTimeout(() => node && node.style && node.style.removeProperty('outline'), 2000);
-} catch {}
+//try {
+//  node.style.setProperty('outline', '2px solid red', 'important');
+//  setTimeout(() => node && node.style && node.style.removeProperty('outline'), 2000);
+//} catch {}
 
     const scR = scroller.getBoundingClientRect();
     const r = node.getBoundingClientRect();
@@ -637,7 +637,7 @@ try {
     cancelAnimationFrame(resizeT);
     resizeT = requestAnimationFrame(() => {
       // アンカーは shared.js に従う（可視ガイドも描画更新）
-      try { CG?.renderViz?.(CFG, true); } catch {}
+      try { CG?.renderViz?.(CFG); } catch {}
       rebuild();
       // リサイズでつまみが画面外に出たら戻す
       clampPanelWithinViewport();
