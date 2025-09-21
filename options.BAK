@@ -14,12 +14,56 @@
     .desc{ color:var(--muted); margin:0 0 18px; }
     .card{ border:1px solid var(--bd); border-radius:14px; padding:16px; background:var(--pill); }
     .group{ margin:18px 0 0; }
-    .row{ display:grid; grid-template-columns: 280px 1fr; gap:14px; align-items:center; padding:10px 0; border-top:1px dashed var(--bd);}
-    .row:first-child{ border-top:none; padding-top:0; }
+    .row{
+      display:grid;
+      grid-template-columns: 280px 1fr;
+      gap:14px;
+      align-items:center;
+      padding:10px 0;
+      border-top:1px dashed var(--bd);
+    }
+    .row:first-child{
+      border-top:none;
+      padding-top:0; 
+    }
+    #cgtn-options .group .row {
+      align-items: start;
+    }
     label b{ font-weight:700; }
     input[type="number"]{
       width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg);
     }
+/* ボタンの基本スタイル */
+.actions button {
+  /* 基本的な設定 (既存のものに追記・変更) */
+  display: inline-block; /* 配置の調整 */
+  border: 1px solid #ccc; /* 境界線を少し濃く */
+  border-radius: 8px; /* 角丸を少し調整 */
+  padding: 10px 18px;
+  background-color: #f7f7f7; /* 背景色 */
+  color: #333; /* 文字色を濃く */
+  font-weight: bold; /* 文字を太く */
+  font-size: 14px;
+  cursor: pointer;
+  
+  /* 立体感を出すための影 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  /* アニメーションを滑らかに */
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+/* マウスが乗った時のスタイル */
+.actions button:hover {
+  background-color: #e9e9e9; /* 少し暗い色に */
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1); /* 影を少し濃く */
+}
+
+/* クリックした瞬間のスタイル */
+.actions button:active {
+  background-color: #e0e0e0; /* さらに暗い色に */
+  box-shadow: none; /* 影を消して押した感じを出す */
+}
     .hint{ color:var(--muted); font-size:14px; }
     .actions{ display:flex; gap:10px; margin-top:18px; }
     button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }
@@ -28,11 +72,6 @@
 </head>
 <body>
   <h1>ChatGPT Turn Navigator 設定</h1>
-  <p class="desc">
-    入力した数値は自動で保存されます。<br>
-    範囲外の値などは、入力後に自動で修正されます。<br>
-    ※「保存」ボタンは念のため設置しており、押す必要はありません。
-  </p>
 
   <form id="cgtn-options" class="card" autocomplete="off">
     <div class="group">
@@ -44,19 +83,19 @@
         </div>
       </div>
       <div class="row">
+        <label for="eps"><b>ゆらぎ幅 (EPS Hysteresis)</b></label>
+        <div>
+          <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
+          <div class="hint">「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。<b>5–50</b> が目安。</div>
+        </div>
+      </div>
+      <div class="row">
         <label><b>ガイドライン</b></label>
         <div>
           <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
             <input id="showViz" name="showViz" type="checkbox" />
             <span>表示/非表示を切替（押した時だけ表示・ロード時は非表示）</span>
           </label>
-        </div>
-      </div>
-      <div class="row">
-        <label for="eps"><b>ゆらぎ幅 (EPS Hysteresis)</b></label>
-        <div>
-          <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
-          <div class="hint">「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。<b>5–50</b> が目安。</div>
         </div>
       </div>
       <div class="row">
@@ -77,6 +116,22 @@
                 <div class="hint">自動スクロール後の入力を一時無視する時間。既定で安定動作します。</div>
               </div>
             </div>
+
+<!-- 詳細設定 セクション内など分かりやすい場所に -->
+<div class="row">
+  <label for="previewChars">プレビュー文字数</label>
+  <input id="previewChars" name="previewChars" type="number" min="10" max="400" step="10">
+  <div class="hint">一覧の各行に表示する抜粋の文字数。10–400 で指定。</div>
+</div>
+
+<div class="row">
+  <label for="listMax">表示件数</label>
+  <input id="listMax" name="listMax" type="number" min="10" max="200" step="10">
+  <div class="hint">一覧に並べる最大件数。超えた分は枠内でスクロール。</div>
+</div>
+
+
+
           </div>
         </details>
       </div>
@@ -86,9 +141,13 @@
       <button id="resetBtn" type="button">既定に戻す</button>
     </div>
 
-    <p class="hint" style="margin-top:10px;">
-      Ctrl+Alt+Shift+V で基準線の表示/非表示を切替可能。オプション画面では入力中にプレビューが表示されます。
+    <p class="desc hint" style="margin-top:10px;">
+    入力した数値は自動で保存されます。<br>
+    範囲外の値などは、入力後に自動で修正されます。<br>
+    ※「保存」ボタンは念のため設置しており、押す必要はありません。
     </p>
+
+
   </form>
 
   <script src="shared.js"></script>

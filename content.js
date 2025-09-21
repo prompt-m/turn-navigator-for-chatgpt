@@ -4,6 +4,10 @@
 
   if (document.getElementById('cgpt-nav')) return;
 
+  document.getElementById('cgpt-list-toggle')?.addEventListener('click', () => {
+    openList();
+  });
+
   const CG = window.CGTN;
 
   const DEFAULTS = {
@@ -13,6 +17,10 @@
     eps: 20,
     showViz: false,
     panel: { x: null, y: null },
+    list: {
+        previewChars: 80,   // 抜粋文字数
+        maxItems: 30        // 最大表示件数
+    },
     hotkeys: {
       enabled: false,
       targetRole: 'assistant',
@@ -258,6 +266,57 @@ function headNodeOf(article) {
     /* 追加: バイアス線/帯は必ずクリックを透過（念のため二段構え） */
     #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
 
+/* === 会話リスト === */
+#cgpt-list {
+  position: fixed;
+  inset: 0 0 0 0;
+  z-index: 2147483646;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.25);
+  pointer-events: auto;
+}
+#cgpt-list .sheet {
+  width: min(800px, 94vw);
+  max-height: min(70vh, 680px);
+  background: rgba(255,255,255,.98);
+  border: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+#cgpt-list header {
+  padding: 10px 14px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0,0,0,.07);
+  display: flex; align-items: center; gap: 8px;
+}
+#cgpt-list header .spacer { flex: 1; }
+#cgpt-list header button { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 8px; border:1px solid rgba(0,0,0,.12); }
+#cgpt-list .list {
+  overflow: auto;
+  padding: 8px 10px;
+}
+#cgpt-list .row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 10px;
+  padding: 10px 8px;
+  border-bottom: 1px dashed rgba(0,0,0,.07);
+  cursor: pointer;
+}
+#cgpt-list .row:hover { background: rgba(0,0,0,.035); }
+#cgpt-list .role { font-weight: 600; opacity: .8; }
+#cgpt-list .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-color-scheme: dark) {
+  #cgpt-list .sheet { background: #2a2a2d; border-color: #3a3a3f; }
+  #cgpt-list header { border-color: #3a3a3f; }
+  #cgpt-list header button { border-color:#3a3a3f; }
+  #cgpt-list .row { border-color:#3a3a3f; }
+}
+
     @media (prefers-color-scheme: dark) {
       .cgpt-nav-group {
         border-color: #3a3a3f;
@@ -322,8 +381,25 @@ function headNodeOf(article) {
        <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
        <span>基準線</span>
       </label>
+      <button id="cgpt-list-toggle" class="cgpt-lang-btn">一覧</button>
     </div>`;
   document.body.appendChild(box);
+
+// 会話リストのオーバーレイ
+const listWrap = document.createElement('div');
+listWrap.id = 'cgpt-list';
+listWrap.innerHTML = `
+  <div class="sheet">
+    <header>
+      <div>会話リスト</div>
+      <div class="spacer"></div>
+      <button data-act="close">閉じる</button>
+    </header>
+    <div class="list"></div>
+  </div>`;
+document.body.appendChild(listWrap);
+
+
 
   // パネル内のフォーカスを奪わない（Tab移動やクリックでフォーカスさせない）
   box.querySelectorAll('button, .cgpt-nav-label, .cgpt-nav-group, #cgpt-drag')
@@ -592,6 +668,71 @@ function headNodeOf(article) {
       currentScrollerForListener = TRUE_SCROLLER;
     }
   }
+
+  //　リスト関連
+
+function textOfTurn(article) {
+  try {
+    // 既存 headNodeOf を利用
+    const head = headNodeOf(article);
+    if (!head) return '';
+    // テキスト抽出（code/blockquote等は簡略に）
+    const t = (head.innerText || head.textContent || '').replace(/\s+/g, ' ').trim();
+    return t;
+  } catch { return ''; }
+}
+
+function roleOf(article) {
+  return article.matches('[data-message-author-role="assistant"], :scope [data-message-author-role="assistant"]')
+    ? 'アシスタント'
+    : 'ユーザー';
+}
+
+function buildListRows() {
+  const cfg = CFG.list || DEFAULTS.list;
+  const max = Math.max(1, Number(cfg.maxItems) || DEFAULTS.list.maxItems);
+  const prevN = Math.max(10, Number(cfg.previewChars) || DEFAULTS.list.previewChars);
+
+  const L = state.all.slice(0, max); // 画面上に並んでいる順（rebuildでソート済み）
+
+  const rows = L.map((el) => {
+    const role = roleOf(el);
+    let text = textOfTurn(el);
+    const trimmed = text.length > prevN;
+    if (trimmed) text = text.slice(0, prevN).trimEnd() + '…';
+    return { el, role, text };
+  });
+  return rows;
+}
+
+function renderList() {
+  const listEl = listWrap.querySelector('.list');
+  listEl.innerHTML = '';
+  const rows = buildListRows();
+  for (const r of rows) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="role">${r.role}</div><div class="text">${r.text || '(画像/添付など)'}</div>`;
+    row.addEventListener('click', () => {
+      closeList();
+      scrollToHead(r.el);
+    });
+    listEl.appendChild(row);
+  }
+}
+
+function openList() {
+  renderList();
+  listWrap.style.display = 'flex';
+}
+function closeList() {
+  listWrap.style.display = 'none';
+}
+
+listWrap.addEventListener('click', (e) => {
+  if (e.target === listWrap) closeList();
+});
+listWrap.querySelector('button[data-act="close"]').addEventListener('click', closeList);
 
   /* === 他タブの保存を即反映（options で保存→即反映） === */
   try {
