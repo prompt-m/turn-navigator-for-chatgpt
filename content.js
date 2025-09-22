@@ -4,10 +4,6 @@
 
   if (document.getElementById('cgpt-nav')) return;
 
-  document.getElementById('cgpt-list-toggle')?.addEventListener('click', () => {
-    openList();
-  });
-
   const CG = window.CGTN;
 
   const DEFAULTS = {
@@ -18,23 +14,15 @@
     showViz: false,
     panel: { x: null, y: null },
     list: {
-        previewChars: 80,   // 抜粋文字数
-        maxItems: 30        // 最大表示件数
-    },
-    hotkeys: {
-      enabled: false,
-      targetRole: 'assistant',
-      modifier: 'Alt',
-      allowInInputs: false,
-      keys: {
-        prev: 'ArrowUp',
-        next: 'ArrowDown',
-        top: 'Home',
-        bottom: 'End',
-        roleUser: 'Digit1',
-        roleAssistant: 'Digit2',
-        roleAll: 'Digit3'
-      }
+      enabled: false,        // 表示ON/OFF（パネルのトグルと連動）
+      maxChars: 40,          // 1行の文字数（省略は … で表示）
+      fontSize: 12,          // px
+      theme: 'mint',         // 'mint' | 'violet' | 'slate' など（後述）
+      width: 320,            // パネル幅
+      x: null,
+      y: null,               // 位置（ドラッグで保存）
+      previewChars: 80,      // 抜粋文字数
+      maxItems: 30           // 最大表示件数
     }
   };
   let CFG = structuredClone(DEFAULTS);
@@ -266,56 +254,6 @@ function headNodeOf(article) {
     /* 追加: バイアス線/帯は必ずクリックを透過（念のため二段構え） */
     #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
 
-/* === 会話リスト === */
-#cgpt-list {
-  position: fixed;
-  inset: 0 0 0 0;
-  z-index: 2147483646;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,.25);
-  pointer-events: auto;
-}
-#cgpt-list .sheet {
-  width: min(800px, 94vw);
-  max-height: min(70vh, 680px);
-  background: rgba(255,255,255,.98);
-  border: 1px solid rgba(0,0,0,.08);
-  box-shadow: 0 20px 60px rgba(0,0,0,.25);
-  border-radius: 16px;
-  overflow: hidden;
-  display: flex; flex-direction: column;
-}
-#cgpt-list header {
-  padding: 10px 14px;
-  font-weight: 600;
-  border-bottom: 1px solid rgba(0,0,0,.07);
-  display: flex; align-items: center; gap: 8px;
-}
-#cgpt-list header .spacer { flex: 1; }
-#cgpt-list header button { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 8px; border:1px solid rgba(0,0,0,.12); }
-#cgpt-list .list {
-  overflow: auto;
-  padding: 8px 10px;
-}
-#cgpt-list .row {
-  display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: 10px;
-  padding: 10px 8px;
-  border-bottom: 1px dashed rgba(0,0,0,.07);
-  cursor: pointer;
-}
-#cgpt-list .row:hover { background: rgba(0,0,0,.035); }
-#cgpt-list .role { font-weight: 600; opacity: .8; }
-#cgpt-list .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (prefers-color-scheme: dark) {
-  #cgpt-list .sheet { background: #2a2a2d; border-color: #3a3a3f; }
-  #cgpt-list header { border-color: #3a3a3f; }
-  #cgpt-list header button { border-color:#3a3a3f; }
-  #cgpt-list .row { border-color:#3a3a3f; }
-}
 
     @media (prefers-color-scheme: dark) {
       .cgpt-nav-group {
@@ -349,6 +287,156 @@ function headNodeOf(article) {
       /* バイアス線/帯は必ずクリック透過（二段構え） */
       #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
       #cgpt-nav { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+
+      /* === 会話リスト（フローティング・ドラッグ可・常時表示OK）=== */
+
+      #cgpt-list-panel {
+        position: fixed;
+        right: 12px;            /* パネル位置は JS で保存/復元するなら left/top に置換されます */
+        bottom: 140px;
+        z-index: 2147483646;
+        width: 360px;
+        max-width: min(92vw, 420px);
+        max-height: min(62vh, 680px);
+
+        display: none;          /* JS で "block" に切替。トグルで常駐させたいなら適宜更新 */
+        flex-direction: column;
+        gap: 0;
+
+        border: 1px solid rgba(0,0,0,.12);
+        border-radius: 16px;
+        background: rgba(255,255,255,.98);
+        box-shadow: 0 18px 56px rgba(0,0,0,.25);
+
+        /* カラーテーマ（後でプリセット差し替えしやすいようにCSS変数化） */
+        --user-bg:       rgba(88,133,255,.06);
+        --assistant-bg:  rgba(64,200,150,.06);
+        --hover:         rgba(0,0,0,.05);
+        --border:        rgba(0,0,0,.10);
+        --text:          #111;
+      }
+
+      /* ヘッダー（つまみ＋タイトル＋閉じる） */
+      #cgpt-list-head {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        padding: 6px 10px;
+        color: var(--text);
+      }
+
+      #cgpt-list-grip {
+        height: 12px;
+        border-radius: 10px;
+        background: linear-gradient(90deg, #aaa 18%, #d0d0d0 50%, #aaa 82%);
+        opacity: .6;
+        cursor: grab;
+        user-select: none;
+      }
+      #cgpt-list-grip:active { cursor: grabbing; }
+
+      #cgpt-list-title {
+        font-weight: 600;
+        font-size: 12px;
+        opacity: .85;
+      }
+
+      #cgpt-list-close {
+        all: unset;
+        font-size: 12px;
+        line-height: 1;
+        padding: 6px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      /* 本体スクロール領域 */
+      #cgpt-list-body {
+        overflow: auto;
+        padding: 6px 8px;
+      }
+
+      /* 行（左右寄せ＋淡い背景色） */
+      #cgpt-list-panel .cgpt-list-item {
+        padding: 8px 8px;
+        border-bottom: 1px dashed var(--border);
+        cursor: pointer;
+        user-select: none;
+        transition: background .12s ease;
+        outline: none;                /* キーボード操作でfocus-visible時にだけ装飾 */
+      }
+      #cgpt-list-panel .cgpt-list-item:last-child { border-bottom: none; }
+
+      #cgpt-list-panel .cgpt-list-item:hover { background: var(--hover); }
+      #cgpt-list-panel .cgpt-list-item:focus-visible {
+        box-shadow: 0 0 0 2px rgba(80,120,255,.35) inset;
+        border-radius: 8px;
+      }
+
+      /* 行内部のレイアウト */
+      #cgpt-list-panel .cgpt-list-item .row-inner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* 役割ごとの寄せ方と色 */
+      #cgpt-list-panel .cgpt-list-item.is-user {
+        justify-content: flex-end;
+        text-align: right;
+        background: var(--user-bg);
+      }
+      #cgpt-list-panel .cgpt-list-item.is-assistant {
+        justify-content: flex-start;
+        text-align: left;
+        background: var(--assistant-bg);
+      }
+
+      /* クリップ（📎）＆テキスト */
+      #cgpt-list-panel .cgpt-list-item .clip {
+        width: 1.2em;
+        flex: 0 0 auto;
+        opacity: .9;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #cgpt-list-panel .cgpt-list-item .clip.none { opacity: 0; } /* 位置合わせ用のダミー */
+
+      #cgpt-list-panel .cgpt-list-item .txt {
+        flex: 1 1 auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text);
+        font-size: 13px;              /* ← フォントサイズを後でオプション化する想定 */
+      }
+
+      /* フッター（必要ならボタンなど） */
+      #cgpt-list-foot {
+        border-top: 1px solid var(--border);
+        padding: 6px 8px;
+        display: flex; gap: 8px; align-items: center; justify-content: flex-end;
+      }
+
+      /* ダークモード */
+      @media (prefers-color-scheme: dark) {
+        #cgpt-list-panel {
+          background: #2a2a2d;
+          --text: #e8e8ea;
+          --border: #3a3a3f;
+          --hover: rgba(255,255,255,.06);
+          /* 背景色は暗色でも淡いままにして見分けやすく */
+          --user-bg: rgba(88,133,255,.14);
+          --assistant-bg: rgba(64,200,150,.16);
+        }
+        #cgpt-list-head { border-color: var(--border); }
+        #cgpt-list-close { border-color: var(--border); }
+      }
     }
   `);
 
@@ -381,25 +469,12 @@ function headNodeOf(article) {
        <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
        <span>基準線</span>
       </label>
-      <button id="cgpt-list-toggle" class="cgpt-lang-btn">一覧</button>
+      <label class="cgpt-list-toggle" style="margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">
+       <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
+       <span>一覧</span>
+      </label>
     </div>`;
   document.body.appendChild(box);
-
-// 会話リストのオーバーレイ
-const listWrap = document.createElement('div');
-listWrap.id = 'cgpt-list';
-listWrap.innerHTML = `
-  <div class="sheet">
-    <header>
-      <div>会話リスト</div>
-      <div class="spacer"></div>
-      <button data-act="close">閉じる</button>
-    </header>
-    <div class="list"></div>
-  </div>`;
-document.body.appendChild(listWrap);
-
-
 
   // パネル内のフォーカスを奪わない（Tab移動やクリックでフォーカスさせない）
   box.querySelectorAll('button, .cgpt-nav-label, .cgpt-nav-group, #cgpt-drag')
@@ -667,6 +742,7 @@ document.body.appendChild(listWrap);
       TRUE_SCROLLER.addEventListener('scroll', rebuild, { passive: true });
       currentScrollerForListener = TRUE_SCROLLER;
     }
+    renderList();  // ★追加
   }
 
   //　リスト関連
@@ -705,34 +781,114 @@ function buildListRows() {
   return rows;
 }
 
-function renderList() {
-  const listEl = listWrap.querySelector('.list');
-  listEl.innerHTML = '';
-  const rows = buildListRows();
-  for (const r of rows) {
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML = `<div class="role">${r.role}</div><div class="text">${r.text || '(画像/添付など)'}</div>`;
-    row.addEventListener('click', () => {
-      closeList();
-      scrollToHead(r.el);
+// === List Panel ===
+// === List Panel ===
+let listBox = null;
+
+function ensureListBox(){
+  if (listBox && document.body.contains(listBox)) return listBox;
+
+  listBox = document.createElement('div');
+  listBox.id = 'cgpt-list-panel';  // ← CSS と一致させる
+  listBox.innerHTML = `
+    <div id="cgpt-list-head">
+      <div id="cgpt-list-grip" title="ドラッグで移動"></div>
+      <button id="cgpt-list-close">閉じる</button>
+    </div>
+    <div id="cgpt-list-body"></div>
+    <div id="cgpt-list-foot"></div>
+  `;
+  document.body.appendChild(listBox);
+
+  // サイズ／テーマ
+  listBox.style.setProperty('--list-w', (CFG.list?.width || 320) + 'px');
+  listBox.style.setProperty('--fs', (CFG.list?.fontSize || 12) + 'px');
+  listBox.classList.add('theme-' + (CFG.list?.theme || 'mint'));
+
+  // 位置
+  const { x, y } = CFG.list || {};
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    listBox.style.left = x + 'px';
+    listBox.style.top  = y + 'px';
+  } else {
+    const r = box.getBoundingClientRect();
+    listBox.style.left = Math.max(8, r.left - (CFG.list?.width || 320) - 12) + 'px';
+    listBox.style.top  = (r.top) + 'px';
+  }
+
+  // ドラッグ
+  (function enableDrag(){
+    const grip = listBox.querySelector('#cgpt-list-grip');
+    let dragging=false, offX=0, offY=0;
+    grip.addEventListener('pointerdown',e=>{
+      dragging=true;
+      const rr=listBox.getBoundingClientRect();
+      offX = e.clientX - rr.left; offY = e.clientY - rr.top;
+      grip.setPointerCapture(e.pointerId);
     });
-    listEl.appendChild(row);
+    window.addEventListener('pointermove',e=>{
+      if(!dragging) return;
+      listBox.style.left = (e.clientX - offX) + 'px';
+      listBox.style.top  = (e.clientY - offY) + 'px';
+    },{passive:true});
+    window.addEventListener('pointerup',e=>{
+      if(!dragging) return;
+      dragging=false; 
+      listBox.querySelector('#cgpt-list-grip').releasePointerCapture(e.pointerId);
+      const rr=listBox.getBoundingClientRect();
+      saveSettingsPatch({ list:{ ...(CFG.list||{}), x:rr.left, y:rr.top } });
+    });
+  })();
+
+  // 閉じる
+  listBox.querySelector('#cgpt-list-close').addEventListener('click', ()=>{
+    setListEnabled(false);
+    const chk = document.getElementById('cgpt-list-toggle');
+    if (chk) chk.checked = false;
+  });
+
+  return listBox;
+}
+
+function setListEnabled(on){
+  ensureListBox();
+  listBox.style.display = on ? 'flex' : 'none';
+  saveSettingsPatch({ list: { ...(CFG.list||{}), enabled: !!on } });
+  const chk = document.getElementById('cgpt-list-toggle');
+  if (chk) chk.checked = !!on;
+}
+
+function toggleList(){ setListEnabled(!(CFG.list?.enabled)); }
+
+// state を使って一覧を再描画
+function renderList(){
+  if (!CFG.list?.enabled) return;
+  const panel = ensureListBox();
+  const body  = panel.querySelector('#cgpt-list-body');
+  body.innerHTML = '';
+
+  const lim      = Math.max(3, Math.min(100, CFG.list?.maxItems ?? 18));
+  const maxChars = Math.max(10, Math.min(200, CFG.list?.maxChars ?? 40));
+
+  const take = state.all.slice(0, lim);
+  for (const art of take){
+    const isUser = art.matches('[data-message-author-role="user"], [data-message-author-role="user"] *');
+    const head   = headNodeOf(art);
+    let txt = (head?.innerText || '').replace(/\s+/g,' ').trim();
+    const clipped = txt.length > maxChars;
+    if (clipped) txt = txt.slice(0, maxChars);
+
+    const row = document.createElement('div');
+    row.className = `cgpt-list-item ${isUser ? 'is-user' : 'is-assistant'}`;
+    row.innerHTML = `
+      <div class="row-inner">
+        <span class="clip">${head?.querySelector('img,video,canvas,figure,[aria-haspopup="dialog"]') ? '📎' : ''}</span>
+        <span class="txt">${txt}${clipped ? '…' : ''}</span>
+      </div>`;
+    row.addEventListener('click', ()=> scrollToHead(art));
+    body.appendChild(row);
   }
 }
-
-function openList() {
-  renderList();
-  listWrap.style.display = 'flex';
-}
-function closeList() {
-  listWrap.style.display = 'none';
-}
-
-listWrap.addEventListener('click', (e) => {
-  if (e.target === listWrap) closeList();
-});
-listWrap.querySelector('button[data-act="close"]').addEventListener('click', closeList);
 
   /* === 他タブの保存を即反映（options で保存→即反映） === */
   try {
@@ -742,6 +898,8 @@ listWrap.querySelector('button[data-act="close"]').addEventListener('click', clo
       const next = structuredClone(DEFAULTS);
       deepMerge(next, newVal);   // 既存の deepMerge を使用
       CFG = next;
+      try { box.querySelector('#cgpt-viz').checked        = !!CFG.showViz; } catch {}
+      try { box.querySelector('#cgpt-list-toggle').checked = !!CFG.list?.enabled; } catch {}
       try { CG?.renderViz?.(CFG, true); } catch {}
       rebuild();
     });
@@ -749,30 +907,58 @@ listWrap.querySelector('button[data-act="close"]').addEventListener('click', clo
 
   // ---------------- Wire UI ----------------
   box.addEventListener('click', (e) => {
-    const langBtn = e.target.closest('.cgpt-lang-btn');
-    if (langBtn) { LANG = LANG === 'ja' ? 'en' : 'ja'; applyLang(); return; }
-    const btn = e.target.closest('button[data-act]'); 
-    if (!btn) {
-      // ガイド線トグル
-      const chk = e.target.closest('#cgpt-viz');
-      if (chk) {
-        const on = chk.checked;
-        try { CG?.toggleViz?.(on, CFG); } catch {}
-        saveSettingsPatch({ showViz: !!on });
-      }
+    const t = (e.target instanceof Element) ? e.target : null;
+    if (!t) return;
+
+    // 一覧トグル（最優先）
+    const listChk = t.closest('#cgpt-list-toggle');
+    if (listChk) {
+      const on = listChk.checked;
+      setListEnabled(on);                          // ← 下の 3) で定義
+      saveSettingsPatch({ list: { ...(CFG.list||{}), enabled: !!on } });
       return;
     }
-    const act = btn.dataset.act;
+
+    // 基準線トグル
+    const vizChk = t.closest('#cgpt-viz');
+    if (vizChk) {
+      const on = vizChk.checked;
+      try { CG?.toggleViz?.(on, CFG); } catch {}
+      saveSettingsPatch({ showViz: !!on });
+      return;
+    }
+
+    // 言語トグル
+    const langBtn = t.closest('.cgpt-lang-btn');
+    if (langBtn) { LANG = LANG === 'ja' ? 'en' : 'ja'; applyLang(); return; }
+  
+    // 既存の移動ボタン
+    const btn = t.closest('button[data-act]');
+    if (!btn) return;
+    const act  = btn.dataset.act;
     const role = btn.closest('.cgpt-nav-group')?.dataset.role;
     const m = `go${act[0].toUpperCase()}${act.slice(1)}`;
     nav[role]?.[m]?.();
-  });
+    },/* capture: */ false);
 
-  const mo = new MutationObserver(() => rebuild());
+  const mo = new MutationObserver((muts) => {
+    // 自分のUI（ナビパネル/リストパネル）で起きた変化は無視
+    for (const m of muts) {
+      const n = m.target instanceof Node ? m.target : null;
+      if (!n) continue;
+      if (box.contains(n)) return;               // ナビ
+      if (listBox && listBox.contains(n)) return; // リスト
+    }
+    rebuild();
+  });
 
   function initialize() {
     loadSettings(() => {
       const { x, y } = CFG.panel || {};
+      if (CFG.list?.enabled) {
+        setListEnabled(true);
+        renderList();
+      }
       if (Number.isFinite(x) && Number.isFinite(y)) {
         box.style.left = x + 'px';
         box.style.top  = y + 'px';
@@ -785,7 +971,12 @@ listWrap.querySelector('button[data-act="close"]').addEventListener('click', clo
       // 初期トグル状態をUIに反映。ロード時は表示しない仕様なので描画は呼ばない
       try { box.querySelector('#cgpt-viz').checked = !!CFG.showViz; } catch {}
       rebuild();
+      // ★ここで UI のトグルと保存値を同期（表示は切り替えない）
+      try { box.querySelector('#cgpt-viz').checked        = !!CFG.showViz; } catch {}
+      try { box.querySelector('#cgpt-list-toggle').checked = !!CFG.list?.enabled; } catch {}
+
       mo.observe(document.body, { childList:true, subtree:true, attributes:false });
+
     });
   }
 

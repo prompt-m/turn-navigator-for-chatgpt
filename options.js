@@ -8,11 +8,25 @@
     eps: 20,
     lockMs: 700,
     showViz: false,
-    list: { previewChars: 80, maxItems: 30 }
+    list: {
+      previewChars: 20,
+      maxItems: 30,
+      listMaxItems: 18,
+      listMaxChars: 40, 
+      listFontSize: 12,
+    }
   };
   const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
   function sanitize(raw) {
+
+    let listMaxItems = parseInt(raw.listMaxItems,10);
+    let listMaxChars = parseInt(raw.listMaxChars,10);
+    let listFontSize = parseInt(raw.listFontSize,10);
+    listMaxItems = clamp(Number.isFinite(listMaxItems)?listMaxItems:DEF.listMaxItems, 3, 100);
+    listMaxChars = clamp(Number.isFinite(listMaxChars)?listMaxChars:DEF.listMaxChars, 10, 200);
+    listFontSize = clamp(Number.isFinite(listFontSize)?listFontSize:DEF.listFontSize, 10, 24);
+
     let centerBias = Number(raw.centerBias);
     let headerPx   = parseInt(raw.headerPx, 10);
     let eps        = parseInt(raw.eps, 10);
@@ -33,7 +47,14 @@
       eps,
       lockMs,
       showViz,
-      list: { previewChars, maxItems: listMax }
+      list: {
+        listMaxItems,
+        listMaxChars,
+        listFontSize,
+        showViz,
+        previewChars,
+        maxItems: listMax
+      }
     };
   }
 
@@ -45,7 +66,10 @@
       lockMs:     form.lockMs.value,
       showViz:    form.showViz.checked,       // ← 追加：UIのチェック状態を反映
       previewChars: form.previewChars.value,
-      listMax:      form.listMax.value
+      listMax:      form.listMax.value,
+      listMaxItems: form.listMaxItems.value,
+      listMaxChars: form.listMaxChars.value,
+      listFontSize: form.listFontSize.value
     });
   }
 
@@ -58,6 +82,9 @@
     form.showViz.checked  = !!v.showViz;
     form.previewChars.value = v.list.previewChars;
     form.listMax.value      = v.list.maxItems;
+    form.listMaxItems.value = v.list.listMaxItems;
+    form.listMaxChars.value = v.list.listMaxChars;
+    form.listFontSize.value = v.list.listFontSize;
   }
 
   function loadCfg(cb){
