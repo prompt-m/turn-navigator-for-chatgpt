@@ -167,278 +167,231 @@ function headNodeOf(article) {
   // ---------------- UI（踏襲） ----------------
   try { CG?.installHotkey?.(); } catch {}
 
-  (function injectCss(css) {
-    const style = document.createElement('style');
-    style.textContent = css;
-    document.head.appendChild(style);
-  })(`
-    #cgpt-nav {
-      position: fixed;
-      right: 12px;
-      bottom: 140px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      z-index: 2147483647;
-      touch-action: none;
-    }
+(function injectCss(css) {
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+})(`
+  /* ===== ナビ本体 ===== */
+  #cgpt-nav {
+    position: fixed;
+    right: 12px;
+    bottom: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 2147483647;
+    touch-action: none;
+  }
+  #cgpt-drag {
+    width: 92px;
+    height: 12px;
+    cursor: grab;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #aaa 20%, #ccc 50%, #aaa 80%);
+    opacity: .55;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+    min-height: 12px; /* 0px化防止 */
+  }
+  #cgpt-drag:active { cursor: grabbing; }
 
-    #cgpt-drag {
-      width: 92px;
-      height: 12px;
-      cursor: grab;
-      border-radius: 10px;
-      background: linear-gradient(90deg, #aaa 20%, #ccc 50%, #aaa 80%);
-      opacity: .55;
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
-    }
+  .cgpt-nav-group {
+    position: relative;
+    width: 92px;
+    border-radius: 14px;
+    padding: 10px;
+    border: 1px solid rgba(0,0,0,.12);
+    background: linear-gradient(0deg, var(--role-tint,transparent), var(--role-tint,transparent)), rgba(255,255,255,.95);
+    box-shadow: 0 6px 24px rgba(0,0,0,.18);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .cgpt-nav-group[data-role="user"]      { --role-tint: rgba(88,133,255,.12); }
+  .cgpt-nav-group[data-role="assistant"] { --role-tint: rgba(64,200,150,.14); }
+  .cgpt-nav-group[data-role="all"]       { --role-tint: rgba(128,128,128,.08); }
 
-    #cgpt-drag:active { cursor: grabbing; }
+  .cgpt-nav-label {
+    text-align: center;
+    font-weight: 600;
+    opacity: .9;
+    margin-bottom: 2px;
+    font-size: 12px;
+  }
 
+  #cgpt-nav button {
+    all: unset;
+    height: 34px;
+    border-radius: 10px;
+    font: 12px/1.1 system-ui,-apple-system,sans-serif;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    user-select: none;
+    background: #f2f2f7;
+    color: #111;
+    border: 1px solid rgba(0,0,0,.08);
+    transition: background .15s ease, transform .03s ease;
+  }
+  #cgpt-nav button:hover  { background: #fff; }
+  #cgpt-nav button:active { transform: translateY(1px); }
+
+  .cgpt-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #cgpt-nav .cgpt-lang-btn { height: 28px; margin-top: 4px; }
+
+  /* バイアス線/帯は必ずクリックを透過（念のため二段構え） */
+  #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
+
+  /* パネルの選択/フォーカス無効（常に） */
+  #cgpt-nav, #cgpt-nav * {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    caret-color: transparent;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ======= 会話リスト（ベースは @media の外に） ======= */
+  #cgpt-list-panel {
+    position: fixed;
+    right: 12px;           /* JSでleft/topに置換される想定 */
+    bottom: 140px;
+    z-index: 2147483646;
+    width: 360px;
+    max-width: min(92vw, 420px);
+    max-height: min(62vh, 680px);
+
+    display: none;         /* JSで block に */
+    flex-direction: column;
+    gap: 0;
+
+    border: 1px solid rgba(0,0,0,.12);
+    border-radius: 16px;
+    background: rgba(255,255,255,.98);
+    box-shadow: 0 18px 56px rgba(0,0,0,.25);
+
+    /* テーマ変数（ライトの既定） */
+    --user-bg:       rgba(88,133,255,.06);
+    --assistant-bg:  rgba(64,200,150,.06);
+    --hover:         rgba(0,0,0,.05);
+    --border:        rgba(0,0,0,.10);
+    --text:          #111;
+  }
+
+  /* ヘッダー（つまみ＋閉じる） */
+  #cgpt-list-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 10px;
+    color: var(--text);
+  }
+  #cgpt-list-grip {
+    height: 12px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #aaa 18%, #d0d0d0 50%, #aaa 82%);
+    opacity: .6;
+    cursor: grab;
+    user-select: none;
+  }
+  #cgpt-list-grip:active { cursor: grabbing; }
+  #cgpt-list-title { font-weight: 600; font-size: 12px; opacity: .85; }
+  #cgpt-list-close {
+    all: unset;
+    font-size: 12px;
+    line-height: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* 本体スクロール領域 */
+  #cgpt-list-body { overflow: auto; padding: 6px 8px; }
+
+   /* === サイズ可変 + 左寄せ + アイコン + 件数表示 === */
+   #cgpt-list-panel{
+     resize: both;             /* サイズ可変 */
+     overflow: auto;
+     min-width: 280px;
+     min-height: 180px;
+   }
+   #cgpt-list-panel .cgpt-list-item {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     padding: 8px 8px;
+     border-bottom: 1px dashed var(--border);
+     cursor: pointer;
+     user-select: none;
+     transition: background .12s ease;
+     outline: none;
+     text-align: left;
+     justify-content: flex-start !important;
+   }
+   #cgpt-list-panel .cgpt-list-item:last-child { border-bottom: none; }
+   #cgpt-list-panel .cgpt-list-item:hover { background: var(--hover); }
+   #cgpt-list-panel .cgpt-list-item:focus-visible {
+     box-shadow: 0 0 0 2px rgba(80,120,255,.35) inset;
+     border-radius: 8px;
+   }
+   /* アイコン列（複数可） */
+   #cgpt-list-panel .cgpt-list-item .icons{
+     display: inline-flex;
+     gap: 4px;
+     min-width: 1.6em;
+     opacity: .9;
+     font-size: 0.95em;
+   }
+   #cgpt-list-panel .cgpt-list-item .txt{
+     flex: 1 1 auto;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+     color: var(--text);
+     font-size: 13px;
+   }
+   /* フッター（件数表示 + ボタン） */
+   #cgpt-list-foot{
+     border-top: 1px solid var(--border);
+     padding: 6px 8px;
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+   }
+   #cgpt-list-count{ font-size:12px; opacity:.75; }
+
+  /* ===== ダークモード差分（色だけ上書き） ===== */
+  @media (prefers-color-scheme: dark) {
     .cgpt-nav-group {
-      position: relative;
-      width: 92px;
-      border-radius: 14px;
-      padding: 10px;
-      border: 1px solid rgba(0,0,0,.12);
-      background: linear-gradient(
-          0deg,
-          var(--role-tint, transparent),
-          var(--role-tint, transparent)
-        ),
-        rgba(255,255,255,.95);
-      box-shadow: 0 6px 24px rgba(0,0,0,.18);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      align-items: stretch;
+      border-color: #3a3a3f;
+      background: linear-gradient(0deg, var(--role-tint,transparent), var(--role-tint,transparent)), #2a2a2d;
     }
-
-    .cgpt-nav-group[data-role="user"]       { --role-tint: rgba(88,133,255,.12); }
-    .cgpt-nav-group[data-role="assistant"]  { --role-tint: rgba(64,200,150,.14); }
-    .cgpt-nav-group[data-role="all"]        { --role-tint: rgba(128,128,128,.08); }
-
-    .cgpt-nav-label {
-      text-align: center;
-      font-weight: 600;
-      opacity: .9;
-      margin-bottom: 2px;
-      font-size: 12px;
-    }
-
     #cgpt-nav button {
-      all: unset;
-      height: 34px;
-      border-radius: 10px;
-      font: 12px/1.1 system-ui, -apple-system, sans-serif;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      user-select: none;
-      background: #f2f2f7;
-      color: #111;
-      border: 1px solid rgba(0,0,0,.08);
-      transition: background .15s ease, transform .03s ease;
+      background: #3a3a40;
+      color: #e7e7ea;
+      border-color: #3a3a3f;
     }
-    #cgpt-nav button:hover { background: #fff; }
-    #cgpt-nav button:active { transform: translateY(1px); }
+    #cgpt-nav button:hover { background: #4a4a52; }
 
-    .cgpt-grid2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+    #cgpt-list-panel {
+      background: #2a2a2d;
+      --text:   #e8e8ea;
+      --border: #3a3a3f;
+      --hover:  rgba(255,255,255,.06);
+      --user-bg:      rgba(88,133,255,.14);
+      --assistant-bg: rgba(64,200,150,.16);
     }
+    #cgpt-list-head  { border-color: var(--border); }
+    #cgpt-list-close { border-color: var(--border); }
+  }
+`);
 
-    #cgpt-nav .cgpt-lang-btn { height: 28px; margin-top: 4px; }
-
-    /* 追加: バイアス線/帯は必ずクリックを透過（念のため二段構え） */
-    #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
-
-
-    @media (prefers-color-scheme: dark) {
-      .cgpt-nav-group {
-        border-color: #3a3a3f;
-        background: linear-gradient(
-            0deg,
-            var(--role-tint, transparent),
-            var(--role-tint, transparent)
-          ),
-          #2a2a2d;
-      }
-      #cgpt-nav button {
-        background: #3a3a40;
-        color: #e7e7ea;
-        border-color: #3a3a3f;
-      }
-      #cgpt-nav button:hover { background: #4a4a52; }
-
-      /* === パネルのフォーカス/選択を全面オフ === */
-      #cgpt-nav, #cgpt-nav * {
-        -webkit-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        caret-color: transparent;
-        outline: none;
-        -webkit-tap-highlight-color: transparent;
-      }
-      /* グリップは最低高さを確保して“0px化”を防ぐ */
-      #cgpt-drag { min-height: 12px; }
-
-      /* バイアス線/帯は必ずクリック透過（二段構え） */
-      #cgpt-bias-line, #cgpt-bias-band { pointer-events: none !important; }
-      #cgpt-nav { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
-
-      /* === 会話リスト（フローティング・ドラッグ可・常時表示OK）=== */
-
-      #cgpt-list-panel {
-        position: fixed;
-        right: 12px;            /* パネル位置は JS で保存/復元するなら left/top に置換されます */
-        bottom: 140px;
-        z-index: 2147483646;
-        width: 360px;
-        max-width: min(92vw, 420px);
-        max-height: min(62vh, 680px);
-
-        display: none;          /* JS で "block" に切替。トグルで常駐させたいなら適宜更新 */
-        flex-direction: column;
-        gap: 0;
-
-        border: 1px solid rgba(0,0,0,.12);
-        border-radius: 16px;
-        background: rgba(255,255,255,.98);
-        box-shadow: 0 18px 56px rgba(0,0,0,.25);
-
-        /* カラーテーマ（後でプリセット差し替えしやすいようにCSS変数化） */
-        --user-bg:       rgba(88,133,255,.06);
-        --assistant-bg:  rgba(64,200,150,.06);
-        --hover:         rgba(0,0,0,.05);
-        --border:        rgba(0,0,0,.10);
-        --text:          #111;
-      }
-
-      /* ヘッダー（つまみ＋タイトル＋閉じる） */
-      #cgpt-list-head {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 8px;
-        border-bottom: 1px solid var(--border);
-        padding: 6px 10px;
-        color: var(--text);
-      }
-
-      #cgpt-list-grip {
-        height: 12px;
-        border-radius: 10px;
-        background: linear-gradient(90deg, #aaa 18%, #d0d0d0 50%, #aaa 82%);
-        opacity: .6;
-        cursor: grab;
-        user-select: none;
-      }
-      #cgpt-list-grip:active { cursor: grabbing; }
-
-      #cgpt-list-title {
-        font-weight: 600;
-        font-size: 12px;
-        opacity: .85;
-      }
-
-      #cgpt-list-close {
-        all: unset;
-        font-size: 12px;
-        line-height: 1;
-        padding: 6px 8px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-        user-select: none;
-      }
-
-      /* 本体スクロール領域 */
-      #cgpt-list-body {
-        overflow: auto;
-        padding: 6px 8px;
-      }
-
-      /* 行（左右寄せ＋淡い背景色） */
-      #cgpt-list-panel .cgpt-list-item {
-        padding: 8px 8px;
-        border-bottom: 1px dashed var(--border);
-        cursor: pointer;
-        user-select: none;
-        transition: background .12s ease;
-        outline: none;                /* キーボード操作でfocus-visible時にだけ装飾 */
-      }
-      #cgpt-list-panel .cgpt-list-item:last-child { border-bottom: none; }
-
-      #cgpt-list-panel .cgpt-list-item:hover { background: var(--hover); }
-      #cgpt-list-panel .cgpt-list-item:focus-visible {
-        box-shadow: 0 0 0 2px rgba(80,120,255,.35) inset;
-        border-radius: 8px;
-      }
-
-      /* 行内部のレイアウト */
-      #cgpt-list-panel .cgpt-list-item .row-inner {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      /* 役割ごとの寄せ方と色 */
-      #cgpt-list-panel .cgpt-list-item.is-user {
-        justify-content: flex-end;
-        text-align: right;
-        background: var(--user-bg);
-      }
-      #cgpt-list-panel .cgpt-list-item.is-assistant {
-        justify-content: flex-start;
-        text-align: left;
-        background: var(--assistant-bg);
-      }
-
-      /* クリップ（📎）＆テキスト */
-      #cgpt-list-panel .cgpt-list-item .clip {
-        width: 1.2em;
-        flex: 0 0 auto;
-        opacity: .9;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      #cgpt-list-panel .cgpt-list-item .clip.none { opacity: 0; } /* 位置合わせ用のダミー */
-
-      #cgpt-list-panel .cgpt-list-item .txt {
-        flex: 1 1 auto;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: var(--text);
-        font-size: 13px;              /* ← フォントサイズを後でオプション化する想定 */
-      }
-
-      /* フッター（必要ならボタンなど） */
-      #cgpt-list-foot {
-        border-top: 1px solid var(--border);
-        padding: 6px 8px;
-        display: flex; gap: 8px; align-items: center; justify-content: flex-end;
-      }
-
-      /* ダークモード */
-      @media (prefers-color-scheme: dark) {
-        #cgpt-list-panel {
-          background: #2a2a2d;
-          --text: #e8e8ea;
-          --border: #3a3a3f;
-          --hover: rgba(255,255,255,.06);
-          /* 背景色は暗色でも淡いままにして見分けやすく */
-          --user-bg: rgba(88,133,255,.14);
-          --assistant-bg: rgba(64,200,150,.16);
-        }
-        #cgpt-list-head { border-color: var(--border); }
-        #cgpt-list-close { border-color: var(--border); }
-      }
-    }
-  `);
 
   const box = document.createElement('div');
   box.id = 'cgpt-nav';
@@ -465,13 +418,13 @@ function headNodeOf(article) {
         <button data-act="bottom">▼</button>
       </div>
       <button class="cgpt-lang-btn"></button>
-      <label class="cgpt-viz-toggle" style="margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">
-       <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
-       <span>基準線</span>
+      <label class="cgpt-viz-toggle"  style="margin-top:6px;display:flex;gap:8px;align-items:center;font-size:12px;">
+        <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
+        <span>基準線</span>
       </label>
-      <label class="cgpt-list-toggle" style="margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">
-       <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
-       <span>一覧</span>
+      <label class="cgpt-list-toggle" style="margin-top:6px;display:flex;gap:8px;align-items:center;font-size:12px;">
+        <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
+        <span>一覧</span>
       </label>
     </div>`;
   document.body.appendChild(box);
@@ -816,6 +769,20 @@ function ensureListBox(){
     listBox.style.top  = (r.top) + 'px';
   }
 
+// 初期サイズ（保存値があれば反映）
+if (Number.isFinite(CFG.list?.width))  listBox.style.width  = CFG.list.width + 'px';
+if (Number.isFinite(CFG.list?.height)) listBox.style.height = CFG.list.height + 'px';
+
+// リサイズ検知 → 保存
+const ro = new ResizeObserver(entries=>{
+  for (const e of entries){
+    const cr = e.contentRect;
+    saveSettingsPatch({ list:{ ...(CFG.list||{}), width: Math.round(cr.width), height: Math.round(cr.height) }});
+  }
+});
+ro.observe(listBox);
+
+
   // ドラッグ
   (function enableDrag(){
     const grip = listBox.querySelector('#cgpt-list-grip');
@@ -860,11 +827,25 @@ function setListEnabled(on){
 
 function toggleList(){ setListEnabled(!(CFG.list?.enabled)); }
 
-// state を使って一覧を再描画
+function iconsFor(head){
+  if (!head) return [];
+  const icons = [];
+  // 画像系
+  if (head.querySelector('img,figure picture,canvas')) icons.push('🖼');
+  // 動画/音声系
+  if (head.querySelector('video, audio')) icons.push('🎞');
+  // PDFリンク
+  if (head.querySelector('a[href$=".pdf" i]')) icons.push('📑');
+  // テキスト/コード添付らしきもの（<pre>やプレーン添付リンク）
+  if (head.querySelector('pre, code, a[href$=".txt" i], a[href$=".md" i]')) icons.push('📄');
+  // 何も無ければ空配列
+  return icons;
+}
 function renderList(){
   if (!CFG.list?.enabled) return;
   const panel = ensureListBox();
   const body  = panel.querySelector('#cgpt-list-body');
+  const foot  = panel.querySelector('#cgpt-list-foot');
   body.innerHTML = '';
 
   const lim      = Math.max(3, Math.min(100, CFG.list?.maxItems ?? 18));
@@ -872,23 +853,35 @@ function renderList(){
 
   const take = state.all.slice(0, lim);
   for (const art of take){
-    const isUser = art.matches('[data-message-author-role="user"], [data-message-author-role="user"] *');
-    const head   = headNodeOf(art);
+    const head = headNodeOf(art);
     let txt = (head?.innerText || '').replace(/\s+/g,' ').trim();
     const clipped = txt.length > maxChars;
     if (clipped) txt = txt.slice(0, maxChars);
 
+    const ico = iconsFor(head).join('');
     const row = document.createElement('div');
-    row.className = `cgpt-list-item ${isUser ? 'is-user' : 'is-assistant'}`;
+    row.className = 'cgpt-list-item';
     row.innerHTML = `
-      <div class="row-inner">
-        <span class="clip">${head?.querySelector('img,video,canvas,figure,[aria-haspopup="dialog"]') ? '📎' : ''}</span>
-        <span class="txt">${txt}${clipped ? '…' : ''}</span>
-      </div>`;
+      <span class="icons">${ico}</span>
+      <span class="txt">${txt}${clipped ? '…' : ''}</span>
+    `;
     row.addEventListener('click', ()=> scrollToHead(art));
     body.appendChild(row);
   }
+
+  // 件数表示をフッターに
+  const total   = state.all.length;
+  const showing = take.length;
+  foot.innerHTML = `
+    <span id="cgpt-list-count">${showing} / ${total}</span>
+    <button id="cgpt-list-close">閉じる</button>
+  `;
+  foot.querySelector('#cgpt-list-close').onclick = () => {
+    setListEnabled(false);
+    const chk = document.getElementById('cgpt-list-toggle'); if (chk) chk.checked = false;
+  };
 }
+
 
   /* === 他タブの保存を即反映（options で保存→即反映） === */
   try {
