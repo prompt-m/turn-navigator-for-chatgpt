@@ -16,10 +16,15 @@
       UI.applyLang();
       UI.clampPanelWithinViewport();
 
-      LG.rebuild();
+//      LG.rebuild();
+      (window.CGTN_APP?.rebuildAndMaybeRenderList || rebuild)();
+
       EV.bindEvents();
 
-      mo = new MutationObserver(() => LG.rebuild());
+//      mo = new MutationObserver(() => LG.rebuild());
+      mo = new MutationObserver(() => {
+        (window.CGTN_APP?.rebuildAndMaybeRenderList || rebuild)();
+      });
       mo.observe(document.body, { childList:true, subtree:true });
 
       window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });

@@ -4,8 +4,18 @@
 
   const SH = window.CGTN_SHARED;
   const DEF = SH?.DEFAULTS || {
-    centerBias:0.40, headerPx:0, eps:20, lockMs:700, showViz:false,
-    list:{ maxItems:30, maxChars:40, fontSize:12 }
+    centerBias: 0.40,
+    headerPx: 0,
+    eps: 20,
+    lockMs: 700,
+    showViz: false,
+    panel: { x: null, y: null },
+    list: {
+      enabled: false,
+      maxItems: 30,
+      maxChars: 40,
+      fontSize: 12
+    }
   };
 
   const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);

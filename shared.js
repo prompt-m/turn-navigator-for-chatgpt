@@ -11,9 +11,10 @@
     showViz: false,
     panel: { x: null, y: null },
     list: {
-      maxItems: 30,      // 一覧件数
-      maxChars: 40,      // 1行の文字数
-      fontSize: 12       // px
+      enabled: false,   // ← 追加：リスト表示ON/OFFを保存
+      maxItems: 30,     // 一覧件数（1ページ分）
+      maxChars: 40,     // 1行の文字数
+      fontSize: 12      // px
     }
   });
 
@@ -41,6 +42,8 @@
       chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings }) => {
         CFG = structuredClone(DEFAULTS);
         if (cgNavSettings) deepMerge(CFG, cgNavSettings);
+        // list が無ければデフォルトを補う
+        if (!CFG.list) CFG.list = structuredClone(DEFAULTS.list);
         cb?.();
       });
     } catch {

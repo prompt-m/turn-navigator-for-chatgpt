@@ -25,6 +25,7 @@
   #cgpt-nav button:hover{background:#fff}
   .cgpt-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   #cgpt-nav .cgpt-lang-btn{height:28px;margin-top:4px}
+  #cgpt-nav input[type=checkbox] {cursor: pointer;}
   .cgpt-viz-toggle,.cgpt-list-toggle{margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:flex-start;font-size:12px;cursor:pointer}
   .cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{cursor:pointer;opacity:.9}
   /* リストパネル（簡易版） */
@@ -38,6 +39,7 @@
   #cgpt-list-body .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
   #cgpt-bias-line,#cgpt-bias-band{pointer-events:none!important}
   `;
+
 
   injectCss(BASE_CSS);
 /*
@@ -85,7 +87,7 @@
           <span data-i18n="line"></span>
         </label>
         <label class="cgpt-list-toggle">
-          <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;" disabled>
+          <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
       </div>`;
