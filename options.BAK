@@ -90,7 +90,7 @@
         </div>
       </div>
       <div class="row">
-        <label><b>ガイドライン</b></label>
+        <label><b>基準線</b></label>
         <div>
           <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
             <input id="showViz" name="showViz" type="checkbox" />
@@ -119,18 +119,22 @@
 
 <!-- 詳細設定 セクション内など分かりやすい場所に -->
 <div class="row">
-  <label for="previewChars">プレビュー文字数</label>
-  <input id="previewChars" name="previewChars" type="number" min="10" max="400" step="10">
-  <div class="hint">一覧の各行に表示する抜粋の文字数。10–400 で指定。</div>
-</div>
-
-<div class="row">
-  <label for="listMax">表示件数</label>
-  <input id="listMax" name="listMax" type="number" min="10" max="200" step="10">
+  <label for="listMaxItems">表示件数</label>
+  <input id="listMaxItems" name="listMaxItems" type="number" min="10" max="200" step="10">
   <div class="hint">一覧に並べる最大件数。超えた分は枠内でスクロール。</div>
 </div>
 
+<div class="row">
+  <label for="listMaxChars">1行の最大文字数</label>
+  <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
+  <div class="hint">長い行は…で省略。10–200。</div>
+</div>
 
+<div class="row">
+  <label for="listFontSize">フォントサイズ</label>
+  <input id="listFontSize" name="listFontSize" type="number" min="10" max="18" step="1" />
+  <div class="hint">リストの文字サイズ(px)。</div>
+</div>
 
           </div>
         </details>

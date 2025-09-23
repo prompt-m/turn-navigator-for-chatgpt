@@ -16,7 +16,13 @@
   "content_scripts": [
     {
       "matches": ["https://chatgpt.com/*", "https://*.openai.com/*"],
-      "js": ["shared.js","content.js"],
+      "js": [
+        "shared.js",
+        "ui.js",
+        "logic.js",
+        "events.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],

@@ -1,24 +1,71 @@
-// shared.js
-// 可視ライン（赤線とEPS帯）の計算・生成・反映・トグルを一元化
+// shared.js  —  設定の既定値/保存、基準線API、グローバル公開
 (() => {
-  const NS = (window.CGTN = window.CGTN || {});
+  const NS = (window.CGTN_SHARED = window.CGTN_SHARED || {});
 
-  // 既定値（content/options と同じキーを保持）
+  // === 既定値（options / content と完全一致） ===
   const DEFAULTS = Object.freeze({
     centerBias: 0.40,
     headerPx: 0,
     eps: 20,
     lockMs: 700,
+    showViz: false,
+    panel: { x: null, y: null },
+    list: {
+      maxItems: 30,      // 一覧件数
+      maxChars: 40,      // 1行の文字数
+      fontSize: 12       // px
+    }
   });
 
-  // 小物
-  const num   = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
-  const int   = (v, d) => (Number.isFinite(parseInt(v,10)) ? parseInt(v,10) : d);
+  let CFG = structuredClone(DEFAULTS);
+
+  // --- 小物 ---
+  const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  const int = (v, d) => (Number.isFinite(parseInt(v,10)) ? parseInt(v,10) : d);
   const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
-  // 画面内の基準線Yと帯厚を計算
-  function computeAnchor(cfg) {
-    const s = { ...DEFAULTS, ...(cfg || {}) };
+  function deepMerge(dst, src){
+    for (const k in src){
+      if (src[k] && typeof src[k]==='object' && !Array.isArray(src[k])) {
+        dst[k] = deepMerge(dst[k] || {}, src[k]);
+      } else {
+        dst[k] = src[k];
+      }
+    }
+    return dst;
+  }
+
+  // === 設定のロード/保存 ===
+  function loadSettings(cb){
+    try {
+      chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings }) => {
+        CFG = structuredClone(DEFAULTS);
+        if (cgNavSettings) deepMerge(CFG, cgNavSettings);
+        cb?.();
+      });
+    } catch {
+      CFG = structuredClone(DEFAULTS);
+      cb?.();
+    }
+  }
+
+  function saveSettingsPatch(patch){
+    try {
+      chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings }) => {
+        const next = structuredClone(DEFAULTS);
+        if (cgNavSettings) deepMerge(next, cgNavSettings);
+        deepMerge(next, patch);
+        CFG = next;
+        try { chrome?.storage?.sync?.set?.({ cgNavSettings: next }); } catch {}
+      });
+    } catch {
+      deepMerge(CFG, patch);
+    }
+  }
+
+  // === 基準線の計算・描画 ===
+  function computeAnchor(cfg){
+    const s = { ...DEFAULTS, ...(cfg||{}) };
     const vh = window.innerHeight || document.documentElement.clientHeight || 0;
     const centerBias = clamp(num(s.centerBias, DEFAULTS.centerBias), 0, 1);
     const headerPx   = clamp(int(s.headerPx,   DEFAULTS.headerPx),   0, 2000);
@@ -27,8 +74,7 @@
     return { y, eps, centerBias, headerPx };
   }
 
-  // DOM を用意（なければ生成、あれば再利用）
-  function ensureVizElements() {
+  function ensureVizElements(){
     const mk = (id, css) => {
       let el = document.getElementById(id);
       if (!el) {
@@ -39,42 +85,26 @@
       }
       return el;
     };
-
     const line = mk('cgpt-bias-line', {
-      position: 'fixed',
-      left: 0, right: 0,
-      height: '0',
-      borderTop: '3px solid red',
-      zIndex: 2147483647,
-      pointerEvents: 'none',
-      display: 'none',            // 初期は非表示
-      boxSizing: 'content-box',
-      margin: 0, padding: 0,
+      position:'fixed', left:0, right:0, height:'0',
+      borderTop:'3px solid red', zIndex:2147483647,
+      pointerEvents:'none', display:'none', boxSizing:'content-box', margin:0, padding:0
     });
-
     const band = mk('cgpt-bias-band', {
-      position: 'fixed',
-      left: 0, right: 0,
-      height: '0',
-      zIndex: 2147483647,
-      pointerEvents: 'none',
-      display: 'none',            // 初期は非表示
-      boxSizing: 'content-box',
-      margin: 0, padding: 0,
-      background: 'linear-gradient(to bottom, rgba(255,0,0,0.08) 0%, rgba(255,0,0,0.22) 50%, rgba(255,0,0,0.08) 100%)',
+      position:'fixed', left:0, right:0, height:'0',
+      zIndex:2147483647, pointerEvents:'none', display:'none',
+      boxSizing:'content-box', margin:0, padding:0,
+      background:'linear-gradient(to bottom, rgba(255,0,0,0.08) 0%, rgba(255,0,0,0.22) 50%, rgba(255,0,0,0.08) 100%)'
     });
-
     return { line, band };
   }
 
-  // 位置反映（visible = 表示/非表示の指定。省略時は表示状態は維持）
-  function renderViz(cfg, visible = undefined) {
-    const { y, eps } = computeAnchor(cfg);
+  function renderViz(cfg, visible = undefined){
+    const { y, eps } = computeAnchor(cfg || CFG);
     const { line, band } = ensureVizElements();
     line.style.top = `${y}px`;
     band.style.top = `${y - eps}px`;
     band.style.height = `${eps * 2}px`;
-
     if (typeof visible === 'boolean') {
       const disp = visible ? '' : 'none';
       line.style.display = disp;
@@ -82,40 +112,31 @@
     }
   }
 
-  // 表示状態を保持（デフォルト非表示）
   let _visible = false;
-
-  // ON/OFF トグル（UI から呼び出す想定）
-  function toggleViz(on) {
-    if (typeof on === 'boolean') _visible = on;
-    else _visible = !_visible;
-
-    const apply = (cfg) => renderViz(cfg || {}, _visible);
-    try {
-      chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings }) => apply(cgNavSettings));
-    } catch {
-      apply({});
-    }
+  function toggleViz(on){
+    _visible = (typeof on === 'boolean') ? on : !_visible;
+    renderViz(CFG, _visible);
   }
 
-  // 設定変更の追随（他タブ保存 → その場で位置だけ更新。表示状態は維持）
+  // 他タブ保存の反映（表示/非表示は維持）
   try {
-    chrome?.storage?.onChanged?.addListener?.((c, area) => {
-      if (area === 'sync' && c.cgNavSettings) {
-        const cfg = c.cgNavSettings.newValue || {};
-        renderViz(cfg, undefined); // 表示/非表示は変えない
-      }
+    chrome?.storage?.onChanged?.addListener?.((changes, area) => {
+      if (area !== 'sync' || !changes.cgNavSettings) return;
+      const next = structuredClone(DEFAULTS);
+      deepMerge(next, changes.cgNavSettings.newValue || {});
+      CFG = next;
+      renderViz(CFG, undefined);
+      // ロジック側の再構築も（在れば）
+      try { window.CGTN_LOGIC?.rebuild?.(); } catch {}
     });
   } catch {}
 
-  // 公開API（content.js / options.js から使う）
+  // === グローバル公開 ===
+  NS.DEFAULTS = DEFAULTS;
+  NS.getCFG = () => CFG;
+  NS.loadSettings = loadSettings;
+  NS.saveSettingsPatch = saveSettingsPatch;
   NS.computeAnchor = computeAnchor;
-  NS.renderViz     = renderViz;
-  NS.toggleViz     = toggleViz;
-  NS.toggleVizLines = toggleViz;   // 互換別名（既存呼び出しのため残す）
-
-  // 互換API（installHotkey は“空”にして残す：呼ばれても何もしない）
-  NS.installHotkey = function () {};
-  window.debugShowLines = () => toggleViz(true);
-  window.toggleVizLines = toggleViz;
+  NS.renderViz = renderViz;
+  NS.toggleViz = toggleViz;
 })();
