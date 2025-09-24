@@ -38,23 +38,17 @@
   #cgpt-list-body .row:hover{background:rgba(0,0,0,.04)}
   #cgpt-list-body .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
   #cgpt-bias-line,#cgpt-bias-band{pointer-events:none!important}
+  .cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
+  .cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
+  /* つまみ（両パネルで統一） */
+  #cgpt-drag,#cgpt-list-grip{
+    background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
+  }
+  #cgpt-list-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-top:1px solid rgba(0,0,0,.08)}
   `;
 
-
   injectCss(BASE_CSS);
-/*
-  // 最低限のスタイル（必要ならお使いのCSSに差し替えOK）
-  injectCss(`
-    #cgpt-nav{position:fixed;right:12px;bottom:140px;display:flex;flex-direction:column;gap:12px;z-index:2147483647}
-    #cgpt-drag{width:92px;height:12px;cursor:grab;border-radius:10px;background:linear-gradient(90deg,#aaa 20%,#ccc 50%,#aaa 80%);opacity:.55;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
-    .cgpt-nav-group{position:relative;width:92px;border-radius:14px;padding:10px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.95);box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:6px;align-items:stretch}
-    .cgpt-nav-label{text-align:center;font-weight:600;opacity:.9;margin-bottom:2px;font-size:12px}
-    #cgpt-nav button{all:unset;height:34px;border-radius:10px;font:12px/1.1 system-ui,-apple-system,sans-serif;display:grid;place-items:center;cursor:pointer;user-select:none;background:#f2f2f7;color:#111;border:1px solid rgba(0,0,0,.08)}
-    #cgpt-nav .cgpt-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-    #cgpt-nav .cgpt-lang-btn{height:28px;margin-top:4px}
-    #cgpt-bias-line,#cgpt-bias-band{pointer-events:none!important}
-  `);
-*/
+
   function installUI(){
     if (document.getElementById('cgpt-nav')) return;
     const box = document.createElement('div');

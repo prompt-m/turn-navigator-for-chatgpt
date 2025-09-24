@@ -57,6 +57,8 @@
       chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings }) => {
         const next = structuredClone(DEFAULTS);
         if (cgNavSettings) deepMerge(next, cgNavSettings);
+        // list が無ければデフォルトを補う
+        if (!CFG.list) CFG.list = structuredClone(DEFAULTS.list);
         deepMerge(next, patch);
         CFG = next;
         try { chrome?.storage?.sync?.set?.({ cgNavSettings: next }); } catch {}

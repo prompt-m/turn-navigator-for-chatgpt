@@ -24,13 +24,6 @@
       if (t.closest('#cgpt-list-toggle')) {
         const on = t.closest('#cgpt-list-toggle').checked;
         LG.setListEnabled(on);
-
-        const cur = SH.getCFG() || {};
-        const nextList = { ...(cur.list||{}), enabled: on };
-        SH.saveSettingsPatch({ list: nextList });
-        if (window.CGTN_APP?.rebuildAndMaybeRenderList) {
-          window.CGTN_APP.rebuildAndMaybeRenderList();
-        }
         return;
       }
 

@@ -1,34 +1,10 @@
-// logic.js — 会話リスト（ページング付）/ 位置決め / 再構築
+// logic.js
 (() => {
-  const SH = window.CGTN_SHARED;   // 設定API（DEFAULTS/CFGロード・保存・基準線計算…）
-  const UI = window.CGTN_UI;       // UIヘルパ（言語反映・パネル位置クランプ等）
-
+  const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
   const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
 
-  // 他ファイルからも使えるように公開（既存の公開パターンに合わせて）
-  window.CGTN_APP = Object.assign(window.CGTN_APP || {}, {
-    rebuild,
-    rebuildAndMaybeRenderList
-  });
-
-
-  // ------- 基本ユーティリティ -------
-
-  // 必要なときだけリストを再描画
-  function rebuildAndMaybeRenderList() {
-    rebuild();
-    if (isListEnabled() && typeof renderList === 'function') {
-      try { renderList(); } catch {}
-    }
-  }
-
-  function isListEnabled() {
-    try {
-      return !!(window.CGTN_SHARED?.getCFG?.().list?.enabled);
-    } catch { return false; }
-  }
-
+  // --- util ---
   function isVisible(el){
     if (!el) return false;
     const s = getComputedStyle(el);
@@ -50,7 +26,9 @@
     return NS._scroller;
   }
 
+  // ★スクロール用 厳しめ（既存のまま）
   function headNodeOf(article){
+    if (!article) return null;
     const pick = (root, sel) => {
       const n = (root || article).querySelector(sel);
       return n && isVisible(n) ? n : null;
@@ -70,35 +48,76 @@
     return article;
   }
 
+// === List Panel 専用（スクロールには未使用） ===================
+// 本文候補をゆるめに拾う *前回の安定版*
+function listHeadNodeOf(article){
+  if (!article) return null;
+  const q = [
+    ':scope [data-message-author-role]', // 最上位ラッパ
+    ':scope div.markdown',               // 回答本文
+    ':scope div.text-base',              // 旧レイアウト本文
+    ':scope .user-message-bubble',       // ユーザー気泡
+    ':scope article', ':scope section', ':scope > div'
+  ];
+  for (const sel of q){
+    const n = article.matches(sel) ? article : article.querySelector(sel);
+    if (n && isVisible(n)) return n;
+  }
+  return article;
+}
+
+  // 添付検出：DOM のみ（テキストは付けない）
+  function detectAttachmentKinds(head){
+    if (!head) return [];
+    const kinds = [];
+    if (head.querySelector('video')) kinds.push('🎞');
+    if (head.querySelector('img,picture,canvas,figure')) kinds.push('🖼');
+    // ダウンロード系（明示的な要素のみ）
+    if (head.querySelector('a[download], [data-testid*="download"], a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"], a[href$=".xlsx"], a[href$=".pptx"]')) {
+      kinds.push('📄');
+    }
+    return kinds;
+  }
+
+  // innerText が空のときだけ最小フォールバック
+  function extractSummaryText(head, maxChars){
+    let txt = (head?.innerText || '').replace(/\s+/g,' ').trim();
+    if (!txt) {
+      const figcap = head?.querySelector?.('figcaption')?.innerText?.trim();
+      const alt    = head?.querySelector?.('img[alt]')?.getAttribute('alt')?.trim();
+      const aria   = head?.getAttribute?.('aria-label')?.trim();
+      txt = figcap || alt || aria || '';
+    }
+    if (maxChars && txt.length > maxChars) txt = txt.slice(0, maxChars) + '…';
+    return txt;
+  }
+
   function articleTop(scroller, article){
     const node = headNodeOf(article);
     const scR = scroller.getBoundingClientRect();
     const r = node.getBoundingClientRect();
     return scroller.scrollTop + (r.top - scR.top);
   }
+  function currentAnchorY(){ return SH.computeAnchor(SH.getCFG()).y; }
 
-  function currentAnchorY(){
-    const { y } = SH.computeAnchor(SH.getCFG());
-    return y;
-  }
-
-  // ------- スクロール制御 -------
+  // --- scroll core ---
   let _lockUntil = 0;
   const isLocked = () => performance.now() < _lockUntil;
   function lockFor(ms){ _lockUntil = performance.now() + (Number(ms)||0); }
 
+  // ★Math.round() をやめ、元の正確な位置で止める
   function scrollToHead(article){
     if (!article) return;
     const sc = getTrueScroller();
     const anchor = currentAnchorY();
-    const desired = Math.round(articleTop(sc, article) - anchor);
+    const desired = articleTop(sc, article) - anchor; // ←丸めない
     const maxScroll = Math.max(0, sc.scrollHeight - sc.clientHeight);
     const clamped = Math.min(maxScroll, Math.max(0, desired));
     lockFor(SH.getCFG().lockMs);
     sc.scrollTo({ top: clamped, behavior: 'smooth' });
   }
 
-  // ------- 会話の収集 / ソート -------
+  // --- collect ---
   function pickAllTurns(){
     let list = Array.from(document.querySelectorAll(TURN_SEL));
     if (!list.length){
@@ -108,7 +127,6 @@
     }
     return list.filter(a => a.getBoundingClientRect().height > 10 && getComputedStyle(a).display !== 'none');
   }
-
   function sortByY(list){
     const sc = getTrueScroller();
     try {
@@ -117,7 +135,6 @@
                  .map(x => x.el);
     } catch { return list; }
   }
-
   function isRealTurn(article){
     const head = headNodeOf(article);
     if (!head) return false;
@@ -125,39 +142,24 @@
     if (r.height < 8 || !isVisible(head)) return false;
     const txt = (head.textContent || head.innerText || '').trim();
     const hasText  = txt.length > 0;
-    const hasMedia = !!head.querySelector('img,video,canvas,figure,[aria-haspopup="dialog"]');
-    const looksBusy = head.getAttribute?.('aria-busy') === 'true';
-    return (hasText || hasMedia) && !looksBusy;
+    const hasMedia = !!head.querySelector('img,video,canvas,figure,[data-testid*="download"]');
+    const busy = head.getAttribute?.('aria-busy') === 'true';
+    return (hasText || hasMedia) && !busy;
   }
 
-  // ------- 公開: rebuild / goXx など -------
-  const ST = { all: [], user: [], assistant: [], page:1 }; // page = 1-based
-
-  function rebuild() {
+  // --- state & rebuild ---
+  const ST = { all: [], user: [], assistant: [], page:1 };
+  function rebuild(){
     if (isLocked && isLocked()) return;
-
-    TRUE_SCROLLER = getTrueScroller();
+    NS._scroller = getTrueScroller();
     const allRaw = pickAllTurns().filter(isRealTurn);
-
-    // 修正ポイント：引数は list のみ
     ST.all = sortByY(allRaw);
-
     ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
     ST.assistant = ST.all.filter(a => a.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
-
-    if (typeof currentScrollerForListener !== 'undefined') {
-      if (currentScrollerForListener !== TRUE_SCROLLER) {
-        if (currentScrollerForListener) currentScrollerForListener.removeEventListener('scroll', rebuild);
-        TRUE_SCROLLER.addEventListener('scroll', rebuild, { passive: true });
-        currentScrollerForListener = TRUE_SCROLLER;
-      }
-    }
   }
 
-
-  // ------- 一覧パネル（ページング付） -------
+  // --- list panel ---
   let listBox = null;
-
   function ensureListBox(){
     if (listBox && document.body.contains(listBox)) return listBox;
     listBox = document.createElement('div');
@@ -172,7 +174,7 @@
     `;
     document.body.appendChild(listBox);
 
-    // ドラッグ移動＆保存
+    // ドラッグ保存
     (function enableDrag(){
       const grip = listBox.querySelector('#cgpt-list-grip');
       let dragging=false, offX=0, offY=0;
@@ -190,46 +192,34 @@
         if(!dragging) return;
         dragging=false; grip.releasePointerCapture(e.pointerId);
         const r=listBox.getBoundingClientRect();
-        SH.saveSettingsPatch({ list:{ ...(SH.getCFG().list||{}), x:r.left, y:r.top } });
+        const cfg = SH.getCFG();
+        SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), x:r.left, y:r.top } });
       });
     })();
 
-    // 閉じる
     listBox.querySelector('#cgpt-list-close').addEventListener('click', ()=>{
       setListEnabled(false);
       const chk = document.getElementById('cgpt-list-toggle');
       if (chk) chk.checked = false;
     });
-
     return listBox;
   }
 
-  function detectAttachmentKind(head){
-    if (!head) return null;
-    if (head.querySelector('video')) return '🎞';
-    if (head.querySelector('img,canvas,figure')) return '🖼';
-    if (head.querySelector('[aria-haspopup="dialog"]')) return '📑';
-    if (/\.(pdf|docx?|xlsx?|pptx?)\b/i.test(head.innerText||'')) return '📄';
-    return null;
-  }
-
-  function renderList(){
-
-  const cfg = (SH && SH.getCFG && SH.getCFG()) || {};
-//  if (!cfg.list || !cfg.list.enabled) {
-//    console.warn("renderList: cfg.list が無効です！！");
-//    return;
-//  }
+  function renderList(forceOn=false){
+    const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
+    const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
+    if (!enabled) return;
 
     const panel = ensureListBox();
-    const body  = panel.querySelector('#cgpt-list-body');
-    const foot  = panel.querySelector('#cgpt-list-foot');
+    panel.style.display = 'flex';
+    const body = panel.querySelector('#cgpt-list-body');
+    const foot = panel.querySelector('#cgpt-list-foot');
     body.innerHTML = '';
     foot.innerHTML = '';
 
     const pageSize = Math.max(1, Number(cfg.list?.maxItems) || 30);
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 40);
-    const total    = ST.all.length;
+    const total = ST.all.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const page = Math.min(totalPages, Math.max(1, ST.page));
 
@@ -237,21 +227,15 @@
     const slice = ST.all.slice(start, start + pageSize);
 
     for (const art of slice){
+      const head  = listHeadNodeOf(art);        // ← headNodeOf と同じ
+      const icons = detectAttachmentKinds(head).join('');
+      const txt   = extractSummaryText(head, maxChars);
 
-      const head = headNodeOf(art);
-console.log("renderList head:", head, "text:", head?.innerText);
-
-      let txt = (head?.innerText || '').replace(/\s+/g,' ').trim();
-      if (!txt) txt = '';
-      const clipped = txt.length > maxChars;
-      if (clipped) txt = txt.slice(0, maxChars);
-
-      const icon = detectAttachmentKind(head) || '';
       const row = document.createElement('div');
       row.className = 'row';
       row.innerHTML = `
-        <span class="clip" style="width:1.2em;display:inline-flex;justify-content:center">${icon}</span>
-        <span class="txt">${txt}${clipped?'…':''}</span>
+        <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${icons}</span>
+        <span class="txt">${txt}</span>
       `;
       row.addEventListener('click', ()=> scrollToHead(art));
       body.appendChild(row);
@@ -263,22 +247,21 @@ console.log("renderList head:", head, "text:", head?.innerText);
     count.textContent = `${shownTo}/${total}`;
 
     const pager = document.createElement('div');
-    pager.style.cssText = 'display:flex;gap:6px;align-items:center';
+    pager.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap'; // 折返し
 
-    function mkBtn(lbl, onClick, disabled=false){
+    const mkBtn = (lbl, onClick, disabled=false)=>{
       const b = document.createElement('button');
       b.textContent = lbl;
       b.style.cssText = 'all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer;opacity:'+(disabled?'.35':'1');
       if (!disabled) b.addEventListener('click', onClick);
       return b;
-    }
+    };
 
     pager.appendChild(mkBtn('前へ', ()=>{ ST.page=Math.max(1,page-1); renderList(); }, page<=1));
     const win = 10;
     let pStart = Math.max(1, page - Math.floor(win/2));
     let pEnd   = Math.min(totalPages, pStart + win - 1);
     if (pEnd - pStart + 1 < win) pStart = Math.max(1, pEnd - win + 1);
-
     for (let p=pStart; p<=pEnd; p++){
       const b = mkBtn(String(p), ()=>{ ST.page=p; renderList(); }, false);
       if (p===page) b.style.cssText += 'background:#f2f2f7';
@@ -290,15 +273,15 @@ console.log("renderList head:", head, "text:", head?.innerText);
     foot.appendChild(pager);
   }
 
-  // ------- パブリックAPI -------
   function setListEnabled(on){
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
     const panel = ensureListBox();
     panel.style.display = on ? 'flex' : 'none';
-    if (on) renderList();
+    if (on) renderList(true);
   }
 
+  // --- navigation ---
   function goTop(role){
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
@@ -336,37 +319,8 @@ console.log("renderList head:", head, "text:", head?.innerText);
     }
   }
 
-
-  (function exposeApp(){
-    function isListEnabled(){
-      try { return !!(window.CGTN_SHARED?.getCFG?.().list?.enabled); }
-      catch { return false; }
-    }
-    function rebuildAndMaybeRenderList(){
-      try { window.CGTN_LOGIC?.rebuild?.(); } catch {}
-      if (isListEnabled() && typeof window.CGTN_LOGIC?.renderList === 'function') {
-        try { window.CGTN_LOGIC.renderList(); } catch {}
-      }
-    }
-    window.CGTN_APP = Object.assign(window.CGTN_APP || {}, {
-      rebuildAndMaybeRenderList
-    });
-  })();
-
-  // デバッグ用: 現在のターン数を出す
-  NS._debugAll = function(){
-    const all = pickAllTurns();
-    console.log("pickAllTurns() count:", all.length, all);
-    console.log("ST.all count:", ST.all.length, ST.all);
-    return ST.all;
-  };
-
-
-  // 公開
+  // --- expose ---
   NS.rebuild = rebuild;
   NS.setListEnabled = setListEnabled;
-  NS.goTop = goTop;
-  NS.goBottom = goBottom;
-  NS.goPrev = goPrev;
-  NS.goNext = goNext;
+  NS.goTop = goTop; NS.goBottom = goBottom; NS.goPrev = goPrev; NS.goNext = goNext;
 })();
