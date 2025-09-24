@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="ja">
 <head>
@@ -14,56 +15,11 @@
     .desc{ color:var(--muted); margin:0 0 18px; }
     .card{ border:1px solid var(--bd); border-radius:14px; padding:16px; background:var(--pill); }
     .group{ margin:18px 0 0; }
-    .row{
-      display:grid;
-      grid-template-columns: 280px 1fr;
-      gap:14px;
-      align-items:center;
-      padding:10px 0;
-      border-top:1px dashed var(--bd);
-    }
-    .row:first-child{
-      border-top:none;
-      padding-top:0; 
-    }
-    #cgtn-options .group .row {
-      align-items: start;
-    }
+    .row{ display:grid; grid-template-columns:280px 1fr; gap:14px; align-items:center; padding:10px 0; border-top:1px dashed var(--bd); }
+    .row:first-child{ border-top:none; padding-top:0; }
+    #cgtn-options .group .row { align-items:start; }
     label b{ font-weight:700; }
-    input[type="number"]{
-      width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg);
-    }
-/* ボタンの基本スタイル */
-.actions button {
-  /* 基本的な設定 (既存のものに追記・変更) */
-  display: inline-block; /* 配置の調整 */
-  border: 1px solid #ccc; /* 境界線を少し濃く */
-  border-radius: 8px; /* 角丸を少し調整 */
-  padding: 10px 18px;
-  background-color: #f7f7f7; /* 背景色 */
-  color: #333; /* 文字色を濃く */
-  font-weight: bold; /* 文字を太く */
-  font-size: 14px;
-  cursor: pointer;
-  
-  /* 立体感を出すための影 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-
-  /* アニメーションを滑らかに */
-  transition: background-color 0.2s, box-shadow 0.2s;
-}
-
-/* マウスが乗った時のスタイル */
-.actions button:hover {
-  background-color: #e9e9e9; /* 少し暗い色に */
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1); /* 影を少し濃く */
-}
-
-/* クリックした瞬間のスタイル */
-.actions button:active {
-  background-color: #e0e0e0; /* さらに暗い色に */
-  box-shadow: none; /* 影を消して押した感じを出す */
-}
+    input[type="number"]{ width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); }
     .hint{ color:var(--muted); font-size:14px; }
     .actions{ display:flex; gap:10px; margin-top:18px; }
     button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }
@@ -98,6 +54,7 @@
           </label>
         </div>
       </div>
+
       <div class="row">
         <details>
           <summary style="cursor:pointer;">詳細設定（通常は変更不要）</summary>
@@ -117,52 +74,39 @@
               </div>
             </div>
 
-<!-- 詳細設定 セクション内など分かりやすい場所に -->
-<div class="row">
-  <label for="listMaxItems">表示件数</label>
-  <input id="listMaxItems" name="listMaxItems" type="number" min="10" max="200" step="10">
-  <div class="hint">一覧に並べる最大件数。超えた分は枠内でスクロール。</div>
-</div>
+            <div class="row" style="border-top:none;padding:0;">
+              <label for="listMaxItems">表示件数</label>
+              <input id="listMaxItems" name="listMaxItems" type="number" min="10" max="200" step="10">
+              <div class="hint">一覧に並べる最大件数。超えた分は枠内でスクロール。</div>
+            </div>
 
-<div class="row">
-  <label for="listMaxChars">1行の最大文字数</label>
-  <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
-  <div class="hint">長い行は…で省略。10–200。</div>
-</div>
+            <div class="row" style="border-top:none;padding:0;">
+              <label for="listMaxChars">1行の最大文字数</label>
+              <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
+              <div class="hint">長い行は…で省略。10–200。</div>
+            </div>
 
-<div class="row">
-  <label for="listFontSize">フォントサイズ</label>
-  <input id="listFontSize" name="listFontSize" type="number" min="10" max="18" step="1" />
-  <div class="hint">リストの文字サイズ(px)。</div>
-</div>
-
+            <div class="row" style="border-top:none;padding:0;">
+              <label for="listFontSize">フォントサイズ</label>
+              <input id="listFontSize" name="listFontSize" type="number" min="10" max="18" step="1" />
+              <div class="hint">リストの文字サイズ(px)。</div>
+            </div>
           </div>
         </details>
       </div>
+    </div>
 
     <div class="actions">
-      <button id="saveBtn" type="submit">保存</button>
+      <button id="saveBtn"  type="submit">保存</button>
       <button id="resetBtn" type="button">既定に戻す</button>
     </div>
 
-    <p class="desc hint" style="margin-top:10px;">
-    入力した数値は自動で保存されます。<br>
-    範囲外の値などは、入力後に自動で修正されます。<br>
-    ※「保存」ボタンは念のため設置しており、押す必要はありません。
-    </p>
-
-    <div style="margin-top:12px;">
-     <button id="resetBtn" type="button">規定に戻す</button>
-    </div>
-    <div id="msg" style="margin-top:8px;font-size:12px;color:green;display:none;">
-      保存しました
-    </div>
-    </form>
+    <p class="desc hint" id="msg" style="margin-top:10px;display:none;">保存しました</p>
+  </form>
 
   <script src="shared.js"></script>
   <script src="options.js"></script>
+
+  <footer><p class="desc hint" id="buildInfo" style="margin-top:10px;"></p></footer>
 </body>
-<footer>
-  <p class="desc hint" id="buildInfo" style="margin-top:6px;"></p>
-</footer>
 </html>

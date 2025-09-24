@@ -26,7 +26,7 @@
     return NS._scroller;
   }
 
-  // ★スクロール用 厳しめ（既存のまま）
+  // ★スクロール用 厳しめ（安定版のまま）
   function headNodeOf(article){
     if (!article) return null;
     const pick = (root, sel) => {
@@ -48,38 +48,36 @@
     return article;
   }
 
-// === List Panel 専用（スクロールには未使用） ===================
-// 本文候補をゆるめに拾う *前回の安定版*
-function listHeadNodeOf(article){
-  if (!article) return null;
-  const q = [
-    ':scope [data-message-author-role]', // 最上位ラッパ
-    ':scope div.markdown',               // 回答本文
-    ':scope div.text-base',              // 旧レイアウト本文
-    ':scope .user-message-bubble',       // ユーザー気泡
-    ':scope article', ':scope section', ':scope > div'
-  ];
-  for (const sel of q){
-    const n = article.matches(sel) ? article : article.querySelector(sel);
-    if (n && isVisible(n)) return n;
+  // === List Panel 専用（ゆるめ） ===
+  function listHeadNodeOf(article){
+    if (!article) return null;
+    const q = [
+      ':scope [data-message-author-role]',
+      ':scope div.markdown',
+      ':scope div.text-base',
+      ':scope .user-message-bubble',
+      ':scope article', ':scope section', ':scope > div'
+    ];
+    for (const sel of q){
+      const n = article.matches(sel) ? article : article.querySelector(sel);
+      if (n && isVisible(n)) return n;
+    }
+    return article;
   }
-  return article;
-}
 
-  // 添付検出：DOM のみ（テキストは付けない）
+  // 添付検出（画像/動画/ダウンロード）
   function detectAttachmentKinds(head){
     if (!head) return [];
     const kinds = [];
     if (head.querySelector('video')) kinds.push('🎞');
     if (head.querySelector('img,picture,canvas,figure')) kinds.push('🖼');
-    // ダウンロード系（明示的な要素のみ）
     if (head.querySelector('a[download], [data-testid*="download"], a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"], a[href$=".xlsx"], a[href$=".pptx"]')) {
       kinds.push('📄');
     }
     return kinds;
   }
 
-  // innerText が空のときだけ最小フォールバック
+  // innerText が空のときだけ figcaption/alt/aria から最小要約
   function extractSummaryText(head, maxChars){
     let txt = (head?.innerText || '').replace(/\s+/g,' ').trim();
     if (!txt) {
@@ -98,21 +96,20 @@ function listHeadNodeOf(article){
     const r = node.getBoundingClientRect();
     return scroller.scrollTop + (r.top - scR.top);
   }
-  function currentAnchorY(){ return SH.computeAnchor(SH.getCFG()).y; }
+  const currentAnchorY = ()=> SH.computeAnchor(SH.getCFG()).y;
 
   // --- scroll core ---
   let _lockUntil = 0;
   const isLocked = () => performance.now() < _lockUntil;
   function lockFor(ms){ _lockUntil = performance.now() + (Number(ms)||0); }
 
-  // ★Math.round() をやめ、元の正確な位置で止める
   function scrollToHead(article){
     if (!article) return;
     const sc = getTrueScroller();
-    const anchor = currentAnchorY();
-    const desired = articleTop(sc, article) - anchor; // ←丸めない
+    const anchor  = currentAnchorY();
+    const desired = articleTop(sc, article) - anchor; // 丸めない
     const maxScroll = Math.max(0, sc.scrollHeight - sc.clientHeight);
-    const clamped = Math.min(maxScroll, Math.max(0, desired));
+    const clamped   = Math.min(maxScroll, Math.max(0, desired));
     lockFor(SH.getCFG().lockMs);
     sc.scrollTo({ top: clamped, behavior: 'smooth' });
   }
@@ -129,11 +126,10 @@ function listHeadNodeOf(article){
   }
   function sortByY(list){
     const sc = getTrueScroller();
-    try {
+    try{
       return list.map(el => ({ el, y: articleTop(sc, el) }))
-                 .sort((a,b) => a.y - b.y)
-                 .map(x => x.el);
-    } catch { return list; }
+                 .sort((a,b)=> a.y - b.y).map(x=>x.el);
+    }catch{ return list; }
   }
   function isRealTurn(article){
     const head = headNodeOf(article);
@@ -227,12 +223,13 @@ function listHeadNodeOf(article){
     const slice = ST.all.slice(start, start + pageSize);
 
     for (const art of slice){
-      const head  = listHeadNodeOf(art);        // ← headNodeOf と同じ
+      const head  = listHeadNodeOf(art);
       const icons = detectAttachmentKinds(head).join('');
       const txt   = extractSummaryText(head, maxChars);
 
       const row = document.createElement('div');
       row.className = 'row';
+      row.style.fontSize = (cfg.list?.fontSize || 12) + 'px';
       row.innerHTML = `
         <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${icons}</span>
         <span class="txt">${txt}</span>
@@ -247,7 +244,7 @@ function listHeadNodeOf(article){
     count.textContent = `${shownTo}/${total}`;
 
     const pager = document.createElement('div');
-    pager.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap'; // 折返し
+    pager.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap';
 
     const mkBtn = (lbl, onClick, disabled=false)=>{
       const b = document.createElement('button');
