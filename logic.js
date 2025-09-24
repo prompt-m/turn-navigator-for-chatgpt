@@ -163,7 +163,7 @@
     listBox.innerHTML = `
       <div id="cgpt-list-head">
         <div id="cgpt-list-grip" title="ドラッグで移動"></div>
-        <button id="cgpt-list-close">閉じる</button>
+        <button id="cgpt-list-close">畳む/開く</button>
       </div>
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot"></div>

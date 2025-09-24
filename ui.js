@@ -45,6 +45,47 @@
     background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
   }
   #cgpt-list-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-top:1px solid rgba(0,0,0,.08)}
+/* パネルは縦フレックスで head / body / foot を上下に配置 */
+#cgpt-list-panel{
+  position:fixed; right:120px; bottom:140px;
+  display:none; flex-direction:column;            /* ← 追加 */
+  z-index:2147483646; width:360px; max-width:min(92vw,420px);
+  max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12);
+  border-radius:16px; background:rgba(255,255,255,.98);
+  box-shadow:0 18px 56px rgba(0,0,0,.25);
+}
+#cgpt-list-head{
+  display:flex; align-items:center; gap:8px;
+  border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
+}
+#cgpt-list-grip{ height:12px; border-radius:10px; flex:1;
+  background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%); opacity:.6; cursor:grab;
+}
+
+/* 畳む/開くボタン（閉じるの代わりに） */
+#cgpt-list-collapse{
+  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px;
+  padding:6px 8px; cursor:pointer; display:inline-grid; place-items:center;
+}
+
+/* 本文は可変。ここだけスクロールさせる */
+#cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }  /* ← flex:1 を追加 */
+#cgpt-list-body .row{ display:flex; gap:8px; align-items:center;
+  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer }
+#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
+#cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
+
+/* フッターは常に最下部に見える（パネルがflex縦なのでsticky不要） */
+#cgpt-list-foot{
+  display:flex; gap:8px; align-items:center; justify-content:flex-end;
+  flex-wrap:wrap;                                   /* ← ページャ折返し */
+  padding:6px 8px; border-top:1px solid rgba(0,0,0,.08);
+}
+
+/* パネルを畳んだ見た目（ヘッダだけ残す） */
+#cgpt-list-panel.collapsed { max-height: 48px; }
+#cgpt-list-panel.collapsed #cgpt-list-body,
+#cgpt-list-panel.collapsed #cgpt-list-foot { display:none; }
   `;
 
   injectCss(BASE_CSS);
@@ -98,6 +139,21 @@
 
     applyLang();
     try { box.querySelector('#cgpt-viz').checked = !!SH.getCFG().showViz; } catch {}
+
+// 畳む/開く
+(function bindCollapse(){
+  const panel = document.getElementById('cgpt-list-panel');
+  const btn = document.getElementById('cgpt-list-collapse');
+  if (!panel || !btn) return;
+  btn.addEventListener('click', () => {
+    panel.classList.toggle('collapsed');
+    const on = !panel.classList.contains('collapsed');
+    btn.textContent = on ? '▾' : '▸';
+    btn.setAttribute('aria-expanded', String(on));
+  });
+})();
+
+
   }
 
   function applyLang(){

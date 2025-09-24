@@ -34,6 +34,15 @@
       } catch {}
 
       LG.rebuild();
+
+// === 基準線の初期表示（保存された showViz を尊重） ===
+try {
+  const cfg = window.CGTN_SHARED?.getCFG?.();
+  window.CGTN_SHARED?.renderViz?.(cfg, !!cfg?.showViz); // ← trueなら表示まで
+} catch {}
+// === 基準線の初期表示 ここまで ===
+
+
       EV.bindEvents();
 
       // === 基準線の自動追従（リサイズ/DevTools開閉/回転/可視状態変更） ===
