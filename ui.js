@@ -28,8 +28,14 @@
   #cgpt-nav input[type=checkbox] {cursor: pointer;}
   .cgpt-viz-toggle,.cgpt-list-toggle{margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:flex-start;font-size:12px;cursor:pointer}
   .cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{cursor:pointer;opacity:.9}
-  /* リストパネル（簡易版） */
-  #cgpt-list-panel{position:fixed;right:120px;bottom:140px;display:none;flex-direction:column;z-index:2147483646;width:360px;max-width:min(92vw,420px);max-height:min(62vh,680px);border:1px solid rgba(0,0,0,.12);border-radius:16px;background:rgba(255,255,255,.98);box-shadow:0 18px 56px rgba(0,0,0,.25)}
+#cgpt-list-panel{
+  position:fixed;right:120px;bottom:140px;
+  display:none;flex-direction:column;
+  z-index:2147483646;width:360px;max-width:min(92vw,420px);
+  max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12);
+  border-radius:16px;background:rgba(255,255,255,.98);
+  box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden;
+}
   #cgpt-list-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.1);padding:6px 10px}
   #cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
   #cgpt-list-close{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:6px 8px;cursor:pointer}
@@ -46,14 +52,6 @@
   }
   #cgpt-list-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-top:1px solid rgba(0,0,0,.08)}
 /* パネルは縦フレックスで head / body / foot を上下に配置 */
-#cgpt-list-panel{
-  position:fixed; right:120px; bottom:140px;
-  display:none; flex-direction:column;            /* ← 追加 */
-  z-index:2147483646; width:360px; max-width:min(92vw,420px);
-  max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12);
-  border-radius:16px; background:rgba(255,255,255,.98);
-  box-shadow:0 18px 56px rgba(0,0,0,.25);
-}
 #cgpt-list-head{
   display:flex; align-items:center; gap:8px;
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
@@ -86,6 +84,14 @@
 #cgpt-list-panel.collapsed { max-height: 48px; }
 #cgpt-list-panel.collapsed #cgpt-list-body,
 #cgpt-list-panel.collapsed #cgpt-list-foot { display:none; }
+
+#cgpt-list-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.1);padding:6px 10px;position:sticky;top:0;background:rgba(255,255,255,.98)}
+#cgpt-list-close{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;cursor:pointer}
+#cgpt-list-collapse{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer}
+#cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
+
+
+
   `;
 
   injectCss(BASE_CSS);

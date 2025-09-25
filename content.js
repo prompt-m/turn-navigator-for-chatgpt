@@ -30,9 +30,8 @@
           SH.saveSettingsPatch({ list:{ ...(cur.list||{}), enabled:false } });
         }
         const chk = document.getElementById('cgpt-list-toggle');
-          chk.checked = false;
-          setListEnabled(false,false)
-          LG?.setListEnabled?.(false, /*save*/ false);
+        chk.checked = false;
+        LG?.setListEnabled?.(false, /*save*/ false);
       } catch {}
 
       LG.rebuild();

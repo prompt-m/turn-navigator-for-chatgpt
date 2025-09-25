@@ -65,42 +65,115 @@
     return article;
   }
 
-  function detectAttachmentKinds(head){
-    const kinds = [];
-    if (!head) return kinds;
-    if (head.querySelector('video, source[type^="video/"]')) kinds.push('🎞');
-    if (head.querySelector('img,picture,canvas,figure'))    kinds.push('🖼');
-    if (head.querySelector('a[download], [data-testid*="download"], a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"], a[href$=".xlsx"], a[href$=".pptx"], a[href$=".txt"]'))
-      kinds.push('📝');
-    return kinds;
+// ★ ファイル先頭または detectAttachmentKinds の近くに追加
+const FILE_ICON = {
+  image: '🖼', video: '🎞', text: '📝'
+};
+const FILE_RE = {
+  image: /\.(png|jpe?g|gif|webp|svg)$/i,
+  video: /\.(mp4|webm|mov|mkv)$/i,
+  text : /\.(pdf|md|txt|csv|tsv|docx?|xlsx?|pptx?|js|ts|gs|htm|html)$/i
+};
+
+function summarizeAttachments(head){
+  const parts = [];
+  head.querySelectorAll('a[download], a[href^="blob:"], a[href*="attachment"]')
+    .forEach(a => {
+      const name = (a.getAttribute('download') || a.textContent || '').trim();
+      const icon =
+        FILE_RE.image.test(name) ? FILE_ICON.image :
+        FILE_RE.video.test(name) ? FILE_ICON.video :
+        FILE_ICON.text;
+      parts.push(`${icon} ${name || '添付'}`);
+    });
+  return parts;
+}
+
+// logic.js（ヘルパーを差し替え）
+function detectAttachmentKinds(scope){
+  const root = (scope && scope.closest && scope.closest('article')) ? scope.closest('article') : (scope || document);
+  const kinds = [];
+
+  // 画像
+  if (root.querySelector('img, figure img, [data-testid="image"] img')) kinds.push('🖼');
+
+  // 動画
+  if (root.querySelector('video, source[type^="video/"], [data-testid="video"]')) kinds.push('📹');
+
+  // ダウンロード/文書系（a[download] or 拡張子）
+  const fileExtRe = /\.(?:pdf|md|gs|js|htm|html|txt|csv|tsv|docx?|xlsx?|pptx?)$/i;
+  const hasDoc = [...root.querySelectorAll('a')].some(a => {
+    const href = a.getAttribute('href') || '';
+    return a.hasAttribute('download') || fileExtRe.test(href);
+  });
+  if (hasDoc) kinds.push('📄');
+
+  return kinds;
+}
+
+// 添付のファイル名を集める（記事全体を対象に）
+function collectAttachmentNames(art){
+  const names = [];
+  if (!art) return names;
+
+  // ChatGPT の “ファイルチップ” と通常の download リンクの両方を拾う
+  const anchors = art.querySelectorAll(
+    'a[href][download], a.group.text-token-text-primary[href*="/backend-api/"]'
+  );
+
+  anchors.forEach(a => {
+    // download 属性 > テキスト の順でファイル名を推定
+    const dl = (a.getAttribute('download') || '').trim();
+    const txt = (a.textContent || '').trim();
+    const name = dl || txt;
+    if (name) names.push(name);
+  });
+
+  return names;
+}
+
+// ファイル名からアイコンを決める（画像/動画/その他=テキスト）
+function detectAttachmentKindsByNames(names){
+  const kinds = [];
+  if (!names || !names.length) return kinds;
+
+  const imgRe = /\.(png|jpe?g|gif|webp|svg)$/i;
+  const vidRe = /\.(mp4|mov|webm|mkv|avi)$/i;
+  const docRe = /\.(pdf|md|txt|csv|tsv|docx?|xlsx?|pptx?|js|ts|json|html?)$/i;
+
+  for (const n of names){
+    const s = String(n);
+    if (imgRe.test(s)) kinds.push('🖼');
+    else if (vidRe.test(s)) kinds.push('🎞');
+    else if (docRe.test(s)) kinds.push('📝');
+    else kinds.push('📝'); // 既定はテキスト扱い
   }
+  return kinds;
+}
 
 /*
-  // 添付検出（画像/動画/ダウンロード）
-  function detectAttachmentKinds(head){
-    if (!head) return [];
-    const kinds = [];
-    if (head.querySelector('video')) kinds.push('🎞');
-    if (head.querySelector('img,picture,canvas,figure')) kinds.push('🖼');
-    // PDF/Office/任意の download を「テキストっぽい添付」として扱う
-    if (head.querySelector('a[download], [data-testid*="download"], a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"], a[href$=".xlsx"], a[href$=".pptx"]')) {
-      kinds.push('📝');
-    }
-    return kinds;
-  }
+function collectAttachmentNames(scope){
+  const root = (scope && scope.closest && scope.closest('article')) ? scope.closest('article') : (scope || document);
+  const fileExtRe = /\.(?:pdf|md|txt|csv|tsv|docx?|xlsx?|pptx?)$/i;
 
-  function detectAttachmentKinds(head){
-    if (!head) return [];
-    const kinds = [];
-    if (head.querySelector('video')) kinds.push('🎞');
-    if (head.querySelector('img,picture,canvas,figure')) kinds.push('🖼');
-    if (head.querySelector('a[download], [data-testid*="download"], a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"], a[href$=".xlsx"], a[href$=".pptx"]')) {
-      kinds.push('📄');
-    }
-    return kinds;
+  const names = [];
+  // a[download] 優先
+  for (const a of root.querySelectorAll('a[download]')) {
+    const nm = (a.getAttribute('download') || a.textContent || '').trim();
+    if (nm) names.push(nm);
   }
-*/
-/*
+  // download属性が無い“拡張子付きリンク”も拾う
+  for (const a of root.querySelectorAll('a[href]')) {
+    const href = a.getAttribute('href') || '';
+    if (fileExtRe.test(href)) {
+      const nm = (a.textContent || href.split('/').pop() || '').trim();
+      if (nm) names.push(nm);
+    }
+  }
+  return [...new Set(names)]; // 重複除去
+}
+
+
   // innerText が空のときだけ figcaption/alt/aria から最小要約
   function extractSummaryText(head, maxChars){
     let txt = (head?.innerText || '').replace(/\s+/g,' ').trim();
@@ -324,38 +397,86 @@
 
     const start = (page-1)*pageSize;
     const slice = ST.all.slice(start, start + pageSize);
-
 for (const art of slice){
-  const head  = listHeadNodeOf(art);
-  const kinds = detectAttachmentKinds(head);              // ← 1回だけ呼ぶ
-  const icons = kinds.join(' ');
+  const head  = listHeadNodeOf(art);                      // ← これは従来どおり本文抽出用
+  const files = collectAttachmentNames(art);              // ★ 記事全体からファイル名を集める
+  const kinds = detectAttachmentKindsByNames(files);      // ★ ファイル名からアイコン決定
   const txt   = extractSummaryText(head, maxChars);
 
+  // まとめ表示にするなら（1行に集約）
+  const attLine = files.length ? files.join('、') : '';
+  const mainText = attLine || txt;
+
+  // 行追加
   const row = document.createElement('div');
   row.className = 'row';
-
-  // 行の配色・文字サイズ
   const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
   const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
   if (isUser) row.style.background = 'rgba(240,246,255,.35)';
   if (isAsst) row.style.background = 'rgba(234,255,245,.35)';
   row.style.fontSize = (cfg.list?.fontSize || 12) + 'px';
 
-  // ここで innerHTML を一度だけセット
   row.innerHTML = `
-    <span class="clip" style="width:1.6em;display:inline-flex;justify-content:center"></span>
+    <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${kinds.join('')}</span>
     <span class="txt"></span>
   `;
-
-  // ★ innerHTML した“後”にテキストとアイコンを流し込む（上書き防止）
-  row.querySelector('.clip').textContent = icons;
-  row.querySelector('.txt').textContent  = txt;
-
-  // クリックでジャンプ
+  row.querySelector('.txt').textContent = mainText || '';
   row.addEventListener('click', ()=> scrollToHead(art));
   body.appendChild(row);
+
+  // デバッグ（必要なら）
+  // console.debug('files:', files, 'kinds:', kinds, 'txt:', txt);
 }
 
+/*
+for (const art of slice){
+  const head  = listHeadNodeOf(art);
+  const attParts = summarizeAttachments(head);
+//  const kinds = detectAttachmentKinds(art);           // ★ art を渡す
+  const kinds = detectAttachmentKinds(art).join(''); // ←従来の種別マーク（左の小枠用）
+  const files = collectAttachmentNames(art);          // ★ 追加
+  const txt   = extractSummaryText(head, maxChars);
+  const mainText = attParts.length ? attParts.join('、 ') : txt; // まとめ表示
+
+
+  const addRow = (iconsStr, textStr, roleTint) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    if (roleTint === 'user')      row.style.background = 'rgba(240,246,255,.35)';
+    else if (roleTint === 'asst') row.style.background = 'rgba(234,255,245,.35)';
+    row.style.fontSize = (cfg.list?.fontSize || 12) + 'px';
+//    row.innerHTML = `
+//      <span class="clip" style="width:1.6em;display:inline-flex;justify-content:center"></span>
+//      <span class="txt"></span>
+//    `;
+row.innerHTML = `
+  <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${kinds}</span>
+  <span class="txt">${mainText}</span>
+`;
+    row.querySelector('.clip').textContent = iconsStr || '';
+    row.querySelector('.txt').textContent  = textStr  || '';
+    row.addEventListener('click', ()=> scrollToHead(art));
+    body.appendChild(row);
+  };
+
+  const roleTint =
+    art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]') ? 'user' :
+    art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]') ? 'asst' :
+    '';
+
+  // 1) 添付の行（ある場合のみ）
+  if (kinds.length || files.length){
+    const iconsStr = kinds;
+    const nameStr  = files.join('、');   // 例: "content.js、README.md"
+    addRow(iconsStr, nameStr, roleTint);
+  }
+
+  // 2) 本文の行（本文があるとき）
+  if (txt){
+    addRow('', txt, roleTint);
+  }
+}
+*/
     const count = document.createElement('div');
     count.style.cssText = 'margin-right:auto;opacity:.8;font-size:12px';
     const shownTo = Math.min(total, start + slice.length);
