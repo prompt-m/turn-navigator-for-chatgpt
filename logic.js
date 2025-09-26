@@ -287,7 +287,7 @@ function extractBodySnippet(head, maxChars){
     listBox.innerHTML = `
       <div id="cgpt-list-head">
         <div id="cgpt-list-grip" title="ドラッグで移動"></div>
-        <button id="cgpt-list-collapse" aria-expanded="true">∨</button>
+        <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
       </div>
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot"></div>
@@ -321,7 +321,7 @@ function extractBodySnippet(head, maxChars){
         SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), x:r.left, y:r.top } });
       });
     })();
-
+/*
     // 「畳む/開く」トグル
     listBox.querySelector('#cgpt-list-collapse').addEventListener('click', () => {
       const on = listBox.classList.toggle('collapsed') === false; // collapsed が無ければ展開＝on
@@ -331,6 +331,18 @@ function extractBodySnippet(head, maxChars){
         btn.setAttribute('aria-expanded', String(on));
       }
     });
+*/
+    // 「畳む/開く」トグル
+    listBox.querySelector('#cgpt-list-collapse').addEventListener('click', () => {
+      const collapsed = listBox.classList.toggle('collapsed');
+      const on = !collapsed;                 // 展開時 true
+      const btn = listBox.querySelector('#cgpt-list-collapse');
+      if (btn) {
+        btn.textContent = on ? '▴' : '▾';    // ← ui.js と統一（開=▾ / 閉=▴）
+        btn.setAttribute('aria-expanded', String(on));
+      }
+    });
+
     return listBox;
   }
 

@@ -154,7 +154,7 @@
   btn.addEventListener('click', () => {
     panel.classList.toggle('collapsed');
     const on = !panel.classList.contains('collapsed');
-    btn.textContent = on ? '▾' : '▸';
+    btn.textContent = on ? '▴' : '▾';
     btn.setAttribute('aria-expanded', String(on));
   });
 })();

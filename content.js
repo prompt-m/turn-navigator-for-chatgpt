@@ -86,17 +86,15 @@ try {
 
       window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
       window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
+
+      // setListEnabled(false) を initialize 最後に一度だけ強制
+      try {
+        const chk = document.getElementById('cgpt-list-toggle');
+        if (chk) chk.checked = false;
+        window.CGTN_LOGIC?.setListEnabled?.(false);
+      } catch {}
+
     });
-
-// setListEnabled(false) を initialize 最後に一度だけ強制
-try {
-  const chk = document.getElementById('cgpt-list-toggle');
-  if (chk) chk.checked = false;
-  window.CGTN_LOGIC?.setListEnabled?.(false);
-} catch {}
-
-
-
   }
 
 //基準線の追従
