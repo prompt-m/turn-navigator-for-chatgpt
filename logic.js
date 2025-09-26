@@ -154,40 +154,40 @@
     return picked || '（内容なし）';
   }
 
-// （画像）やファイル名を並べた「添付行」を返す。無ければ空文字。
-function buildAttachmentLine(root){
-  const el = root || document;
-  const names = collectAttachmentNames(el);     // すでに実装済み（href無チップ対応）
-  const hasImg = !!el.querySelector('img, picture img');
+  // （画像）やファイル名を並べた「添付行」を返す。無ければ空文字。
+  function buildAttachmentLine(root){
+    const el = root || document;
+    const names = collectAttachmentNames(el);     // すでに実装済み（href無チップ対応）
+    const hasImg = !!el.querySelector('img, picture img');
 
-  const parts = [];
-  if (hasImg) parts.push('（画像）');            // 画像は1つに統一
-  // 画像以外も含むファイル名を重複排除で追加
-  for (const n of new Set(names)) {
-    if (n) parts.push(String(n));
+    const parts = [];
+    if (hasImg) parts.push('（画像）');            // 画像は1つに統一
+    // 画像以外も含むファイル名を重複排除で追加
+    for (const n of new Set(names)) {
+      if (n) parts.push(String(n));
+    }
+    return parts.join(' ');
   }
-  return parts.join(' ');
-}
 
-// 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
-function extractBodySnippet(head, maxChars){
-  if (!head) return '';
+  // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
+  function extractBodySnippet(head, maxChars){
+    if (!head) return '';
 
-  // クローンして添付系要素を除去してからテキスト化
-  const clone = head.cloneNode(true);
-  clone.querySelectorAll([
-    // ファイルチップやリンク類
-    '.border.rounded-xl', 'a[download]', 'a[href]',
-    // 図版・メディア
-    'figure', 'figcaption', 'img', 'picture', 'video', 'source'
-  ].join(',')).forEach(n => n.remove());
+    // クローンして添付系要素を除去してからテキスト化
+    const clone = head.cloneNode(true);
+    clone.querySelectorAll([
+      // ファイルチップやリンク類
+      '.border.rounded-xl', 'a[download]', 'a[href]',
+      // 図版・メディア
+      'figure', 'figcaption', 'img', 'picture', 'video', 'source'
+    ].join(',')).forEach(n => n.remove());
 
-  let txt = (clone.innerText || '').replace(/\s+/g, ' ').trim();
-  if (!txt) return '';
+    let txt = (clone.innerText || '').replace(/\s+/g, ' ').trim();
+    if (!txt) return '';
 
-  if (maxChars && txt.length > maxChars) txt = txt.slice(0, maxChars) + '…';
-  return txt;
-}
+    if (maxChars && txt.length > maxChars) txt = txt.slice(0, maxChars) + '…';
+    return txt;
+  }
 
   function articleTop(scroller, article){
     const node = headNodeOf(article);
@@ -196,6 +196,55 @@ function extractBodySnippet(head, maxChars){
     return scroller.scrollTop + (r.top - scR.top);
   }
   const currentAnchorY = ()=> SH.computeAnchor(SH.getCFG()).y;
+
+  // --- Pins (付箋) ---
+  function getTurnKey(article){
+    if (!article) return '';
+    // ChatGPTの article には data-turn-id、子に data-message-id があることが多い
+    const id = article.getAttribute('data-turn-id')
+           || article.querySelector('[data-message-id]')?.getAttribute('data-message-id')
+           || article.id
+           || '';
+    return String(id);
+  }
+  function getPins(){ return (window.CGTN_SHARED?.getCFG?.().pins) || {}; }
+  function isPinned(article){ const k=getTurnKey(article); return !!getPins()[k]; }
+  function togglePin(article){
+    const k = getTurnKey(article);
+    if (!k) return;
+    const cfg = window.CGTN_SHARED?.getCFG?.() || {};
+    const pins = { ...(cfg.pins||{}) };
+    if (pins[k]) delete pins[k]; else pins[k] = true;
+    window.CGTN_SHARED?.saveSettingsPatch?.({ pins });
+  }
+
+  function qListBody(){ return document.getElementById('cgpt-list-body'); }
+
+  function rowsByTurn(turnKey){
+    const body = qListBody();
+    if (!body) return [];
+    return Array.from(body.querySelectorAll(`.row[data-turn="${CSS.escape(turnKey)}"]`));
+  }
+
+  function paintPinRow(row, pinned){
+    // 左マーク
+    const lm = row.querySelector('.clip');
+    if (lm) lm.textContent = pinned ? '📌' : '';
+    // ボタン表示（薄く／通常）
+    const btn = row.querySelector('.pin-btn');
+    if (btn){
+      btn.setAttribute('aria-pressed', String(!!pinned));
+      btn.style.opacity = pinned ? '1' : '.6';
+      btn.title = pinned ? '付箋を外す' : '付箋を付ける';
+    }
+  }
+
+  function refreshPinUIForTurn(turnKey){
+    const pinned = !!getPins()[turnKey];
+    const rows = rowsByTurn(turnKey);
+    for (const r of rows) paintPinRow(r, pinned);
+  }
+
 
   // --- scroll core ---
   let _lockUntil = 0;
@@ -287,6 +336,7 @@ function extractBodySnippet(head, maxChars){
     listBox.innerHTML = `
       <div id="cgpt-list-head">
         <div id="cgpt-list-grip" title="ドラッグで移動"></div>
+        <button id="cgpt-pin-filter" title="付箋のみ/すべて切替">📌</button>
         <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
       </div>
       <div id="cgpt-list-body"></div>
@@ -321,17 +371,7 @@ function extractBodySnippet(head, maxChars){
         SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), x:r.left, y:r.top } });
       });
     })();
-/*
-    // 「畳む/開く」トグル
-    listBox.querySelector('#cgpt-list-collapse').addEventListener('click', () => {
-      const on = listBox.classList.toggle('collapsed') === false; // collapsed が無ければ展開＝on
-      const btn = listBox.querySelector('#cgpt-list-collapse');
-      if (btn) {
-        btn.textContent = on ? '∧' : '∨';
-        btn.setAttribute('aria-expanded', String(on));
-      }
-    });
-*/
+
     // 「畳む/開く」トグル
     listBox.querySelector('#cgpt-list-collapse').addEventListener('click', () => {
       const collapsed = listBox.classList.toggle('collapsed');
@@ -343,84 +383,146 @@ function extractBodySnippet(head, maxChars){
       }
     });
 
+    // ensureListBox() 内、イベント追加
+    (function bindPinFilter(){
+      const btn = listBox.querySelector('#cgpt-pin-filter');
+      btn.addEventListener('click', ()=>{
+        const cur = SH.getCFG() || {};
+        const next = !cur.list?.pinOnly;
+        SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
+        renderList(true);
+      });
+    })();
+
     return listBox;
   }
 
-function renderList(forceOn=false){
-  const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
-  const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
-  if (!enabled) return;
+  function renderList(forceOn=false){
+    const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
+    const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
+    if (!enabled) return;
 
-  const panel = ensureListBox();
-  panel.style.display = 'flex';
-  const body = panel.querySelector('#cgpt-list-body');
-  const foot = panel.querySelector('#cgpt-list-foot');
-  body.style.maxHeight = 'min(75vh, 700px)';   // 画面に合わせて
-  body.style.overflowY = 'auto';
-  body.innerHTML = '';
-  foot.innerHTML = ''; // ページャ撤去
+    const panel = ensureListBox();
+    panel.style.display = 'flex';
+    const body = panel.querySelector('#cgpt-list-body');
+    const foot = panel.querySelector('#cgpt-list-foot');
+    body.style.maxHeight = 'min(75vh, 700px)';
+    body.style.overflowY = 'auto';
+    body.innerHTML = '';
+    foot.innerHTML = '';
 
-  // パネル側をスクロール容器に（CSSの補強：高さは既存CSSに依存）
-  body.style.overflowY = 'auto';
+    const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
+    const fontPx   = (cfg.list?.fontSize || 12) + 'px';
+    const pinOnly  = !!cfg.list?.pinOnly;
 
-  const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
-  const fontPx   = (cfg.list?.fontSize || 12) + 'px';
-
-  // すべてのターンをそのまま描画（ページングなし）
-  for (const art of ST.all){
-    const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
-
-    // 1) 添付行
-    const attachLine = buildAttachmentLine(art);
-    if (attachLine){
-      const row = document.createElement('div');
-      row.className = 'row';
-      row.style.fontSize = fontPx;
-      // 行の背景（発言者に応じて）
-      const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
-      const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
-      if (isUser) row.style.background = 'rgba(240,246,255,.60)';
-      if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
-
-      row.innerHTML = `
-        <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">🖼</span>
-        <span class="txt"></span>
-      `;
-      row.querySelector('.txt').textContent = attachLine;
-      row.addEventListener('click', () => scrollToHead(art));
-      body.appendChild(row);
+    // === 対象ターンを決定（pinOnlyの場合はピン留めされたものだけ）
+    let turns = ST.all;
+    if (pinOnly){
+      turns = turns.filter(isPinned);
     }
 
-    // 2) 本文行
-    const bodyLine = extractBodySnippet(head, maxChars);
-    if (bodyLine){
-      const row2 = document.createElement('div');
-      row2.className = 'row';
-      row2.style.fontSize = fontPx;
-      // 添付行と同じ背景で統一感
-      const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
-      const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
-      if (isUser) row2.style.background = 'rgba(240,246,255,.60)';
-      if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
+    for (const art of turns){
+      const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
 
-      row2.innerHTML = `
-        <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center"> </span>
-        <span class="txt"></span>
-      `;
-      row2.querySelector('.txt').textContent = bodyLine;
-      row2.addEventListener('click', () => scrollToHead(art));
-      body.appendChild(row2);
+      // 添付行
+      const attachLine = buildAttachmentLine(art);
+      if (attachLine){
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.style.fontSize = fontPx;
+
+        const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
+        const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
+        if (isUser) row.style.background = 'rgba(240,246,255,.60)';
+        if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
+
+        const pinMark = isPinned(art) ? '📌' : '';
+        row.innerHTML = `
+          <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${pinMark}</span>
+          <span class="txt"></span>
+          <button class="pin-btn" style="margin-left:auto">📌</button>
+        `;
+        row.querySelector('.txt').textContent = attachLine;
+        const turnKey = getTurnKey(art);
+        row.dataset.turn = turnKey;
+        row.dataset.kind = 'attach';
+        paintPinRow(row, isPinned(art));
+
+        row.addEventListener('click', () => scrollToHead(art));
+
+        row.querySelector('.pin-btn').addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          const k = getTurnKey(art);
+          const before = isPinned(art);
+          togglePin(art);
+          const after = isPinned(art);
+
+          const cfg = SH.getCFG() || {};
+          // 付箋のみ表示中に外したら、関連行は削除
+          if (cfg.list?.pinOnly && before && !after){
+            rowsByTurn(k).forEach(n => n.remove());
+            return;
+          }
+          // それ以外は同ターンの行だけ見た目更新
+          refreshPinUIForTurn(k);
+        });
+
+        body.appendChild(row);
+      }
+
+      // 本文行
+      const bodyLine = extractBodySnippet(head, maxChars);
+      if (bodyLine){
+        const row2 = document.createElement('div');
+        row2.className = 'row';
+        row2.style.fontSize = fontPx;
+
+        const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
+        const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
+        if (isUser) row2.style.background = 'rgba(240,246,255,.60)';
+        if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
+
+        const pinMark = isPinned(art) ? '📌' : '';
+        row2.innerHTML = `
+          <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${pinMark}</span>
+          <span class="txt"></span>
+          <button class="pin-btn" style="margin-left:auto">📌</button>
+        `;
+        row2.querySelector('.txt').textContent = bodyLine;
+        const turnKey = getTurnKey(art);
+        row2.dataset.turn = turnKey;
+        row2.dataset.kind = 'body';
+        paintPinRow(row2, isPinned(art));
+
+        row2.addEventListener('click', () => scrollToHead(art));
+
+        row2.querySelector('.pin-btn').addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          const k = getTurnKey(art);
+          const before = isPinned(art);
+          togglePin(art);
+          const after = isPinned(art);
+
+          const cfg = SH.getCFG() || {};
+          if (cfg.list?.pinOnly && before && !after){
+            rowsByTurn(k).forEach(n => n.remove());
+            return;
+          }
+          refreshPinUIForTurn(k);
+        });
+
+        body.appendChild(row2);
+      }
     }
+
+    // フッタに件数表示
+    const totalTurns = ST.all.length;
+    const shown = turns.length;
+    const info = document.createElement('div');
+    info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
+    info.textContent = `${shown}行（${totalTurns}ターン中）`;
+    foot.appendChild(info);
   }
-
-  // 件数だけ下部に表示（ページャは無し）
-  const total = ST.all.length;
-  const shown = body.children.length;
-  const info = document.createElement('div');
-  info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
-  info.textContent = `${shown} 行（${total} ターン）`;
-  foot.appendChild(info);
-}
 
 
   function setListEnabled(on){

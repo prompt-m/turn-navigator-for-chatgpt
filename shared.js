@@ -15,9 +15,14 @@
       maxItems: 30,
       maxChars: 40,
       fontSize: 12,
+      pinOnly:false,
       // 将来のためのサイズ保存（なければ null）
-      w: null, h: null, x: null, y: null
-    }
+      w: null, 
+      h: null,
+      x: null,
+      y: null
+    },
+    pins: {}// ← 付箋（key: true）
   });
 
   let CFG = structuredClone(DEFAULTS);

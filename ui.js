@@ -131,6 +131,10 @@
           <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
+        <label class="cgpt-list-toggle">
+          <input id="cgpt-pinonly" type="checkbox" style="accent-color:#888;">
+          <span>付箋のみ</span>
+        </label>
       </div>`;
     document.body.appendChild(box);
 
@@ -146,20 +150,30 @@
     applyLang();
     try { box.querySelector('#cgpt-viz').checked = !!SH.getCFG().showViz; } catch {}
 
-// 畳む/開く
-(function bindCollapse(){
-  const panel = document.getElementById('cgpt-list-panel');
-  const btn = document.getElementById('cgpt-list-collapse');
-  if (!panel || !btn) return;
-  btn.addEventListener('click', () => {
-    panel.classList.toggle('collapsed');
-    const on = !panel.classList.contains('collapsed');
-    btn.textContent = on ? '▴' : '▾';
-    btn.setAttribute('aria-expanded', String(on));
-  });
-})();
-
-
+    // 畳む/開く
+    (function bindCollapse(){
+      const panel = document.getElementById('cgpt-list-panel');
+      const btn = document.getElementById('cgpt-list-collapse');
+      if (!panel || !btn) return;
+      btn.addEventListener('click', () => {
+        panel.classList.toggle('collapsed');
+        const on = !panel.classList.contains('collapsed');
+        btn.textContent = on ? '▴' : '▾';
+        btn.setAttribute('aria-expanded', String(on));
+      });
+    })();
+    // 「付箋のみ」ON/OFF
+    try {
+      const cfg = SH.getCFG();
+      const cb = document.getElementById('cgpt-pinonly');
+      cb.checked = !!cfg.list?.pinOnly;
+      cb.addEventListener('change', () => {
+        const cur = SH.getCFG() || {};
+        SH.saveSettingsPatch({ list: { ...(cur.list||{}), pinOnly: cb.checked } });
+        window.CGTN_LOGIC?.rebuild?.();   // データ面の再構成
+        window.CGTN_LOGIC?.setListEnabled?.(true); // 再描画
+      });
+    } catch {}
   }
 
   function applyLang(){
