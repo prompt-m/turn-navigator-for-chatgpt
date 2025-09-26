@@ -24,15 +24,15 @@
       UI.clampPanelWithinViewport();
 
       // 初期状態は常に OFF（リロード/チャット切替とも）
-      try {
-        const cur = SH.getCFG() || {};
-        if (cur.list?.enabled) {
-          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), enabled:false } });
-        }
-        const chk = document.getElementById('cgpt-list-toggle');
-        chk.checked = false;
-        LG?.setListEnabled?.(false, /*save*/ false);
-      } catch {}
+//      try {
+//        const cur = SH.getCFG() || {};
+//        if (cur.list?.enabled) {
+//          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), enabled:false } });
+//        }
+//        const chk = document.getElementById('cgpt-list-toggle');
+//        chk.checked = false;
+//        LG?.setListEnabled?.(false, /*save*/ false);
+//      } catch {}
 
       LG.rebuild();
 
@@ -87,6 +87,16 @@ try {
       window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
       window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
     });
+
+// setListEnabled(false) を initialize 最後に一度だけ強制
+try {
+  const chk = document.getElementById('cgpt-list-toggle');
+  if (chk) chk.checked = false;
+  window.CGTN_LOGIC?.setListEnabled?.(false);
+} catch {}
+
+
+
   }
 
 //基準線の追従

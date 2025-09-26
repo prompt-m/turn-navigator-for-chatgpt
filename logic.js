@@ -343,6 +343,8 @@ function renderList(forceOn=false){
   panel.style.display = 'flex';
   const body = panel.querySelector('#cgpt-list-body');
   const foot = panel.querySelector('#cgpt-list-foot');
+  body.style.maxHeight = 'min(75vh, 700px)';   // 画面に合わせて
+  body.style.overflowY = 'auto';
   body.innerHTML = '';
   foot.innerHTML = ''; // ページャ撤去
 
@@ -365,8 +367,8 @@ function renderList(forceOn=false){
       // 行の背景（発言者に応じて）
       const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
       const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
-      if (isUser) row.style.background = 'rgba(240,246,255,.35)';
-      if (isAsst) row.style.background = 'rgba(234,255,245,.35)';
+      if (isUser) row.style.background = 'rgba(240,246,255,.60)';
+      if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
       row.innerHTML = `
         <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">🖼</span>
@@ -386,8 +388,8 @@ function renderList(forceOn=false){
       // 添付行と同じ背景で統一感
       const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
       const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
-      if (isUser) row2.style.background = 'rgba(240,246,255,.35)';
-      if (isAsst) row2.style.background = 'rgba(234,255,245,.35)';
+      if (isUser) row2.style.background = 'rgba(240,246,255,.60)';
+      if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
       row2.innerHTML = `
         <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center"> </span>
