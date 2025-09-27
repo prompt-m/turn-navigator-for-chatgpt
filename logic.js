@@ -227,15 +227,45 @@
     return k;
   }
 
-  function getPins(){ return (window.CGTN_SHARED?.getCFG?.().pins) || {}; }
-  function isPinned(article){ const k=getTurnKey(article); return !!getPins()[k]; }
-  function togglePin(article){
-    const k = getTurnKey(article);
-    if (!k) return;
-    const cfg = window.CGTN_SHARED?.getCFG?.() || {};
-    const pins = { ...(cfg.pins||{}) };
-    if (pins[k]) delete pins[k]; else pins[k] = true;
-    window.CGTN_SHARED?.saveSettingsPatch?.({ pins });
+  // === PINS: sync cache ===
+  let PINS = new Set();
+
+  function _pinsSetFromCFG(cfg){
+    const arr = (cfg && cfg.list && Array.isArray(cfg.list.pins)) ? cfg.list.pins : [];
+    return new Set(arr.map(String));
+  }
+  function _savePinsSet(set){
+    PINS = new Set(set);
+    const cur = SH.getCFG() || {};
+    SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pins: Array.from(PINS) } });
+  }
+  function initPinsCache(){ PINS = _pinsSetFromCFG(SH.getCFG() || {}); }
+
+  // キーAPI（ここが“真実”）
+  function isPinnedByKey(k){ return PINS.has(String(k)); }
+  function setPinnedByKey(k, val){
+    const s = new Set(PINS); const ks = String(k);
+    if (val) s.add(ks); else s.delete(ks);
+    _savePinsSet(s); return val;
+  }
+  function togglePinnedByKey(k){
+    const s = new Set(PINS); const ks = String(k);
+    const next = !s.has(ks); if (next) s.add(ks); else s.delete(ks);
+    _savePinsSet(s); return next; // ← 次状態を返すのが超重要
+  }
+
+  function getPins(){ return Array.from(PINS); }
+  function isPinned(artOrKey){
+    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+    return isPinnedByKey(k);
+  }
+  function togglePin(artOrKey){
+    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+    return togglePinnedByKey(k); // boolean を返す
+  }
+  function setPinned(artOrKey,val){
+    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+    return setPinnedByKey(k, !!val);
   }
 
   function qListBody(){ return document.getElementById('cgpt-list-body'); }
@@ -256,63 +286,70 @@
     else btn.classList.remove('golden');
   }
 
-  // ここ変えたよ：左の .clip にクラス付与＋aria-pressedで色を出す
   function paintPinRow(row, pinned){
     const clip = row.querySelector('.clip');
     if (!clip) return;
-    clip.classList.add('cgtn-clip-pin');           // ★ クラス付与（CSS命中のため）
-    clip.textContent =  '🔖\uFE0E'; 
+    clip.classList.add('cgtn-clip-pin');
+    // ダミーは見せずに幅だけ確保
+    if (clip.classList.contains('clip-dummy')){
+      clip.setAttribute('aria-pressed', 'false');
+      clip.style.visibility = 'hidden';
+      clip.style.pointerEvents = 'none';
+      return;
+    }
+    clip.style.visibility = 'visible';
+    clip.style.pointerEvents = 'auto';
+    clip.textContent = '🔖\uFE0E';
     clip.setAttribute('aria-pressed', String(!!pinned));
   }
-//🔖︎
+
+  //🔖︎
   // ここ変えたよ：左🔖クリックで即トグル＆見た目更新、付箋のみ中は行削除
-  function bindClipPin(clip, art){
-    if (!clip) return;
-    if (!clip.textContent) {
-      // ここ変えたよ：モノクロ表示バリアントで挿入
-      clip.textContent = '🔖\uFE0E';
+function bindClipPin(clip, art){
+  if (!clip) return;
+  if (!clip.textContent) clip.textContent = '🔖\uFE0E'; // ← VS15 でモノクロ
+  clip.classList.add('cgtn-clip-pin');
+  clip.style.cursor = 'pointer'; clip.style.userSelect = 'none'; clip.style.padding = '2px 6px';
+
+  const handler = (ev)=>{
+    ev.stopPropagation();
+    const k = getTurnKey(art);
+    const next = togglePinnedByKey(k); // ← 同期で確定
+    clip.setAttribute('aria-pressed', String(next));
+
+    const cfg = SH.getCFG() || {};
+    if (cfg.list?.pinOnly && !next){
+      rowsByTurn(k).forEach(n => n.remove()); // 付箋のみ中→OFFは即消す
+      return;
     }
-    clip.classList.add('cgtn-clip-pin');           // 念のため
-    clip.style.cursor = 'pointer';
-    clip.style.userSelect = 'none';
-    clip.style.padding = '2px 6px';
+    refreshPinUIForTurn(k, next); // ← 相方行も“確定値”で更新
+  };
+  clip.addEventListener('pointerdown', handler, {passive:true});
+  clip.addEventListener('click',        handler, {passive:true});
+}
 
-    const handler = (ev)=>{
-      ev.stopPropagation();
-      const k = getTurnKey(art);
-      const before = isPinned(art);
-      togglePin(art);
-      const after = isPinned(art);
-
-      // 自身を即更新
-      clip.setAttribute('aria-pressed', String(!!after));
-
-      // 付箋のみ中に外したら、そのターンの行を即削除
-      const cfg = SH.getCFG() || {};
-      if (cfg.list?.pinOnly && before && !after){
-        rowsByTurn(k).forEach(n => n.remove());
-        return;
-      }
-
-      // 同ターンのもう一方の行も、確定状態で色更新
-      refreshPinUIForTurn(k, after);
-    };
-    clip.addEventListener('pointerdown', handler, {passive:true});
-    clip.addEventListener('click',        handler, {passive:true});
-  }
-
+/*
   // ここ変えたよ：確定状態を渡して2行同時に色を更新
-  function refreshPinUIForTurn(turnKey, forcedState /* boolean? */){
-    const pinned = (typeof forcedState === 'boolean') ? forcedState : undefined;
+  function refreshPinUIForTurn(turnKey, forcedState){
     rowsByTurn(turnKey).forEach(row=>{
-      const state = (pinned !== undefined)
-        ? pinned
+      const state = (typeof forcedState === 'boolean')
+        ? forcedState
         : (row.querySelector('.cgtn-clip-pin')?.getAttribute('aria-pressed') === 'true');
       paintPinRow(row, state);
       const clip = row.querySelector('.cgtn-clip-pin');
       if (clip) clip.setAttribute('aria-pressed', String(!!state));
     });
   }
+*/
+
+function refreshPinUIForTurn(turnKey, forcedState){
+  const state = (typeof forcedState === 'boolean') ? forcedState : isPinnedByKey(turnKey);
+  rowsByTurn(turnKey).forEach(row=>{
+    const clip = row.querySelector('.cgtn-clip-pin');
+    if (clip) clip.setAttribute('aria-pressed', String(!!state));
+  });
+}
+
 
   // --- scroll core ---
   let _lockUntil = 0;
@@ -364,6 +401,7 @@
 
   // rebuild の最後にキーを必ず割り振る
   function rebuild(){
+    initPinsCache();
     if (isLocked && isLocked()) return;
     NS._scroller = getTrueScroller();
     const allRaw = pickAllTurns().filter(isRealTurn);
@@ -510,26 +548,29 @@
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
 
-    // ここ変えたよ：overrideを優先
     const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
 
-    // ヘッダの押下状態を同期
     const pinBtn = panel.querySelector('#cgpt-pin-filter');
     if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
     applyPinTheme?.();
 
-    // ターンサブセット
     let turns = ST.all;
     if (pinOnly) turns = turns.filter(isPinned);
 
     for (const art of turns){
-      const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
       const turnKey = getTurnKey(art);
+      const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
+
+      const attachLine = buildAttachmentLine(art, maxChars);
+      const bodyLine   = extractBodySnippet(head, maxChars);
+
+      // 🔖をどちらに出すか：添付があれば添付行、無ければ本文行
+      const showClipOnAttach = !!attachLine;
+      const showClipOnBody   = !attachLine && !!bodyLine;
 
       // 添付行
-      const attachLine = buildAttachmentLine(art, maxChars);
       if (attachLine){
         const row = document.createElement('div');
         row.className = 'row';
@@ -541,22 +582,21 @@
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
         row.innerHTML = `
-          <span class="clip" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖</span>
+          <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           <span class="txt"></span>
         `;
         row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
-
         row.dataset.turn = turnKey;
         row.dataset.kind = 'attach';
-        paintPinRow(row, isPinned(art));
-        bindClipPin(row.querySelector('.clip'), art);
 
+//        paintPinRow(row, isPinned(art));
+        paintPinRow(row,  isPinnedByKey(turnKey));
+        if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
         body.appendChild(row);
       }
 
       // 本文行
-      const bodyLine = extractBodySnippet(head, maxChars);
       if (bodyLine){
         const row2 = document.createElement('div');
         row2.className = 'row';
@@ -568,28 +608,26 @@
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
         row2.innerHTML = `
-          <span class="clip" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖</span>
+          <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           <span class="txt"></span>
         `;
         row2.querySelector('.txt').textContent = bodyLine;
         row2.addEventListener('click', () => scrollToHead(art));
-
         row2.dataset.turn = turnKey;
         row2.dataset.kind = 'body';
-        paintPinRow(row2, isPinned(art));
-        bindClipPin(row2.querySelector('.clip'), art);
 
+//        paintPinRow(row2, isPinned(art));
+        paintPinRow(row2, isPinnedByKey(turnKey));
+        if (showClipOnBody) bindClipPin(row2.querySelector('.clip'), art);
         body.appendChild(row2);
       }
     }
 
-    // 件数
     const info = document.createElement('div');
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
     info.textContent = `${body.children.length}行（${ST.all.length}ターン中）`;
     foot.appendChild(info);
   }
-
 
   function setListEnabled(on){
     const cfg = SH.getCFG();
