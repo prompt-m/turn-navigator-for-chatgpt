@@ -90,7 +90,52 @@
 #cgpt-list-collapse{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer}
 #cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
 
+/* === pins color === */
+/* 行右端の付箋ボタン（操作用） */
+#cgpt-list-panel .row .pin-btn[aria-pressed="false"] { color:#f8bcd0; } /* 薄ピンク：OFF */
+#cgpt-list-panel .row .pin-btn[aria-pressed="true"]  { color:#e60033; } /* 赤：ON */
+#cgpt-list-panel .row .pin-btn { cursor:pointer; }
 
+/* 行頭の状態マーク（表示用）——薄めに */
+#cgpt-list-panel .row .clip { opacity:.85; }
+
+
+/* つまみ横の付箋のみボタン（通常は薄ピンク、ONで赤） */
+#cgpt-list-head #cgpt-pin-filter { color:#f8bcd0; }
+#cgpt-list-head #cgpt-pin-filter[aria-pressed="true"] { color:#e60033; }
+#cgpt-list-head #cgpt-pin-filter:hover { filter:brightness(1.08); }
+
+/* つまみ横：Alt+クリックでゴールド“実験モード” */
+#cgpt-list-head #cgpt-pin-filter.golden { color:#b8860b; } /* OFF時の金系ブラウン */
+#cgpt-list-head #cgpt-pin-filter.golden[aria-pressed="true"] {
+  color:#FFD700; text-shadow:0 0 4px rgba(255,215,0,.7);
+  animation: cgpt-gold-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes cgpt-gold-pulse { from { filter:brightness(1.0); } to { filter:brightness(1.25); } }
+
+/* 付箋ボタンのヒットボックスを少し広げ、誤クリックを減らす */
+#cgpt-list-panel .row .pin-btn { padding:2px 8px; }
+#cgpt-list-panel .row .clip { cursor:default; }
+
+/* ここ変えたよ：左側🔖の色（OFF=グレー, ON=赤） */
+#cgpt-list-panel .row .clip[aria-pressed="false"] { color:#979797; }
+#cgpt-list-panel .row .clip[aria-pressed="true"]  { color:#e60033; }
+
+/* ホバー時の見た目（押せる感は出すが控えめ） */
+#cgpt-list-panel .row .clip:hover { filter: brightness(1.1); }
+
+/* 左側🔖のON/OFF色（確実に命中させるためクラス指定） */
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; } /* グレー（OFF） */
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; } /* 赤（ON） */
+
+/* hoverで押せる感だけ少し強調 */
+#cgpt-list-panel .row .cgtn-clip-pin:hover { filter: brightness(1.1); }
+
+/* 左🔖は色をはっきり見せる */
+#cgpt-list-panel .row .cgtn-clip-pin { opacity:1; }
+
+/* 操作対象としてのカーソル（左🔖のみ） */
+#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
 
   `;
 
@@ -98,17 +143,20 @@
 
   function installUI(){
     if (document.getElementById('cgpt-nav')) return;
+
     const box = document.createElement('div');
     box.id = 'cgpt-nav';
     box.innerHTML = `
       <div id="cgpt-drag" title=""></div>
+
       <div class="cgpt-nav-group" data-role="user">
         <div class="cgpt-nav-label" data-i18n="user"></div>
         <button data-act="top" data-i18n="top"></button>
         <button data-act="prev" data-i18n="prev"></button>
         <button data-act="next" data-i18n="next"></button>
-        <button data-act="bottom" data-i18n="bottom"></button>
+      <button data-act="bottom" data-i18n="bottom"></button>
       </div>
+
       <div class="cgpt-nav-group" data-role="assistant">
         <div class="cgpt-nav-label" data-i18n="assistant"></div>
         <button data-act="top" data-i18n="top"></button>
@@ -116,6 +164,7 @@
         <button data-act="next" data-i18n="next"></button>
         <button data-act="bottom" data-i18n="bottom"></button>
       </div>
+
       <div class="cgpt-nav-group" data-role="all">
         <div class="cgpt-nav-label" data-i18n="all"></div>
         <div class="cgpt-grid2">
@@ -123,37 +172,67 @@
           <button data-act="bottom">▼</button>
         </div>
         <button class="cgpt-lang-btn"></button>
+
         <label class="cgpt-viz-toggle">
           <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
           <span data-i18n="line"></span>
         </label>
+
         <label class="cgpt-list-toggle">
           <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
+
         <label class="cgpt-list-toggle">
           <input id="cgpt-pinonly" type="checkbox" style="accent-color:#888;">
           <span>付箋のみ</span>
         </label>
-      </div>`;
+      </div>
+    `;
     document.body.appendChild(box);
 
     // ドラッグ移動（保存は shared 側）
     (function enableDragging(){
       const grip = box.querySelector('#cgpt-drag');
       let dragging=false,offX=0,offY=0;
-      grip.addEventListener('pointerdown',e=>{ dragging=true; const r=box.getBoundingClientRect(); offX=e.clientX-r.left; offY=e.clientY-r.top; grip.setPointerCapture(e.pointerId); });
-      window.addEventListener('pointermove',e=>{ if(!dragging) return; box.style.left=(e.clientX-offX)+'px'; box.style.top=(e.clientY-offY)+'px'; },{passive:true});
-      window.addEventListener('pointerup',e=>{ if(!dragging) return; dragging=false; grip.releasePointerCapture(e.pointerId); clampPanelWithinViewport(); const r=box.getBoundingClientRect(); SH.saveSettingsPatch({ panel:{ x:r.left, y:r.top } }); });
+      grip.addEventListener('pointerdown',e=>{
+        dragging=true;
+        const r=box.getBoundingClientRect();
+        offX=e.clientX-r.left; offY=e.clientY-r.top;
+        grip.setPointerCapture(e.pointerId);
+      });
+      window.addEventListener('pointermove',e=>{
+        if(!dragging) return;
+        box.style.left=(e.clientX-offX)+'px';
+        box.style.top=(e.clientY-offY)+'px';
+      },{passive:true});
+      window.addEventListener('pointerup',e=>{
+        if(!dragging) return;
+        dragging=false; grip.releasePointerCapture(e.pointerId);
+        clampPanelWithinViewport();
+        const r=box.getBoundingClientRect();
+        SH.saveSettingsPatch({ panel:{ x:r.left, y:r.top } });
+      });
     })();
 
     applyLang();
-    try { box.querySelector('#cgpt-viz').checked = !!SH.getCFG().showViz; } catch {}
 
-    // 畳む/開く
+    // 初期チェック状態の反映
+    const cfg = SH.getCFG() || {};
+    const vizChk     = box.querySelector('#cgpt-viz');
+    const listChk    = box.querySelector('#cgpt-list-toggle');
+    const pinOnlyChk = box.querySelector('#cgpt-pinonly');
+    try {
+      vizChk.checked      = !!cfg.showViz;
+      listChk.checked     = !!cfg.list?.enabled;
+      pinOnlyChk.checked  = !!cfg.list?.pinOnly;
+      pinOnlyChk.disabled = !listChk.checked;   // 一覧OFFなら操作不可
+    } catch {}
+
+    // 折りたたみ（パネルDOMは logic 側で生成されるので存在すればバインド）
     (function bindCollapse(){
       const panel = document.getElementById('cgpt-list-panel');
-      const btn = document.getElementById('cgpt-list-collapse');
+      const btn   = document.getElementById('cgpt-list-collapse');
       if (!panel || !btn) return;
       btn.addEventListener('click', () => {
         panel.classList.toggle('collapsed');
@@ -162,18 +241,63 @@
         btn.setAttribute('aria-expanded', String(on));
       });
     })();
-    // 「付箋のみ」ON/OFF
-    try {
-      const cfg = SH.getCFG();
-      const cb = document.getElementById('cgpt-pinonly');
-      cb.checked = !!cfg.list?.pinOnly;
-      cb.addEventListener('change', () => {
-        const cur = SH.getCFG() || {};
-        SH.saveSettingsPatch({ list: { ...(cur.list||{}), pinOnly: cb.checked } });
-        window.CGTN_LOGIC?.rebuild?.();   // データ面の再構成
-        window.CGTN_LOGIC?.setListEnabled?.(true); // 再描画
-      });
-    } catch {}
+
+    // ==== チェックの相互連動 ====
+
+    // 「付箋のみ」トグル（置換）
+    pinOnlyChk.addEventListener('change', () => {
+      const cur = SH.getCFG() || {};
+      const val = !!pinOnlyChk.checked;
+
+      // 保存
+      SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: val } });
+
+      // 一覧がOFFならONにして表示を保証
+      const listOn = !!(SH.getCFG()?.list?.enabled);
+      if (!listOn) window.CGTN_LOGIC?.setListEnabled?.(true);
+
+      // ★ 即時に新状態で再描画（保存反映待ちを回避）
+      window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: val });
+
+      // フォーカスを外して“カーソル残り”を防ぐ
+      try { pinOnlyChk.blur(); } catch {}
+    });
+
+    // 「一覧」トグル
+    listChk.addEventListener('change', () => {
+      const on  = listChk.checked;
+      const cur = SH.getCFG() || {};
+      const patch = on
+        ? { list:{ ...(cur.list||{}), enabled:true } }
+        : { list:{ ...(cur.list||{}), enabled:false, pinOnly:false } }; // OFFならpinOnlyもOFF
+      SH.saveSettingsPatch(patch);
+
+      // 付箋のみの活性/非活性を即時反映
+      pinOnlyChk.disabled = !on;
+      if (!on) pinOnlyChk.checked = false;
+
+      // 描画更新
+      window.CGTN_LOGIC?.setListEnabled?.(on);
+      // フォーカスを外して“カーソル残り”を防ぐ
+      try{ listChk.blur(); }catch{}
+    });
+
+    // 基準線トグル（従来どおり）
+    vizChk.addEventListener('change', () => {
+      const on = vizChk.checked;
+      SH.toggleViz(on);
+      SH.saveSettingsPatch({ showViz: !!on });
+    });
+
+    // ナビエリア内のクリック後、フォーカスを外す（カーソル残り対策）
+    box.addEventListener('click', () => {
+      const ae = document.activeElement;
+      if (ae && typeof ae.blur === 'function') {
+        // チェックボックスやボタンの残留フォーカスを除去
+        ae.blur();
+      }
+    }, {capture:true});
+
   }
 
   function applyLang(){

@@ -14,6 +14,11 @@
     try {
       box.querySelector('#cgpt-viz').checked  = !!SH.getCFG().showViz;
       box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG().list?.enabled);
+      const pinOnlyChk = document.getElementById('cgpt-pinonly');
+      if (pinOnlyChk){
+        pinOnlyChk.checked  = !!(SH.getCFG().list?.pinOnly);
+        pinOnlyChk.disabled = !SH.getCFG().list?.enabled;
+      }
     } catch {}
 
     box.addEventListener('click', (e) => {
@@ -24,6 +29,15 @@
       if (t.closest('#cgpt-list-toggle')) {
         const on = t.closest('#cgpt-list-toggle').checked;
         LG.setListEnabled(on);
+
+        // 一覧をOFFにしたら付箋もOFF & 無効化
+        const pinOnlyChk = document.getElementById('cgpt-pinonly');
+        if (!on && pinOnlyChk){
+          const cur = SH.getCFG() || {};
+          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly:false } });
+          pinOnlyChk.checked = false;
+          pinOnlyChk.disabled = true;
+        }
         return;
       }
 

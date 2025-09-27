@@ -65,6 +65,12 @@
     return article;
   }
 
+  // ここ変えたよ：共通トランケータ
+  function truncate(s, max){
+    if (!max || !s) return s || '';
+    return s.length > max ? s.slice(0, max) + '…' : s;
+  }
+
   // ===== 添付ファイル検出（Article.txt対応） =====
 
   // 1) ファイル名の収集
@@ -154,39 +160,45 @@
     return picked || '（内容なし）';
   }
 
-  // （画像）やファイル名を並べた「添付行」を返す。無ければ空文字。
-  function buildAttachmentLine(root){
+  // ここ変えたよ：種別アイコンを先頭に横並び → （画像） → ファイル名を連結
+  function buildAttachmentLine(root, maxChars){
     const el = root || document;
-    const names = collectAttachmentNames(el);     // すでに実装済み（href無チップ対応）
-    const hasImg = !!el.querySelector('img, picture img');
 
-    const parts = [];
-    if (hasImg) parts.push('（画像）');            // 画像は1つに統一
-    // 画像以外も含むファイル名を重複排除で追加
-    for (const n of new Set(names)) {
-      if (n) parts.push(String(n));
-    }
-    return parts.join(' ');
+    // 種別（既存の detectAttachmentKinds は 🖼/🎞/📝 を返す想定）
+    const kinds = Array.from(new Set(detectAttachmentKinds(el) || []));
+    // 表示順を固定（画像→動画→文書ほか）
+    const order = ['🖼','🎞','📝'];
+    kinds.sort((a,b)=> order.indexOf(a) - order.indexOf(b));
+    const kindsStr = kinds.join('');
+
+    // （画像）表記
+    const hasImg = !!el.querySelector('img, picture img');
+    const imgLabel = hasImg ? '（画像）' : '';
+
+    // ファイル名（href無しのチップも含む）
+    const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
+    const namesStr = names.join(' '); // ← 横に並べる
+
+    // 結合：🖼📝 + 半角スペース + （画像） + 半角スペース + 連結名
+    const line = [kindsStr, imgLabel, namesStr].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+
+    // 既存の truncate/または安全切り詰め
+    const max = Math.max(10, Number(maxChars)||0);
+    return max ? (line.length > max ? line.slice(0, max) + '…' : line) : line;
   }
 
   // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
+  // ここ変えたよ：トリム＆maxChars 厳密適用
   function extractBodySnippet(head, maxChars){
     if (!head) return '';
-
-    // クローンして添付系要素を除去してからテキスト化
     const clone = head.cloneNode(true);
     clone.querySelectorAll([
-      // ファイルチップやリンク類
-      '.border.rounded-xl', 'a[download]', 'a[href]',
-      // 図版・メディア
-      'figure', 'figcaption', 'img', 'picture', 'video', 'source'
+      '.border.rounded-xl','a[download]','a[href]',
+      'figure','figcaption','img','picture','video','source'
     ].join(',')).forEach(n => n.remove());
 
     let txt = (clone.innerText || '').replace(/\s+/g, ' ').trim();
-    if (!txt) return '';
-
-    if (maxChars && txt.length > maxChars) txt = txt.slice(0, maxChars) + '…';
-    return txt;
+    return truncate(txt, maxChars);
   }
 
   function articleTop(scroller, article){
@@ -197,16 +209,24 @@
   }
   const currentAnchorY = ()=> SH.computeAnchor(SH.getCFG()).y;
 
+  // ここ変えたよ：ターンキー安定化。DOMに無ければ連番を割り当てて保持。
+  const _turnKeyMap = new WeakMap();
+
   // --- Pins (付箋) ---
   function getTurnKey(article){
     if (!article) return '';
-    // ChatGPTの article には data-turn-id、子に data-message-id があることが多い
-    const id = article.getAttribute('data-turn-id')
-           || article.querySelector('[data-message-id]')?.getAttribute('data-message-id')
-           || article.id
-           || '';
-    return String(id);
+    const domId =
+      article.getAttribute('data-turn-id') ||
+      article.querySelector('[data-message-id]')?.getAttribute('data-message-id') ||
+      article.id;
+    if (domId) return String(domId);
+    // 連番の自前キー
+    if (_turnKeyMap.has(article)) return _turnKeyMap.get(article);
+    const k = 'turn:' + Math.random().toString(36).slice(2, 9);
+    _turnKeyMap.set(article, k);
+    return k;
   }
+
   function getPins(){ return (window.CGTN_SHARED?.getCFG?.().pins) || {}; }
   function isPinned(article){ const k=getTurnKey(article); return !!getPins()[k]; }
   function togglePin(article){
@@ -226,25 +246,73 @@
     return Array.from(body.querySelectorAll(`.row[data-turn="${CSS.escape(turnKey)}"]`));
   }
 
+  // === pin theme (gold test) ===
+  function applyPinTheme(){
+    const cfg = SH.getCFG() || {};
+    const theme = cfg.list?.pinTheme || 'red';
+    const btn = document.getElementById('cgpt-pin-filter');
+    if (!btn) return;
+    if (theme === 'gold') btn.classList.add('golden');
+    else btn.classList.remove('golden');
+  }
+
+  // ここ変えたよ：左の .clip にクラス付与＋aria-pressedで色を出す
   function paintPinRow(row, pinned){
-    // 左マーク
-    const lm = row.querySelector('.clip');
-    if (lm) lm.textContent = pinned ? '📌' : '';
-    // ボタン表示（薄く／通常）
-    const btn = row.querySelector('.pin-btn');
-    if (btn){
-      btn.setAttribute('aria-pressed', String(!!pinned));
-      btn.style.opacity = pinned ? '1' : '.6';
-      btn.title = pinned ? '付箋を外す' : '付箋を付ける';
+    const clip = row.querySelector('.clip');
+    if (!clip) return;
+    clip.classList.add('cgtn-clip-pin');           // ★ クラス付与（CSS命中のため）
+    clip.textContent =  '🔖\uFE0E'; 
+    clip.setAttribute('aria-pressed', String(!!pinned));
+  }
+//🔖︎
+  // ここ変えたよ：左🔖クリックで即トグル＆見た目更新、付箋のみ中は行削除
+  function bindClipPin(clip, art){
+    if (!clip) return;
+    if (!clip.textContent) {
+      // ここ変えたよ：モノクロ表示バリアントで挿入
+      clip.textContent = '🔖\uFE0E';
     }
+    clip.classList.add('cgtn-clip-pin');           // 念のため
+    clip.style.cursor = 'pointer';
+    clip.style.userSelect = 'none';
+    clip.style.padding = '2px 6px';
+
+    const handler = (ev)=>{
+      ev.stopPropagation();
+      const k = getTurnKey(art);
+      const before = isPinned(art);
+      togglePin(art);
+      const after = isPinned(art);
+
+      // 自身を即更新
+      clip.setAttribute('aria-pressed', String(!!after));
+
+      // 付箋のみ中に外したら、そのターンの行を即削除
+      const cfg = SH.getCFG() || {};
+      if (cfg.list?.pinOnly && before && !after){
+        rowsByTurn(k).forEach(n => n.remove());
+        return;
+      }
+
+      // 同ターンのもう一方の行も、確定状態で色更新
+      refreshPinUIForTurn(k, after);
+    };
+    clip.addEventListener('pointerdown', handler, {passive:true});
+    clip.addEventListener('click',        handler, {passive:true});
   }
 
-  function refreshPinUIForTurn(turnKey){
-    const pinned = !!getPins()[turnKey];
-    const rows = rowsByTurn(turnKey);
-    for (const r of rows) paintPinRow(r, pinned);
+  // ここ変えたよ：確定状態を渡して2行同時に色を更新
+  function refreshPinUIForTurn(turnKey, forcedState /* boolean? */){
+    const pinned = (typeof forcedState === 'boolean') ? forcedState : undefined;
+    rowsByTurn(turnKey).forEach(row=>{
+      const state = (pinned !== undefined)
+        ? pinned
+        : (row.querySelector('.cgtn-clip-pin')?.getAttribute('aria-pressed') === 'true');
+      paintPinRow(row, state);
+      const clip = row.querySelector('.cgtn-clip-pin');
+      if (clip) clip.setAttribute('aria-pressed', String(!!state));
+    });
   }
-
 
   // --- scroll core ---
   let _lockUntil = 0;
@@ -293,38 +361,17 @@
 
   // --- state & rebuild ---
   const ST = { all: [], user: [], assistant: [], page:1 };
+
+  // rebuild の最後にキーを必ず割り振る
   function rebuild(){
     if (isLocked && isLocked()) return;
-
-    // 会話スレッドが切り替わったらリストは閉じる
-    (function(){
-      let _lastUrl = location.pathname + location.search;
-      window.addEventListener('popstate', ()=>{ _lastUrl = location.pathname + location.search; });
-      const _ensureOffOnThreadChange = () => {
-        const now = location.pathname + location.search;
-        if (now !== _lastUrl) {
-          _lastUrl = now;
-          try {
-            const chk = document.getElementById('cgpt-list-toggle');
-            if (chk) chk.checked = false;
-            window.CGTN_LOGIC?.setListEnabled?.(false, false);
-          } catch {}
-        }
-      };
-      // rebuild の最初で呼ぶ
-      const _origRebuild = window.CGTN_LOGIC?.rebuild;
-      window.CGTN_LOGIC.rebuild = function(){
-        _ensureOffOnThreadChange();
-        return _origRebuild?.apply(this, arguments);
-      };
-    })();
-    // 会話スレッドが切り替わったらリストは閉じる ここまで
-
     NS._scroller = getTrueScroller();
     const allRaw = pickAllTurns().filter(isRealTurn);
     ST.all = sortByY(allRaw);
     ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
     ST.assistant = ST.all.filter(a => a.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
+    // ここ変えたよ：全要素にキーを確実に紐付け
+    for (const a of ST.all){ getTurnKey(a); }
   }
 
   // --- list panel ---
@@ -336,7 +383,7 @@
     listBox.innerHTML = `
       <div id="cgpt-list-head">
         <div id="cgpt-list-grip" title="ドラッグで移動"></div>
-        <button id="cgpt-pin-filter" title="付箋のみ/すべて切替">📌</button>
+        <button id="cgpt-pin-filter" type="button" title="付箋のみ/すべて切替" aria-pressed="false" style="cursor:pointer">🔖\uFE0E</button>
         <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
       </div>
       <div id="cgpt-list-body"></div>
@@ -372,40 +419,89 @@
       });
     })();
 
-    // 「畳む/開く」トグル
-    listBox.querySelector('#cgpt-list-collapse').addEventListener('click', () => {
-      const collapsed = listBox.classList.toggle('collapsed');
-      const on = !collapsed;                 // 展開時 true
-      const btn = listBox.querySelector('#cgpt-list-collapse');
-      if (btn) {
-        btn.textContent = on ? '▴' : '▾';    // ← ui.js と統一（開=▾ / 閉=▴）
-        btn.setAttribute('aria-expanded', String(on));
-      }
-    });
-
-    // ensureListBox() 内、イベント追加
+    // ここ変えたよ：つまみ横の付箋のみ（1クリック目から確実に反映）
     (function bindPinFilter(){
       const btn = listBox.querySelector('#cgpt-pin-filter');
-      btn.addEventListener('click', ()=>{
+      if (!btn || btn._cgtnBound) return;
+      btn._cgtnBound = true;
+      btn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
         const cur = SH.getCFG() || {};
+
+        // Alt+クリックはテーマ切替（任意運用）
+        if (ev.altKey){
+          const nextTheme = (cur.list?.pinTheme === 'gold') ? 'red' : 'gold';
+          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinTheme: nextTheme } });
+          applyPinTheme?.();
+          return;
+        }
+
+        // 通常クリック：pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
         SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
-        renderList(true);
-      });
+
+        btn.setAttribute('aria-pressed', String(next));
+        const pinOnlyChk = document.getElementById('cgpt-pinonly');
+        if (pinOnlyChk) pinOnlyChk.checked = next;
+
+        // ★ オーバーライドで1クリック目から絞込み／解除を確定
+        renderList(true, { pinOnlyOverride: next });
+      }, {passive:true});
     })();
+
+    // ここ変えたよ：畳み/開きのバインドを安全に一度だけ行う
+    function bindCollapseOnce(panel){
+      const btn = panel.querySelector('#cgpt-list-collapse');
+      if (!btn) return;
+      if (btn._cgtnBound) return;       // 二重バインド防止
+      btn._cgtnBound = true;
+
+      btn.addEventListener('click', () => {
+        const collapsed = panel.classList.toggle('collapsed');
+        const on = !collapsed; // 展開=true
+        btn.textContent = on ? '▴' : '▾';       // 開=▴ / 閉=▾
+        btn.setAttribute('aria-expanded', String(on));
+      });
+    }
+    bindCollapseOnce(listBox);
 
     return listBox;
   }
 
-  function renderList(forceOn=false){
+  // 行右端🗒️のイベントを二重で拾い、誤クリック防止
+  function addPinHandlers(btn, art){
+    if (!btn) return;
+    btn.type = 'button';
+    btn.style.pointerEvents = 'auto';
+    btn.style.cursor = 'pointer';
+    btn.style.padding = '2px 6px';     // ヒットボックス拡大
+    const handler = (ev) => {
+      ev.stopPropagation();
+      const k = getTurnKey(art);
+      const before = isPinned(art);
+      togglePin(art);                  // 保存（SH.saveSettingsPatchベース）
+      const after = isPinned(art);
+
+      const cur = SH.getCFG() || {};
+      if (cur.list?.pinOnly && before && !after){
+        rowsByTurn(k).forEach(n => n.remove()); // 付箋のみで外した→そのターン行を削除
+        return;
+      }
+      refreshPinUIForTurn(k);                   // 同ターン2行を部分更新
+    };
+    btn.addEventListener('pointerdown', handler, {passive:true});
+    btn.addEventListener('click',        handler, {passive:true});
+  }
+
+  function renderList(forceOn=false, opts={}){
     const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
     if (!enabled) return;
 
     const panel = ensureListBox();
+    const body  = panel.querySelector('#cgpt-list-body');
+    const foot  = panel.querySelector('#cgpt-list-foot');
     panel.style.display = 'flex';
-    const body = panel.querySelector('#cgpt-list-body');
-    const foot = panel.querySelector('#cgpt-list-foot');
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
@@ -413,19 +509,27 @@
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
-    const pinOnly  = !!cfg.list?.pinOnly;
 
-    // === 対象ターンを決定（pinOnlyの場合はピン留めされたものだけ）
+    // ここ変えたよ：overrideを優先
+    const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
+      ? !!opts.pinOnlyOverride
+      : !!cfg.list?.pinOnly;
+
+    // ヘッダの押下状態を同期
+    const pinBtn = panel.querySelector('#cgpt-pin-filter');
+    if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
+    applyPinTheme?.();
+
+    // ターンサブセット
     let turns = ST.all;
-    if (pinOnly){
-      turns = turns.filter(isPinned);
-    }
+    if (pinOnly) turns = turns.filter(isPinned);
 
     for (const art of turns){
       const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
+      const turnKey = getTurnKey(art);
 
       // 添付行
-      const attachLine = buildAttachmentLine(art);
+      const attachLine = buildAttachmentLine(art, maxChars);
       if (attachLine){
         const row = document.createElement('div');
         row.className = 'row';
@@ -436,36 +540,17 @@
         if (isUser) row.style.background = 'rgba(240,246,255,.60)';
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
-        const pinMark = isPinned(art) ? '📌' : '';
         row.innerHTML = `
-          <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${pinMark}</span>
+          <span class="clip" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖</span>
           <span class="txt"></span>
-          <button class="pin-btn" style="margin-left:auto">📌</button>
         `;
         row.querySelector('.txt').textContent = attachLine;
-        const turnKey = getTurnKey(art);
+        row.addEventListener('click', () => scrollToHead(art));
+
         row.dataset.turn = turnKey;
         row.dataset.kind = 'attach';
         paintPinRow(row, isPinned(art));
-
-        row.addEventListener('click', () => scrollToHead(art));
-
-        row.querySelector('.pin-btn').addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          const k = getTurnKey(art);
-          const before = isPinned(art);
-          togglePin(art);
-          const after = isPinned(art);
-
-          const cfg = SH.getCFG() || {};
-          // 付箋のみ表示中に外したら、関連行は削除
-          if (cfg.list?.pinOnly && before && !after){
-            rowsByTurn(k).forEach(n => n.remove());
-            return;
-          }
-          // それ以外は同ターンの行だけ見た目更新
-          refreshPinUIForTurn(k);
-        });
+        bindClipPin(row.querySelector('.clip'), art);
 
         body.appendChild(row);
       }
@@ -482,45 +567,26 @@
         if (isUser) row2.style.background = 'rgba(240,246,255,.60)';
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
-        const pinMark = isPinned(art) ? '📌' : '';
         row2.innerHTML = `
-          <span class="clip" style="width:1.4em;display:inline-flex;justify-content:center">${pinMark}</span>
+          <span class="clip" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖</span>
           <span class="txt"></span>
-          <button class="pin-btn" style="margin-left:auto">📌</button>
         `;
         row2.querySelector('.txt').textContent = bodyLine;
-        const turnKey = getTurnKey(art);
+        row2.addEventListener('click', () => scrollToHead(art));
+
         row2.dataset.turn = turnKey;
         row2.dataset.kind = 'body';
         paintPinRow(row2, isPinned(art));
-
-        row2.addEventListener('click', () => scrollToHead(art));
-
-        row2.querySelector('.pin-btn').addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          const k = getTurnKey(art);
-          const before = isPinned(art);
-          togglePin(art);
-          const after = isPinned(art);
-
-          const cfg = SH.getCFG() || {};
-          if (cfg.list?.pinOnly && before && !after){
-            rowsByTurn(k).forEach(n => n.remove());
-            return;
-          }
-          refreshPinUIForTurn(k);
-        });
+        bindClipPin(row2.querySelector('.clip'), art);
 
         body.appendChild(row2);
       }
     }
 
-    // フッタに件数表示
-    const totalTurns = ST.all.length;
-    const shown = turns.length;
+    // 件数
     const info = document.createElement('div');
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
-    info.textContent = `${shown}行（${totalTurns}ターン中）`;
+    info.textContent = `${body.children.length}行（${ST.all.length}ターン中）`;
     foot.appendChild(info);
   }
 
@@ -528,9 +594,29 @@
   function setListEnabled(on){
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
+  
     const panel = ensureListBox();
     panel.style.display = on ? 'flex' : 'none';
-    if (on) renderList(true);
+  
+    // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
+    if (on) {
+      NS.rebuild?.();                              // ★ 初回でも必ずデータ作成
+      panel.classList.remove('collapsed');
+      const btn = panel.querySelector('#cgpt-list-collapse');
+      if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
+  
+      // pinOnly チェックを有効化
+      const pinOnlyChk = document.getElementById('cgpt-pinonly');
+      if (pinOnlyChk) pinOnlyChk.disabled = false;
+  
+      renderList(true);
+    } else {
+      // OFF時は pinOnly もOFFにして保存＆UI無効化
+      const cur = SH.getCFG() || {};
+      SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly:false } });
+      const pinOnlyChk = document.getElementById('cgpt-pinonly');
+      if (pinOnlyChk) { pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
+    }
   }
 
   // --- navigation ---
@@ -572,7 +658,11 @@
   }
 
   // --- expose ---
+  NS.renderList = renderList;
   NS.rebuild = rebuild;
   NS.setListEnabled = setListEnabled;
-  NS.goTop = goTop; NS.goBottom = goBottom; NS.goPrev = goPrev; NS.goNext = goNext;
+  NS.goTop = goTop; 
+  NS.goBottom = goBottom;
+  NS.goPrev = goPrev;
+  NS.goNext = goNext;
 })();

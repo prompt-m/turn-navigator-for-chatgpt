@@ -94,6 +94,18 @@ try {
         window.CGTN_LOGIC?.setListEnabled?.(false);
       } catch {}
 
+      // 一覧は必ずOFF、pinOnlyも必ずOFFでスタート（保存込み）
+      try {
+        const cur = SH.getCFG() || {};
+        SH.saveSettingsPatch({
+          list: { ...(cur.list||{}), enabled: false, pinOnly: false }
+        });
+        const listChk = document.getElementById('cgpt-list-toggle');
+        if (listChk) listChk.checked = false;
+        const pinOnlyChk = document.getElementById('cgpt-pinonly');
+        if (pinOnlyChk) { pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
+        window.CGTN_LOGIC?.setListEnabled?.(false, /*save*/ false);
+      } catch {}
     });
   }
 
