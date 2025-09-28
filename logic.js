@@ -499,6 +499,22 @@ function refreshPinUIForTurn(turnKey, forcedState){
     `;
     document.body.appendChild(listBox);
 
+    // リストパネル内でもクリックでフォーカスを残さない
+    (function suppressMouseFocusInList(panel){
+      if (!panel || panel._cgtnNoMouseFocus) return;
+      panel._cgtnNoMouseFocus = true;
+
+      panel.addEventListener('mousedown', (e) => {
+        const t = e.target.closest('button, label, input[type=checkbox]');
+        if (t) e.preventDefault();
+      }, { passive: false });
+
+      panel.addEventListener('click', (e) => {
+        const t = e.target.closest('button, label, input[type=checkbox]');
+        if (t && t.blur) t.blur();
+      }, { passive: true });
+    })(listBox);
+
     // パネルDOM生成の直後に追加：bottom固定からtop固定へ切替
     const r = listBox.getBoundingClientRect();
     listBox.style.top = `${Math.max(8, r.top)}px`;

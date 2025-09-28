@@ -97,6 +97,20 @@
 #cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
 #cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
 
+/* === マウス操作時のフォーカス枠を消す（キーボード操作の :focus-visible は維持） === */
+#cgpt-nav button:focus,
+#cgpt-nav label:focus,
+#cgpt-list-panel button:focus,
+#cgpt-list-panel label:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+#cgpt-nav button:focus-visible,
+#cgpt-list-panel button:focus-visible {
+  outline: 2px solid rgba(0,0,0,.25);
+  outline-offset: 2px;
+}
+
 
   `;
 
@@ -151,6 +165,25 @@ function installUI(){
       </div>
     `;
     document.body.appendChild(box);
+
+    // クリックでフォーカスを残さない（ボタン/ラベル/チェックボックス対象）
+    (function suppressMouseFocusInNav(){
+      const root = document.getElementById('cgpt-nav');
+      if (!root || root._cgtnNoMouseFocus) return;
+      root._cgtnNoMouseFocus = true;
+
+      // マウス押下時にフォーカス移動を阻止
+      root.addEventListener('mousedown', (e) => {
+        const t = e.target.closest('button, label, input[type=checkbox]');
+        if (t) e.preventDefault();
+      }, { passive: false });
+
+      // クリック後は念のため blur（キーボード操作には影響なし）
+      root.addEventListener('click', (e) => {
+        const t = e.target.closest('button, label, input[type=checkbox]');
+        if (t && t.blur) t.blur();
+      }, { passive: true });
+    })();
 
     // ドラッグ移動（保存は shared 側）
     (function enableDragging(){
