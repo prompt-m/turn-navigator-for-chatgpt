@@ -427,7 +427,13 @@ function refreshPinUIForTurn(turnKey, forcedState){
     if (r.height < 8 || !isVisible(head)) return false;
     const txt = (head.textContent || head.innerText || '').trim();
     const hasText  = txt.length > 0;
-    const hasMedia = !!head.querySelector('img,video,canvas,figure,[data-testid*="download"]');
+//★★★    const hasMedia = !!head.querySelector('img,video,canvas,figure,[data-testid*="download"]');
+    const hasMedia = !!article.querySelector(
+      'img,video,canvas,figure,' +
+      '[data-testid*="download"],[data-testid*="attachment"],[data-testid*="file"],' +
+      'a[download],a[href^="blob:"]'
+    );
+
     const busy = head.getAttribute?.('aria-busy') === 'true';
     return (hasText || hasMedia) && !busy;
   }
@@ -703,7 +709,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
     // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
     if (on) {
       ensurePinsCache();  // ← 追加
-//      NS.rebuild?.();                              // ★ 初回でも必ずデータ作成
+      // ①まず即時スキャン（ある程度は出る）★★★
       rebuild();
       panel.classList.remove('collapsed');
       const btn = panel.querySelector('#cgpt-list-collapse');
@@ -714,6 +720,11 @@ function refreshPinUIForTurn(turnKey, forcedState){
       if (pinOnlyChk) pinOnlyChk.disabled = false;
   
       renderList(true);
+      // ②遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
+      //    rAF×2 でペイント後、さらに少し待ってから確定
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        setTimeout(()=>{ rebuild(); renderList(true); }, 180);
+      }));
     } else {
       // OFF時は pinOnly もOFFにして保存＆UI無効化
       const cur = SH.getCFG() || {};
