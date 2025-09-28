@@ -229,16 +229,25 @@
 
   // === PINS: sync cache ===
   let PINS = new Set();
+  let _pinsInited = false;
 
-  function _pinsSetFromCFG(cfg){
-    const arr = (cfg && cfg.list && Array.isArray(cfg.list.pins)) ? cfg.list.pins : [];
-    return new Set(arr.map(String));
-  }
-  function _savePinsSet(set){
-    PINS = new Set(set);
-    const cur = SH.getCFG() || {};
-    SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pins: Array.from(PINS) } });
-  }
+function _pinsSetFromCFG(cfg){
+  const arr = (cfg && cfg.list && Array.isArray(cfg.list.pins)) ? cfg.list.pins : [];
+  return new Set(arr.map(String));
+}
+function _savePinsSet(set){
+  PINS = new Set(set);
+  const cur = SH.getCFG() || {};
+  SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pins: Array.from(PINS) } });
+}
+
+// ★ここを置換：毎回initしない。初回だけCFGを読み込む。
+function ensurePinsCache(){
+  if (_pinsInited) return;
+  PINS = _pinsSetFromCFG(SH.getCFG() || {});
+  _pinsInited = true;
+}
+
   function initPinsCache(){ PINS = _pinsSetFromCFG(SH.getCFG() || {}); }
 
   // キーAPI（ここが“真実”）
@@ -254,20 +263,29 @@
     _savePinsSet(s); return next; // ← 次状態を返すのが超重要
   }
 
-  function getPins(){ return Array.from(PINS); }
-  function isPinned(artOrKey){
-    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
-    return isPinnedByKey(k);
-  }
-  function togglePin(artOrKey){
-    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
-    return togglePinnedByKey(k); // boolean を返す
-  }
-  function setPinned(artOrKey,val){
-    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
-    return setPinnedByKey(k, !!val);
-  }
-
+function getPins(){ return Array.from(PINS); }
+function isPinned(artOrKey){
+  const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+  return PINS.has(String(k));
+}
+function togglePin(artOrKey){
+  const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+  // 戻り値は次状態（true/false）
+  const s = new Set(PINS);
+  const ks = String(k);
+  const next = !s.has(ks);
+  if (next) s.add(ks); else s.delete(ks);
+  _savePinsSet(s);
+  return next;
+}
+function setPinned(artOrKey, val){
+  const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+  const s = new Set(PINS);
+  const ks = String(k);
+  if (val) s.add(ks); else s.delete(ks);
+  _savePinsSet(s);
+  return !!val;
+}
   function qListBody(){ return document.getElementById('cgpt-list-body'); }
 
   function rowsByTurn(turnKey){
@@ -304,44 +322,62 @@
   }
 
   //🔖︎
-  // ここ変えたよ：左🔖クリックで即トグル＆見た目更新、付箋のみ中は行削除
+// ここ変えたよ：左🔖クリックのハンドラは click だけ、再入＆二重バインドガード付き
 function bindClipPin(clip, art){
   if (!clip) return;
-  if (!clip.textContent) clip.textContent = '🔖\uFE0E'; // ← VS15 でモノクロ
-  clip.classList.add('cgtn-clip-pin');
-  clip.style.cursor = 'pointer'; clip.style.userSelect = 'none'; clip.style.padding = '2px 6px';
 
+  // 再描画での二重バインド防止
+  if (clip._cgtnPinBound) return;
+  clip._cgtnPinBound = true;
+
+  if (!clip.textContent) clip.textContent = '🔖\uFE0E'; // モノクロ字形で color が効く
+  clip.classList.add('cgtn-clip-pin');
+  clip.style.cursor = 'pointer';
+  clip.style.userSelect = 'none';
+  clip.style.padding = '2px 6px';
+
+  let busy = false;
   const handler = (ev)=>{
-    ev.stopPropagation();
+    ev.preventDefault();           // フォーカスや既定動作を抑止
+    ev.stopPropagation();          // 行側のクリック（スクロール）へバブルさせない
+    if (busy) return;              // デバウンス（同フレーム二重発火防止）
+    busy = true;
+
     const k = getTurnKey(art);
-    const next = togglePinnedByKey(k); // ← 同期で確定
+    const next = togglePinnedByKey(k);   // ← 次状態（true/false）を確定
+
+    // 自分を即時反映
     clip.setAttribute('aria-pressed', String(next));
 
     const cfg = SH.getCFG() || {};
     if (cfg.list?.pinOnly && !next){
-      rowsByTurn(k).forEach(n => n.remove()); // 付箋のみ中→OFFは即消す
-      return;
+      // 付箋のみ表示中でOFF → 同ターンの2行を即削除
+      rowsByTurn(k).forEach(n => n.remove());
+    } else {
+      // 相方行の色も“確定値”で更新
+      refreshPinUIForTurn(k, next);
     }
-    refreshPinUIForTurn(k, next); // ← 相方行も“確定値”で更新
+
+    // 次ティックでロック解除（同フレーム多重を防ぐ）
+    setTimeout(()=>{ busy = false; }, 0);
+
+console.debug('[PIN]', k, 'next=', next, 'PINS=', Array.from(PINS));
+
   };
-  clip.addEventListener('pointerdown', handler, {passive:true});
-  clip.addEventListener('click',        handler, {passive:true});
+
+  // ★ click だけを登録（pointerdown は絶対に付けない）
+  clip.addEventListener('click', handler, {passive:false});
 }
 
+// 相方行のUI更新（ここ変えたよ：強制値を優先）
+function refreshPinUIForTurn(turnKey, forcedState){
+  const state = (typeof forcedState === 'boolean') ? forcedState : PINS.has(String(turnKey));
+  rowsByTurn(turnKey).forEach(row=>{
+    const clip = row.querySelector('.cgtn-clip-pin');
+    if (clip) clip.setAttribute('aria-pressed', String(!!state));
+  });
+}
 /*
-  // ここ変えたよ：確定状態を渡して2行同時に色を更新
-  function refreshPinUIForTurn(turnKey, forcedState){
-    rowsByTurn(turnKey).forEach(row=>{
-      const state = (typeof forcedState === 'boolean')
-        ? forcedState
-        : (row.querySelector('.cgtn-clip-pin')?.getAttribute('aria-pressed') === 'true');
-      paintPinRow(row, state);
-      const clip = row.querySelector('.cgtn-clip-pin');
-      if (clip) clip.setAttribute('aria-pressed', String(!!state));
-    });
-  }
-*/
-
 function refreshPinUIForTurn(turnKey, forcedState){
   const state = (typeof forcedState === 'boolean') ? forcedState : isPinnedByKey(turnKey);
   rowsByTurn(turnKey).forEach(row=>{
@@ -349,7 +385,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
     if (clip) clip.setAttribute('aria-pressed', String(!!state));
   });
 }
-
+*/
 
   // --- scroll core ---
   let _lockUntil = 0;
@@ -401,9 +437,37 @@ function refreshPinUIForTurn(turnKey, forcedState){
 
   // rebuild の最後にキーを必ず割り振る
   function rebuild(){
-    initPinsCache();
+
+    ensurePinsCache();
+
     if (isLocked && isLocked()) return;
+
+    // 会話スレッドが切り替わったらリストは閉じる
+    (function(){
+      let _lastUrl = location.pathname + location.search;
+      window.addEventListener('popstate', ()=>{ _lastUrl = location.pathname + location.search; });
+      const _ensureOffOnThreadChange = () => {
+        const now = location.pathname + location.search;
+        if (now !== _lastUrl) {
+          _lastUrl = now;
+          try {
+            const chk = document.getElementById('cgpt-list-toggle');
+            if (chk) chk.checked = false;
+            window.CGTN_LOGIC?.setListEnabled?.(false, false);
+          } catch {}
+        }
+      };
+      // rebuild の最初で呼ぶ
+      const _origRebuild = window.CGTN_LOGIC?.rebuild;
+      window.CGTN_LOGIC.rebuild = function(){
+        _ensureOffOnThreadChange();
+        return _origRebuild?.apply(this, arguments);
+      };
+    })();
+    // 会話スレッドが切り替わったらリストは閉じる ここまで
+
     NS._scroller = getTrueScroller();
+
     const allRaw = pickAllTurns().filter(isRealTurn);
     ST.all = sortByY(allRaw);
     ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
@@ -638,7 +702,9 @@ function refreshPinUIForTurn(turnKey, forcedState){
   
     // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
     if (on) {
-      NS.rebuild?.();                              // ★ 初回でも必ずデータ作成
+      ensurePinsCache();  // ← 追加
+//      NS.rebuild?.();                              // ★ 初回でも必ずデータ作成
+      rebuild();
       panel.classList.remove('collapsed');
       const btn = panel.querySelector('#cgpt-list-collapse');
       if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }

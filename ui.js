@@ -215,10 +215,17 @@ function installUI(){
       // ★ これが抜けていたやつ：付箋のみトグル
       pinOnlyChk.addEventListener('change', () => {
         const cur = SH.getCFG() || {};
-        SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: !!pinOnlyChk.checked } });
-        // データ再構成→必ず描画ONで反映（一覧がOFFならONにする）
-        window.CGTN_LOGIC?.rebuild?.();
-        window.CGTN_LOGIC?.setListEnabled?.(true);
+        const val = !!pinOnlyChk.checked;
+        SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: val } });
+
+        // 一覧がOFFならONにして表示保証
+        const listOn = !!(SH.getCFG()?.list?.enabled);
+        if (!listOn) window.CGTN_LOGIC?.setListEnabled?.(true);
+
+        // ★ 即時に新状態で再描画（保存反映待ちを回避）
+        window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: val });
+
+        try{ pinOnlyChk.blur(); }catch{}
       });
     } catch {}
   }
