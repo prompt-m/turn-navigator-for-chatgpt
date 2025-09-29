@@ -308,6 +308,8 @@ function setPinned(artOrKey, val){
     const clip = row.querySelector('.clip');
     if (!clip) return;
     clip.classList.add('cgtn-clip-pin');
+    clip.classList.add('cgtn-cursor-pin');
+    clip.classList.toggle('off', !pinned);
     // ダミーは見せずに幅だけ確保
     if (clip.classList.contains('clip-dummy')){
       clip.setAttribute('aria-pressed', 'false');
@@ -332,6 +334,8 @@ function bindClipPin(clip, art){
 
   if (!clip.textContent) clip.textContent = '🔖\uFE0E'; // モノクロ字形で color が効く
   clip.classList.add('cgtn-clip-pin');
+  clip.classList.add('cgtn-cursor-pin');
+  clip.classList.toggle('off', !isPinned(art));
   clip.style.cursor = 'pointer';
   clip.style.userSelect = 'none';
   clip.style.padding = '2px 6px';
@@ -348,6 +352,7 @@ function bindClipPin(clip, art){
 
     // 自分を即時反映
     clip.setAttribute('aria-pressed', String(next));
+    clip.classList.toggle('off', !next);
 
     const cfg = SH.getCFG() || {};
     if (cfg.list?.pinOnly && !next){
@@ -361,7 +366,7 @@ function bindClipPin(clip, art){
     // 次ティックでロック解除（同フレーム多重を防ぐ）
     setTimeout(()=>{ busy = false; }, 0);
 
-console.debug('[PIN]', k, 'next=', next, 'PINS=', Array.from(PINS));
+//console.debug('[PIN]', k, 'next=', next, 'PINS=', Array.from(PINS));
 
   };
 
@@ -373,19 +378,14 @@ console.debug('[PIN]', k, 'next=', next, 'PINS=', Array.from(PINS));
 function refreshPinUIForTurn(turnKey, forcedState){
   const state = (typeof forcedState === 'boolean') ? forcedState : PINS.has(String(turnKey));
   rowsByTurn(turnKey).forEach(row=>{
-    const clip = row.querySelector('.cgtn-clip-pin');
-    if (clip) clip.setAttribute('aria-pressed', String(!!state));
+    const clipEl = row.querySelector('.cgtn-clip-pin');
+    if (clipEl){
+      clipEl.setAttribute('aria-pressed', String(!!state));
+      clipEl.classList.toggle('off', !state); // ←★ 同期
+    }
   });
 }
-/*
-function refreshPinUIForTurn(turnKey, forcedState){
-  const state = (typeof forcedState === 'boolean') ? forcedState : isPinnedByKey(turnKey);
-  rowsByTurn(turnKey).forEach(row=>{
-    const clip = row.querySelector('.cgtn-clip-pin');
-    if (clip) clip.setAttribute('aria-pressed', String(!!state));
-  });
-}
-*/
+
 
   // --- scroll core ---
   let _lockUntil = 0;
@@ -484,6 +484,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
 
   // --- list panel ---
   let listBox = null;
+
   function ensureListBox(){
     if (listBox && document.body.contains(listBox)) return listBox;
     listBox = document.createElement('div');
@@ -498,6 +499,77 @@ function refreshPinUIForTurn(turnKey, forcedState){
       <div id="cgpt-list-foot"></div>
     `;
     document.body.appendChild(listBox);
+
+/*ｺｺｶﾗ*/
+// === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
+(function enforceNoFocusList(panel){
+  if (!panel || panel._cgtnFocusGuard) return;
+  panel._cgtnFocusGuard = true;
+
+  let lastWasKeyboard = false;
+  window.addEventListener('keydown',     () => { lastWasKeyboard = true;  }, {capture:true});
+  window.addEventListener('pointerdown', () => { lastWasKeyboard = false; }, {capture:true});
+
+  let park = document.getElementById('cgtn-focus-park');
+  if (!park) {
+    park = document.createElement('button');
+    park.id = 'cgtn-focus-park';
+    park.type = 'button';
+    park.tabIndex = -1;
+    park.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(park);
+  }
+
+  const INTERACTIVE = 'button, label, input[type=checkbox]';
+  panel.addEventListener('focusin', (e) => {
+    const t = e.target && e.target.closest(INTERACTIVE);
+    if (t && !lastWasKeyboard) {
+      try { t.blur(); } catch {}
+      try { park.focus({ preventScroll:true }); } catch {}
+    }
+  }, true);
+
+  panel.addEventListener('mouseup', () => {
+    try {
+      if (document.activeElement && panel.contains(document.activeElement)) {
+        park.focus({ preventScroll:true });
+      }
+    } catch {}
+  }, { capture:true });
+})(listBox);
+/*ｺｺﾏﾃﾞ*/
+    // === リスト側：マウス操作のフォーカス残りを抑止 ===
+    (function suppressMouseFocusInList(){
+      const root = listBox;
+      if (!root || root._cgtnNoMouseFocus) return;
+      root._cgtnNoMouseFocus = true;
+
+      // マウス押下時にフォーカス移動を阻止
+      root.addEventListener('mousedown', (e) => {
+        const t = e.target && e.target.closest('button, label, input[type=checkbox]');
+        if (t) e.preventDefault();
+      }, { passive: false });
+
+      // クリック後は念のため blur（キーボード操作には影響なし）
+      root.addEventListener('click', (e) => {
+        const t = e.target && e.target.closest('button, label, input[type=checkbox]');
+        if (t && t.blur) t.blur();
+      }, { passive: true });
+
+      // マウスアップ捕捉で“今フォーカス中”も外す（より強固に）
+      root.addEventListener('mouseup', () => {
+        try {
+          const ae = document.activeElement;
+          if (ae && typeof ae.blur === 'function') ae.blur();
+        } catch {}
+      }, { capture:true });
+    })();
+
+
+    window.CGTN_SHARED?.applyTooltips?.({
+      '#cgpt-list-collapse': 'list.collapse',
+      '#cgpt-pin-filter'   : 'list.pinonly'
+    }, listBox);
 
     // リストパネル内でもクリックでフォーカスを残さない
     (function suppressMouseFocusInList(panel){
@@ -559,6 +631,10 @@ function refreshPinUIForTurn(turnKey, forcedState){
           applyPinTheme?.();
           return;
         }
+        //行上の付箋にまとめ適用
+        window.CGTN_SHARED?.applyTooltips?.({
+          '#cgpt-list-body .cgtn-clip-pin' : 'row.pin'
+        }, document);
 
         // 通常クリック：pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
@@ -732,8 +808,8 @@ function refreshPinUIForTurn(turnKey, forcedState){
       if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
   
       // pinOnly チェックを有効化
-      const pinOnlyChk = document.getElementById('cgpt-pinonly');
-      if (pinOnlyChk) pinOnlyChk.disabled = false;
+//      const pinOnlyChk = document.getElementById('cgpt-pinonly');
+//      if (pinOnlyChk) pinOnlyChk.disabled = false;
   
       renderList(true);
       // ②遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
@@ -743,10 +819,10 @@ function refreshPinUIForTurn(turnKey, forcedState){
       }));
     } else {
       // OFF時は pinOnly もOFFにして保存＆UI無効化
-      const cur = SH.getCFG() || {};
-      SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly:false } });
-      const pinOnlyChk = document.getElementById('cgpt-pinonly');
-      if (pinOnlyChk) { pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
+//      const cur = SH.getCFG() || {};
+//      SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly:false } });
+//      const pinOnlyChk = document.getElementById('cgpt-pinonly');
+//      if (pinOnlyChk) { pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
     }
   }
 

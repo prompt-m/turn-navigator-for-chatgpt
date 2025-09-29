@@ -111,12 +111,61 @@
   outline-offset: 2px;
 }
 
+/* マウス操作時のフォーカス枠を確実に消す（キーボードの :focus-visible は残す） */
+#cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
+#cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=グレー） */
+.cgtn-cursor-pin{
+  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjZTYwMDMzIiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer;
+}
+.cgtn-cursor-pin.off{
+  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjOTc5Nzk3IiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer;
+}
+
+/* 行の本文は従来どおり“指” */
+#cgpt-list-body .row { cursor: pointer; }
+
+/* === 付箋カーソルを最優先で適用（!important で上書き） === */
+#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {
+  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjZTYwMDMzIiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer !important;
+}
+#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
+  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjOTc5Nzk3IiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer !important;
+}
+
+
+
 
   `;
 
   injectCss(BASE_CSS);
 
-function installUI(){
+/*ｺｺｶﾗ*/
+// いちばん最後に差すフォーカス無効CSS（:focus-visible は保持）
+(function injectFocusKillerCss(){
+  if (document.getElementById('cgtn-focus-css')) return;
+  const s = document.createElement('style');
+  s.id = 'cgtn-focus-css';
+  s.textContent = `
+#cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
+#cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible){
+  outline: none !important;
+  box-shadow: none !important;
+}
+#cgpt-nav :where(button,label,input[type=checkbox])::-moz-focus-inner,
+#cgpt-list-panel :where(button,label,input[type=checkbox])::-moz-focus-inner{
+  border:0 !important;
+}
+  `;
+  document.head.appendChild(s);
+})();
+/*ｺｺﾏﾃﾞ*/
+
+  function installUI(){
     if (document.getElementById('cgpt-nav')) return;
 
     const box = document.createElement('div');
@@ -157,43 +206,25 @@ function installUI(){
           <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
-
-        <label class="cgpt-list-toggle">
-          <input id="cgpt-pinonly" type="checkbox" style="accent-color:#888;">
-          <span>付箋のみ</span>
-        </label>
+        <!-- ※ ナビ側「付箋のみ」は完全削除 -->
       </div>
     `;
     document.body.appendChild(box);
 
-    // クリックでフォーカスを残さない（ボタン/ラベル/チェックボックス対象）
-    (function suppressMouseFocusInNav(){
-      const root = document.getElementById('cgpt-nav');
-      if (!root || root._cgtnNoMouseFocus) return;
-      root._cgtnNoMouseFocus = true;
-
-      // マウス押下時にフォーカス移動を阻止
-      root.addEventListener('mousedown', (e) => {
-        const t = e.target.closest('button, label, input[type=checkbox]');
-        if (t) e.preventDefault();
-      }, { passive: false });
-
-      // クリック後は念のため blur（キーボード操作には影響なし）
-      root.addEventListener('click', (e) => {
-        const t = e.target.closest('button, label, input[type=checkbox]');
-        if (t && t.blur) t.blur();
-      }, { passive: true });
-    })();
+    // 言語リゾルバ（tooltipsの言語切替に使用）
+    window.CGTN_SHARED?.setLangResolver?.(() =>
+      window.CGTN_UI?.getLang?.()
+      || (window.CGTN_SHARED?.getCFG?.()?.lang || (window.CGTN_SHARED?.getCFG?.()?.english ? 'en' : 'ja'))
+    );
 
     // ドラッグ移動（保存は shared 側）
     (function enableDragging(){
       const grip = box.querySelector('#cgpt-drag');
       let dragging=false, offX=0, offY=0;
-      grip.addEventListener('pointerdown', e=>{
-        dragging=true;
-        const r=box.getBoundingClientRect();
+      grip.addEventListener('pointerdown',e=>{
+        dragging=true; const r=box.getBoundingClientRect();
         offX=e.clientX-r.left; offY=e.clientY-r.top;
-        grip.setPointerCapture(e.pointerId);
+        try{ grip.setPointerCapture(e.pointerId); }catch{}
       });
       window.addEventListener('pointermove',e=>{
         if(!dragging) return;
@@ -210,26 +241,42 @@ function installUI(){
       });
     })();
 
-    // クリック後のフォーカス残りを軽減
-    box.addEventListener('mouseup', () => {
-      try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch {}
-    }, {capture:true});
-
     // 初期表示：文言と保存状態
     applyLang();
     try { box.querySelector('#cgpt-viz').checked = !!SH.getCFG().showViz; } catch {}
 
+    // クリックでフォーカスを残さない（ボタン/ラベル/チェックボックス対象）
+    (function suppressMouseFocusInNav(){
+      const root = document.getElementById('cgpt-nav');
+      if (!root || root._cgtnNoMouseFocus) return;
+      root._cgtnNoMouseFocus = true;
+
+      root.addEventListener('mousedown', (e) => {
+        const t = e.target.closest('button, label, input[type=checkbox]');
+        if (t) e.preventDefault();
+      }, { passive: false });
+
+      root.addEventListener('click', (e) => {
+        const t = e.target.closest('button, label, input[type=checkbox]');
+        if (t && t.blur) t.blur();
+      }, { passive: true });
+    })();
+
+    // クリック後のフォーカス残りを軽減（念押し）
+    box.addEventListener('mouseup', () => {
+      try {
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      } catch {}
+    }, {capture:true});
+
     // === チェック群の初期反映とイベント ===
     try {
       const cfg = SH.getCFG() || {};
-      const listChk   = box.querySelector('#cgpt-list-toggle');
-      const pinOnlyChk= box.querySelector('#cgpt-pinonly');
+      const listChk = box.querySelector('#cgpt-list-toggle');
 
-      listChk.checked    = !!cfg.list?.enabled;
-      pinOnlyChk.checked = !!cfg.list?.pinOnly;
-      pinOnlyChk.disabled = !listChk.checked; // 一覧OFFなら操作不可
+      listChk.checked = !!cfg.list?.enabled;
 
-      // 一覧トグル：保存 → 有効/無効 → pinOnlyも連動
+      // 一覧トグル：保存 → 表示切替
       listChk.addEventListener('change', () => {
         const on  = listChk.checked;
         const cur = SH.getCFG() || {};
@@ -237,31 +284,85 @@ function installUI(){
           ? { list:{ ...(cur.list||{}), enabled:true } }
           : { list:{ ...(cur.list||{}), enabled:false, pinOnly:false } };
         SH.saveSettingsPatch(patch);
-
-        pinOnlyChk.disabled = !on;
-        if (!on) pinOnlyChk.checked = false;
-
-        // logic 側に描画切替を委譲
         window.CGTN_LOGIC?.setListEnabled?.(on);
-      });
-
-      // ★ これが抜けていたやつ：付箋のみトグル
-      pinOnlyChk.addEventListener('change', () => {
-        const cur = SH.getCFG() || {};
-        const val = !!pinOnlyChk.checked;
-        SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: val } });
-
-        // 一覧がOFFならONにして表示保証
-        const listOn = !!(SH.getCFG()?.list?.enabled);
-        if (!listOn) window.CGTN_LOGIC?.setListEnabled?.(true);
-
-        // ★ 即時に新状態で再描画（保存反映待ちを回避）
-        window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: val });
-
-        try{ pinOnlyChk.blur(); }catch{}
+        // フォーカスを外して“カーソル残り”を防ぐ ★★★★
+        try{ listChk.blur(); }catch{}
       });
     } catch {}
+
+    // 既定値反映（復唱：念のため）
+    try {
+      box.querySelector('#cgpt-viz').checked  = !!SH.getCFG().showViz;
+      box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG().list?.enabled);
+    } catch {}
+
+    // ツールチップ付与（ナビ側）
+    window.CGTN_SHARED?.applyTooltips?.({
+      '#cgpt-nav [data-role="user"]      [data-act="top"]'    : 'nav.top',
+      '#cgpt-nav [data-role="user"]      [data-act="bottom"]' : 'nav.bottom',
+      '#cgpt-nav [data-role="user"]      [data-act="prev"]'   : 'nav.prev',
+      '#cgpt-nav [data-role="user"]      [data-act="next"]'   : 'nav.next',
+
+      '#cgpt-nav [data-role="assistant"] [data-act="top"]'    : 'nav.top',
+      '#cgpt-nav [data-role="assistant"] [data-act="bottom"]' : 'nav.bottom',
+      '#cgpt-nav [data-role="assistant"] [data-act="prev"]'   : 'nav.prev',
+      '#cgpt-nav [data-role="assistant"] [data-act="next"]'   : 'nav.next',
+
+      '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
+      '#cgpt-viz'                : 'nav.viz',
+      '#cgpt-list-toggle'        : 'nav.list'
+      // ※ nav.pinonly は削除
+    }, document);
+/*ｺｺｶﾗ*/
+    // === フォーカスが残らない最終防御（モダリティ + パーキング） ===
+    (function enforceNoFocusNav(){
+      const root = document.getElementById('cgpt-nav');
+      if (!root || root._cgtnFocusGuard) return;
+      root._cgtnFocusGuard = true;
+
+      // 直近入力モダリティを覚える（キーボード:true / ポインタ:false）
+      let lastWasKeyboard = false;
+      window.addEventListener('keydown',  () => { lastWasKeyboard = true;  }, {capture:true});
+      window.addEventListener('pointerdown', () => { lastWasKeyboard = false; }, {capture:true});
+
+      // フォーカスの逃がし先（画面外・不可視）
+      let park = document.getElementById('cgtn-focus-park');
+      if (!park) {
+        park = document.createElement('button');
+        park.id = 'cgtn-focus-park';
+        park.type = 'button';
+        park.tabIndex = -1;
+        park.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
+        document.body.appendChild(park);
+      }
+
+      const INTERACTIVE = 'button, label, input[type=checkbox]';
+
+      // マウス系で root 内に focusin したら即座に追い出す
+      root.addEventListener('focusin', (e) => {
+        const t = e.target && e.target.closest(INTERACTIVE);
+        if (t && !lastWasKeyboard) {
+          // クリック・ドラッグ等で入ったフォーカスは排除
+          try { t.blur(); } catch {}
+          try { park.focus({ preventScroll:true }); } catch {}
+        }
+      }, true); // ← capture
+
+      // 念押し：マウスアップで常にパークへ
+      root.addEventListener('mouseup', () => {
+        try {
+          // activeElement がまだ残ってたらパーキングに移す
+          if (document.activeElement && root.contains(document.activeElement)) {
+            park.focus({ preventScroll:true });
+          }
+        } catch {}
+      }, { capture:true });
+    })();
+/*ｺｺﾏﾃﾞ*/
+
+
   }
+
 
   function applyLang(){
     const box = document.getElementById('cgpt-nav'); if (!box) return;

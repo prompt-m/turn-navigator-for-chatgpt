@@ -20,28 +20,68 @@
   function initialize(){
     SH.loadSettings(() => {
       UI.installUI();
+
+      // 1回だけ作る不可視パーキング
+      (function ensureFocusPark(){
+        let park = document.getElementById('cgtn-focus-park');
+        if (park) return;
+        park = document.createElement('button');
+        park.id = 'cgtn-focus-park';
+        park.type = 'button';
+        park.tabIndex = -1;
+        park.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
+        document.body.appendChild(park);
+      })();
+
+      // content.js（initialize() の ensureFocusPark の直後あたりでOK）
+      (function installFocusStealGuard(){
+        const nav  = document.getElementById('cgpt-nav');
+        const list = document.getElementById('cgpt-list-panel');
+        const inUI = el => !!(el && ((nav && nav.contains(el)) || (list && list.contains(el))));
+
+        let fromUI = false;
+
+        document.addEventListener('mousedown', e => {
+          fromUI = inUI(e.target);
+        }, { capture:true });
+
+        document.addEventListener('mouseup', () => {
+          if (!fromUI) return;
+          fromUI = false;
+
+          // ★ここに選択範囲削除を入れる
+          try { const sel = getSelection(); sel && sel.removeAllRanges(); } catch{}
+
+          const park = document.getElementById('cgtn-focus-park');
+          if (!park) return;
+
+          // 1) キャレット（選択範囲）を削除
+          try {
+            const sel = getSelection();
+            if (sel) sel.removeAllRanges();
+          } catch {}
+
+          // 2) ページ側の focus が走り終わった後で park に移す
+          setTimeout(() => {
+            try { park.focus({ preventScroll:true }); } catch {}
+          }, 0);
+          requestAnimationFrame(() => {
+            try { park.focus({ preventScroll:true }); } catch {}
+          });
+        }, { capture:true });
+      })();
+
+
       UI.applyLang();
       UI.clampPanelWithinViewport();
-
-      // 初期状態は常に OFF（リロード/チャット切替とも）
-//      try {
-//        const cur = SH.getCFG() || {};
-//        if (cur.list?.enabled) {
-//          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), enabled:false } });
-//        }
-//        const chk = document.getElementById('cgpt-list-toggle');
-//        chk.checked = false;
-//        LG?.setListEnabled?.(false, /*save*/ false);
-//      } catch {}
-
       LG.rebuild();
 
-// === 基準線の初期表示（保存された showViz を尊重） ===
-try {
-  const cfg = window.CGTN_SHARED?.getCFG?.();
-  window.CGTN_SHARED?.renderViz?.(cfg, !!cfg?.showViz); // ← trueなら表示まで
-} catch {}
-// === 基準線の初期表示 ここまで ===
+      // === 基準線の初期表示（保存された showViz を尊重） ===
+      try {
+        const cfg = window.CGTN_SHARED?.getCFG?.();
+        window.CGTN_SHARED?.renderViz?.(cfg, !!cfg?.showViz); // ← trueなら表示まで
+      } catch {}
+      // === 基準線の初期表示 ここまで ===
 
 
       EV.bindEvents();

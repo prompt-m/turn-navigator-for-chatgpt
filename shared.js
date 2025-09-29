@@ -25,6 +25,64 @@
     pins: {}// ← 付箋（key: true）
   });
 
+  // 言語判定の委譲（UI側で変えられるようフックを用意）
+  let langResolver = null;
+  NS.setLangResolver = (fn) => { langResolver = fn; };
+  function curLang(){
+    // 優先: resolver → CFG → <html lang> → ja
+    try {
+      const r = langResolver?.();
+      if (r) return r;
+      const cfg = SH.getCFG?.() || {};
+      if (cfg.lang) return String(cfg.lang);
+      if (cfg.english) return 'en';
+      return document.documentElement.lang || 'ja';
+    } catch { return 'ja'; }
+  }
+
+  // 辞書（必要に応じて増やしてください）
+  const TIPS = {
+    'nav.top'      : { ja:'先頭へ',                    en:'Go to top' },
+    'nav.bottom'   : { ja:'末尾へ',                    en:'Go to bottom' },
+    'nav.prev'     : { ja:'前へ',                      en:'Previous' },
+    'nav.next'     : { ja:'次へ',                      en:'Next' },
+    'nav.lang'     : { ja:'English / 日本語',          en:'English / 日本語' },
+    'nav.viz'      : { ja:'基準線の表示/非表示',        en:'Show/Hide guide line' },
+    'nav.list'     : { ja:'一覧の表示/非表示',          en:'Show/Hide list' },
+    'nav.pinonly'  : { ja:'付箋のみ表示',               en:'Pinned only' },
+
+    'list.collapse': { ja:'畳む / 開く',                en:'Collapse / Expand' },
+    'list.pinonly' : { ja:'付箋のみ表示（Altでテーマ）', en:'Pinned only (Alt for theme)' },
+
+    'row.pin'      : { ja:'このターンを付箋 ON/OFF',    en:'Toggle pin for this turn' },
+    'row.preview'  : { ja:'プレビュー',                 en:'Preview' },
+  };
+
+
+  function t(key){
+    const entry = TIPS[key]; if (!entry) return '';
+    const L = (curLang() || 'ja').startsWith('en') ? 'en' : 'ja';
+    return entry[L] || entry.ja || '';
+  }
+
+  // 直近の登録を覚えておいて、言語切替時に再適用
+  const _registrations = new Set(); // each item: {root, pairs}
+  NS.applyTooltips = function(pairs, root = document){
+    if (!pairs) return;
+    // 保存（同一root+keysは上書き）
+    _registrations.add({ root, pairs });
+    Object.entries(pairs).forEach(([sel, key])=>{
+      root.querySelectorAll(sel).forEach(el => { const s = t(key); if (s) el.title = s; });
+    });
+  };
+  NS.updateTooltips = function(){
+    for (const reg of _registrations){
+      Object.entries(reg.pairs).forEach(([sel, key])=>{
+        reg.root.querySelectorAll(sel).forEach(el => { const s = t(key); if (s) el.title = s; });
+      });
+    }
+  };
+
   let CFG = structuredClone(DEFAULTS);
 
   const isNum = v => Number.isFinite(Number(v));
