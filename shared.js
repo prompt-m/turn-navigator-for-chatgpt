@@ -25,6 +25,8 @@
     pins: {}// ← 付箋（key: true）
   });
 
+
+
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   NS.setLangResolver = (fn) => { langResolver = fn; };
@@ -33,7 +35,7 @@
     try {
       const r = langResolver?.();
       if (r) return r;
-      const cfg = SH.getCFG?.() || {};
+      const cfg = NS.getCFG?.() || {};
       if (cfg.lang) return String(cfg.lang);
       if (cfg.english) return 'en';
       return document.documentElement.lang || 'ja';
@@ -49,11 +51,9 @@
     'nav.lang'     : { ja:'English / 日本語',          en:'English / 日本語' },
     'nav.viz'      : { ja:'基準線の表示/非表示',        en:'Show/Hide guide line' },
     'nav.list'     : { ja:'一覧の表示/非表示',          en:'Show/Hide list' },
-    'nav.pinonly'  : { ja:'付箋のみ表示',               en:'Pinned only' },
-
+    'nav.drag'     : { ja:'ドラッグで移動',             en:'Drag to move' },
     'list.collapse': { ja:'畳む / 開く',                en:'Collapse / Expand' },
     'list.pinonly' : { ja:'付箋のみ表示（Altでテーマ）', en:'Pinned only (Alt for theme)' },
-
     'row.pin'      : { ja:'このターンを付箋 ON/OFF',    en:'Toggle pin for this turn' },
     'row.preview'  : { ja:'プレビュー',                 en:'Preview' },
   };
@@ -66,19 +66,26 @@
   }
 
   // 直近の登録を覚えておいて、言語切替時に再適用
-  const _registrations = new Set(); // each item: {root, pairs}
+  const _registrations = [];
   NS.applyTooltips = function(pairs, root = document){
     if (!pairs) return;
     // 保存（同一root+keysは上書き）
-    _registrations.add({ root, pairs });
+    _registrations.push({ root, pairs });
+
     Object.entries(pairs).forEach(([sel, key])=>{
-      root.querySelectorAll(sel).forEach(el => { const s = t(key); if (s) el.title = s; });
+      root.querySelectorAll(sel).forEach(el => {
+        const s = t(key);
+        if (s) el.title = s; 
+      });
     });
   };
   NS.updateTooltips = function(){
     for (const reg of _registrations){
       Object.entries(reg.pairs).forEach(([sel, key])=>{
-        reg.root.querySelectorAll(sel).forEach(el => { const s = t(key); if (s) el.title = s; });
+        reg.root.querySelectorAll(sel).forEach(el => {
+          const s = t(key);
+          if (s) el.title = s; 
+        });
       });
     }
   };

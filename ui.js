@@ -296,6 +296,7 @@
       box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG().list?.enabled);
     } catch {}
 
+/*
     // ツールチップ付与（ナビ側）
     window.CGTN_SHARED?.applyTooltips?.({
       '#cgpt-nav [data-role="user"]      [data-act="top"]'    : 'nav.top',
@@ -313,6 +314,25 @@
       '#cgpt-list-toggle'        : 'nav.list'
       // ※ nav.pinonly は削除
     }, document);
+*/
+    window.CGTN_SHARED?.applyTooltips?.({
+      '#cgpt-nav [data-role="user"]      [data-act="top"]'    : 'nav.top',
+      '#cgpt-nav [data-role="user"]      [data-act="bottom"]' : 'nav.bottom',
+      '#cgpt-nav [data-role="user"]      [data-act="prev"]'   : 'nav.prev',
+      '#cgpt-nav [data-role="user"]      [data-act="next"]'   : 'nav.next',
+
+      '#cgpt-nav [data-role="assistant"] [data-act="top"]'    : 'nav.top',
+      '#cgpt-nav [data-role="assistant"] [data-act="bottom"]' : 'nav.bottom',
+      '#cgpt-nav [data-role="assistant"] [data-act="prev"]'   : 'nav.prev',
+      '#cgpt-nav [data-role="assistant"] [data-act="next"]'   : 'nav.next',
+
+      '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
+      '#cgpt-viz'                : 'nav.viz',
+      '#cgpt-list-toggle'        : 'nav.list'
+      // ※ nav.pinonly は削除
+    }, document);
+
+
 /*ｺｺｶﾗ*/
     // === フォーカスが残らない最終防御（モダリティ + パーキング） ===
     (function enforceNoFocusNav(){
@@ -367,11 +387,23 @@
   function applyLang(){
     const box = document.getElementById('cgpt-nav'); if (!box) return;
     const t = I18N[LANG] || I18N.ja;
-    box.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (t[k]) el.textContent = t[k]; });
-    box.querySelector('#cgpt-drag').title = t.dragTitle;
+    // ラベルは text だけ更新
+    box.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.getAttribute('data-i18n');
+      if (t[k]) el.textContent = t[k]; 
+    });
+    //box.querySelector('#cgpt-drag').title = t.dragTitle;
     box.querySelector('.cgpt-lang-btn').textContent = t.langBtn;
+
+    // ドラッグ用はツールチップ管理へ移行（ここでは title を触らない）
+    const drag = box.querySelector('#cgpt-drag');
+    if (drag && !drag.hasAttribute('data-tip')) drag.setAttribute('data-tip','nav.drag');
   }
-  function toggleLang(){ LANG = LANG === 'ja' ? 'en' : 'ja'; applyLang(); }
+  function toggleLang(){
+    LANG = LANG === 'ja' ? 'en' : 'ja';
+    applyLang();
+    window.CGTN_SHARED?.updateTooltips?.(); 
+  }
 
   function clampPanelWithinViewport(){
     const box = document.getElementById('cgpt-nav'); if (!box) return;

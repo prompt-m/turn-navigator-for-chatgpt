@@ -48,6 +48,19 @@
     return article;
   }
 
+  //行へスクロールする関数
+  function scrollListToTurn(turnKey){
+    if (!turnKey) return;
+    const list = document.getElementById('cgpt-list-body');
+    if (!list) return;
+    const row = list.querySelector(`.row[data-turn="${CSS.escape(turnKey)}"]`);
+    if (!row) return;
+
+    // 行をパネル中央付近に出す
+    const top = row.offsetTop - (list.clientHeight/2 - row.clientHeight/2);
+    list.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+  }
+
   // === List Panel 専用（ゆるめ） ===
   function listHeadNodeOf(article){
     if (!article) return null;
@@ -401,6 +414,8 @@ function refreshPinUIForTurn(turnKey, forcedState){
     const clamped   = Math.min(maxScroll, Math.max(0, desired));
     lockFor(SH.getCFG().lockMs);
     sc.scrollTo({ top: clamped, behavior: 'smooth' });
+    //注目ターンのキーを覚える
+    NS._currentTurnKey = getTurnKey(article);
   }
 
   // --- collect ---
@@ -789,6 +804,8 @@ function refreshPinUIForTurn(turnKey, forcedState){
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
     info.textContent = `${body.children.length}行（${ST.all.length}ターン中）`;
     foot.appendChild(info);
+    //注目ターンのキー行へスクロール
+    scrollListToTurn(NS._currentTurnKey);
   }
 
   function setListEnabled(on){
