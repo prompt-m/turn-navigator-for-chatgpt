@@ -7,7 +7,18 @@
     ja: { user:'ユーザー', assistant:'アシスタント', all:'全体', top:'先頭', prev:'前へ', next:'次へ', bottom:'末尾', langBtn:'English', dragTitle:'ドラッグで移動', line:'基準線', list:'一覧' },
     en: { user:'User', assistant:'Assistant', all:'All', top:'Top', prev:'Prev', next:'Next', bottom:'Bottom', langBtn:'日本語', dragTitle:'Drag to move', line:'Guide', list:'List' }
   };
+
+  // 初期言語をブラウザの設定から決める
   let LANG = (navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
+  // いつでも <html lang> を真とする（fallback は LANG）
+  document.documentElement.lang = LANG;
+//  SH.setLangResolver?.(() => LANG);
+  SH.setLangResolver?.(SH.getLang);
+  SH.getLang = () => LANG;
+
+  // ★ curLang() がこれを拾えるように resolver にも設定
+  SH.setLangResolver?.(SH.getLang);
+
 
   function injectCss(css){
     const s = document.createElement('style');
@@ -296,8 +307,6 @@
       box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG().list?.enabled);
     } catch {}
 
-/*
-    // ツールチップ付与（ナビ側）
     window.CGTN_SHARED?.applyTooltips?.({
       '#cgpt-nav [data-role="user"]      [data-act="top"]'    : 'nav.top',
       '#cgpt-nav [data-role="user"]      [data-act="bottom"]' : 'nav.bottom',
@@ -308,24 +317,7 @@
       '#cgpt-nav [data-role="assistant"] [data-act="bottom"]' : 'nav.bottom',
       '#cgpt-nav [data-role="assistant"] [data-act="prev"]'   : 'nav.prev',
       '#cgpt-nav [data-role="assistant"] [data-act="next"]'   : 'nav.next',
-
-      '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
-      '#cgpt-viz'                : 'nav.viz',
-      '#cgpt-list-toggle'        : 'nav.list'
-      // ※ nav.pinonly は削除
-    }, document);
-*/
-    window.CGTN_SHARED?.applyTooltips?.({
-      '#cgpt-nav [data-role="user"]      [data-act="top"]'    : 'nav.top',
-      '#cgpt-nav [data-role="user"]      [data-act="bottom"]' : 'nav.bottom',
-      '#cgpt-nav [data-role="user"]      [data-act="prev"]'   : 'nav.prev',
-      '#cgpt-nav [data-role="user"]      [data-act="next"]'   : 'nav.next',
-
-      '#cgpt-nav [data-role="assistant"] [data-act="top"]'    : 'nav.top',
-      '#cgpt-nav [data-role="assistant"] [data-act="bottom"]' : 'nav.bottom',
-      '#cgpt-nav [data-role="assistant"] [data-act="prev"]'   : 'nav.prev',
-      '#cgpt-nav [data-role="assistant"] [data-act="next"]'   : 'nav.next',
-
+      '#cgpt-drag'                : 'nav.drag',
       '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
       '#cgpt-viz'                : 'nav.viz',
       '#cgpt-list-toggle'        : 'nav.list'
@@ -383,26 +375,44 @@
 
   }
 
-
+/*
   function applyLang(){
-    const box = document.getElementById('cgpt-nav'); if (!box) return;
+    const box = document.getElementById('cgpt-nav');
+    if (!box) return;
+    const t = I18N[LANG] || I18N.ja;
+    box.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.getAttribute('data-i18n');
+      if (t[k]){
+        el.textContent = t[k];
+      }
+    });
+    box.querySelector('#cgpt-drag').title = t.dragTitle;
+    box.querySelector('.cgpt-lang-btn').textContent = t.langBtn;
+  }
+*/
+  function applyLang(){
+    const box = document.getElementById('cgpt-nav');
+    if (!box) return;
     const t = I18N[LANG] || I18N.ja;
     // ラベルは text だけ更新
     box.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');
-      if (t[k]) el.textContent = t[k]; 
+      if (t[k]){
+        el.textContent = t[k]; 
+        el.title = t[k]; 
+       }
     });
-    //box.querySelector('#cgpt-drag').title = t.dragTitle;
     box.querySelector('.cgpt-lang-btn').textContent = t.langBtn;
 
-    // ドラッグ用はツールチップ管理へ移行（ここでは title を触らない）
+    // ドラッグも I18N で title を直付け
     const drag = box.querySelector('#cgpt-drag');
-    if (drag && !drag.hasAttribute('data-tip')) drag.setAttribute('data-tip','nav.drag');
+    if (drag) drag.title = t.dragTitle || t.drag || '';
   }
+
   function toggleLang(){
     LANG = LANG === 'ja' ? 'en' : 'ja';
+    console.log("★ui 日英切り替えクリックしました:LANG",LANG);
     applyLang();
-    window.CGTN_SHARED?.updateTooltips?.(); 
   }
 
   function clampPanelWithinViewport(){

@@ -52,7 +52,6 @@
       // 言語トグル
       if (t.closest('.cgpt-lang-btn')) {
         UI.toggleLang();
-        window.CGTN_SHARED?.updateTooltips?.();   // ← 言語切替に追随
         return;
       }
 

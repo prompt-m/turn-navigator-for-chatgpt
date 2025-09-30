@@ -30,17 +30,60 @@
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   NS.setLangResolver = (fn) => { langResolver = fn; };
+
+function curLang(){
+  try {
+    // ★ 最優先：拡張UIが公開する現在言語
+    const u = NS.getLang?.();
+    const ur = String(u).toLowerCase();
+    console.log("◆◆◆ ★ 最優先",ur,"◆◆◆")
+    if (u) return ur;
+
+    // 互換：従来の resolver もサポート
+    const r = langResolver?.();
+    console.log("◆◇◇互換：従来の resolver:",r,"◆◇◇")
+    if (r) return String(r).toLowerCase();
+
+    const cfg = NS.getCFG?.() || {};
+    if (cfg.lang){
+      console.log("◆◇◇CFG")
+      return String(cfg.lang).toLowerCase();
+    }
+    if (cfg.english) {
+      console.log("◆◇◇EG")
+      return 'en';
+    }
+    console.log("◆◇◇JA")
+    return String(document.documentElement.lang || 'ja').toLowerCase();
+  } catch {
+    console.log("◆◇◇Catch JA")
+    return 'ja';
+  }
+}
+
+
+/*
   function curLang(){
     // 優先: resolver → CFG → <html lang> → ja
     try {
+      console.log("◆◆◆langResolverは:",langResolver,"です")
       const r = langResolver?.();
-      if (r) return r;
+      if (r) {
+        console.log("◆◇◇curLangは:",r,"です")
+        return r;
+      }
       const cfg = NS.getCFG?.() || {};
       if (cfg.lang) return String(cfg.lang);
       if (cfg.english) return 'en';
-      return document.documentElement.lang || 'ja';
-    } catch { return 'ja'; }
+      const retLNG = document.documentElement.lang || 'ja';
+      console.log("◇◇◇curLangは:",retLNG,"です")
+      return retLNG;
+    } catch { 
+      console.log("◇◆◇curLangは（catch）ja です")
+      return 'ja'; 
+    }
   }
+*/
 
   // 辞書（必要に応じて増やしてください）
   const TIPS = {
@@ -60,14 +103,17 @@
 
 
   function t(key){
-    const entry = TIPS[key]; if (!entry) return '';
+    const entry = TIPS[key];
+    if (!entry) return '';
     const L = (curLang() || 'ja').startsWith('en') ? 'en' : 'ja';
+    console.log("◆◇◆ t(key) L: ",L," entry:",entry);
     return entry[L] || entry.ja || '';
   }
 
   // 直近の登録を覚えておいて、言語切替時に再適用
   const _registrations = [];
   NS.applyTooltips = function(pairs, root = document){
+    const L = (NS.curLang?.() || 'ja');
     if (!pairs) return;
     // 保存（同一root+keysは上書き）
     _registrations.push({ root, pairs });
@@ -75,15 +121,19 @@
     Object.entries(pairs).forEach(([sel, key])=>{
       root.querySelectorAll(sel).forEach(el => {
         const s = t(key);
+        console.log("***applyTooltips sel:",sel," key:",key," LANG:",L," s:",s);
         if (s) el.title = s; 
       });
     });
   };
-  NS.updateTooltips = function(){
+
+  NS.updateTooltips = function(key){
+    const L = (NS.curLang?.() || 'ja');
     for (const reg of _registrations){
       Object.entries(reg.pairs).forEach(([sel, key])=>{
         reg.root.querySelectorAll(sel).forEach(el => {
           const s = t(key);
+          console.log("***updateTooltips sel:",sel," key:",key," LANG:",L," s:",s);
           if (s) el.title = s; 
         });
       });
