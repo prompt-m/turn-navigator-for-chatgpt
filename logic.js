@@ -225,6 +225,22 @@
   // ここ変えたよ：ターンキー安定化。DOMに無ければ連番を割り当てて保持。
   const _turnKeyMap = new WeakMap();
 
+  // [追記] 本文からプレビュー用テキストを抽出（改行・空白を整理、長すぎるときはカット）
+  function extractPreviewText(node){
+    try {
+      const raw = (node?.innerText || node?.textContent || '').trim();
+      // 行頭・行末の連続空白を整理し、内部の過剰連続空白も縮める
+      const norm = raw.replace(/\r/g,'')
+                      .replace(/[ \t]+\n/g, '\n')
+                      .replace(/\n{3,}/g, '\n\n')
+                      .replace(/[ \t]{2,}/g, ' ');
+      return norm.length > 2000 ? norm.slice(0, 2000) + '…' : norm;
+    } catch {
+      return '';
+    }
+  }
+
+
   // --- Pins (付箋) ---
   function getTurnKey(article){
     if (!article) return '';
@@ -761,6 +777,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         row.innerHTML = `
           <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           <span class="txt"></span>
+          <button class="cgtn-preview-btn" title="プレビュー">…</button>
         `;
         row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
@@ -787,6 +804,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         row2.innerHTML = `
           <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           <span class="txt"></span>
+          <button class="cgtn-preview-btn" title="プレビュー">…</button> 
         `;
         row2.querySelector('.txt').textContent = bodyLine;
         row2.addEventListener('click', () => scrollToHead(art));
@@ -796,6 +814,10 @@ function refreshPinUIForTurn(turnKey, forcedState){
 //        paintPinRow(row2, isPinned(art));
         paintPinRow(row2, isPinnedByKey(turnKey));
         if (showClipOnBody) bindClipPin(row2.querySelector('.clip'), art);
+
+        const previewText = extractPreviewText(art || articleNode);
+        row.dataset.preview = previewText;
+        if (row2) row2.dataset.preview = previewText; 
         body.appendChild(row2);
       }
     }

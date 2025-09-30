@@ -148,8 +148,62 @@
   cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjOTc5Nzk3IiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer !important;
 }
 
+/* === プレビュー吹き出し === */
+.cgtn-preview-popup {
+  position: absolute;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.15);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-width: 320px;
+  max-height: 240px;
+  overflow: auto;
+  box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  font-size: 12px;
+  z-index: 2147483647;
+  white-space: normal;
+}
+.cgtn-preview-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  color: #555;
+}
+.cgtn-preview-btn:hover {
+  color: #000;
+  background: rgba(0,0,0,0.05);
+}
 
+/* === プレビュー吹き出し（追加） === */
+.cgtn-popover {
+  position: fixed;
+  z-index: 2147483000;
+  max-width: 520px;
+  max-height: 320px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(20,20,20,.96);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+  overflow: auto;
+  display: none;
+  font-size: 12px;
+  line-height: 1.5;
+  transform: translate(10px, 14px); /* マウスから少し離す */
+  white-space: normal;
+}
+.cgtn-popover[data-show="1"] { display: block; }
 
+.cgtn-more {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.cgtn-more:hover { background: rgba(255,255,255,.08); }
 
   `;
 

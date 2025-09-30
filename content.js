@@ -86,6 +86,110 @@
 
       EV.bindEvents();
 
+      // [追記] リスト「…」プレビューのイベント委譲（1回だけ）
+      (function bindRowPreviewOnce(){
+        if (document._cgtnPreviewBound) return;
+        document._cgtnPreviewBound = true;
+      
+        let pop = null, raf = 0;
+
+        function ensurePop(){
+          if (pop) return pop;
+          pop = document.createElement('div');
+          pop.className = 'cgtn-popover';
+          document.body.appendChild(pop);
+          return pop;
+        }
+        function position(x, y){
+          if (!pop) return;
+          const pad = 8;
+          const w = pop.offsetWidth, h = pop.offsetHeight;
+          let left = x + 10, top = y + 14;
+          if (left + w + pad > innerWidth)  left = innerWidth  - w - pad;
+          if (top  + h + pad > innerHeight) top  = innerHeight - h - pad;
+          pop.style.left = left + 'px';
+          pop.style.top  = top  + 'px';
+        }
+        function show(btn, e){
+          const row = btn.closest('.row'); if (!row) return;
+          const text = row.dataset.preview || '(内容なし)';
+          const box = ensurePop();
+          box.textContent = text;
+          box.setAttribute('data-show', '1');
+          position(e.clientX, e.clientY);
+        }
+        function hide(){ if (pop) pop.removeAttribute('data-show'); }
+
+        // マウスオーバーで表示
+        document.addEventListener('mouseenter', (e) => {
+          const btn = e.target.closest?.('.cgtn-more[data-act="preview"]');
+          if (!btn) return;
+          show(btn, e);
+        }, true);
+
+        // マウス移動で追従（rAFで負荷軽減）
+        document.addEventListener('mousemove', (e) => {
+          if (!pop || pop.getAttribute('data-show') !== '1') return;
+          cancelAnimationFrame(raf);
+          const x = e.clientX, y = e.clientY;
+          raf = requestAnimationFrame(() => position(x, y));
+        }, true);
+
+        // マウスが外れたら閉じる
+        document.addEventListener('mouseleave', (e) => {
+          if (e.target.closest?.('.cgtn-more[data-act="preview"]')) hide();
+        }, true);
+
+        // スクロール・ウィンドウ外れ・Esc で閉じる（任意）
+        document.addEventListener('scroll', hide, {capture:true, passive:true});
+        window.addEventListener('blur', hide);
+        document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') hide(); });
+      })();
+
+      // content.js initialize() 内、EV.bindEvents(); の直後あたり
+      (function bindPreviewEvents(){
+        if (document._cgtnPreviewBound) return;
+        document._cgtnPreviewBound = true;
+
+        document.addEventListener('mouseover', (e) => {
+          const btn = e.target.closest('.cgtn-preview-btn');
+          if (!btn) return;
+
+          // 既存popupを消す
+          document.querySelectorAll('.cgtn-preview-popup').forEach(n => n.remove());
+
+          const row = btn.closest('.row');
+          if (!row) return;
+
+          // 本文を取得
+          const turnKey = row.dataset.turn;
+          const art = window.CGTN_LOGIC?.ST?.all?.find(a => window.CGTN_LOGIC?.getTurnKey?.(a) === turnKey);
+          if (!art) return;
+          const head = window.CGTN_LOGIC?.listHeadNodeOf?.(art) || art;
+          const text = (head.innerText || '').replace(/\s+/g,' ').trim();
+
+          // popup生成
+          const popup = document.createElement('div');
+          popup.className = 'cgtn-preview-popup';
+          popup.textContent = text || '（内容なし）';
+
+          document.body.appendChild(popup);
+
+          // ボタンの位置に配置
+          const r = btn.getBoundingClientRect();
+          popup.style.left = (window.scrollX + r.right + 8) + 'px';
+          popup.style.top  = (window.scrollY + r.top) + 'px';
+        });
+
+        document.addEventListener('mouseout', (e) => {
+          if (e.target.closest('.cgtn-preview-btn')) {
+            setTimeout(() => {
+              document.querySelectorAll('.cgtn-preview-popup').forEach(n => n.remove());
+            }, 200);
+          }
+        });
+      })();
+
       // === 基準線の自動追従（リサイズ/DevTools開閉/回転/可視状態変更） ===
       // 軽いデバウンス（連続イベントをまとめる）
       const _cgtnDebounce = (fn, ms = 60) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a      ), ms); }; };
