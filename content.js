@@ -49,19 +49,13 @@
           if (!fromUI) return;
           fromUI = false;
 
-          // ★ここに選択範囲削除を入れる
+          // キャレット（選択範囲）を削除
           try { const sel = getSelection(); sel && sel.removeAllRanges(); } catch{}
 
           const park = document.getElementById('cgtn-focus-park');
           if (!park) return;
 
-          // 1) キャレット（選択範囲）を削除
-          try {
-            const sel = getSelection();
-            if (sel) sel.removeAllRanges();
-          } catch {}
-
-          // 2) ページ側の focus が走り終わった後で park に移す
+          // ページ側の focus が走り終わった後で park に移す
           setTimeout(() => {
             try { park.focus({ preventScroll:true }); } catch {}
           }, 0);
@@ -97,6 +91,7 @@
           if (pop) return pop;
           pop = document.createElement('div');
           pop.className = 'cgtn-popover';
+          pop.style.zIndex = '2147483647';  // 念のための保険（CSSより強い inline）
           document.body.appendChild(pop);
           return pop;
         }
@@ -110,10 +105,11 @@
           pop.style.left = left + 'px';
           pop.style.top  = top  + 'px';
         }
+        // NOTE: preview は renderList 時点で row/row2 に埋めてあるので dataset から読むだけで良い。
         function show(btn, e){
           const row = btn.closest('.row'); if (!row) return;
-          const text = row.dataset.preview || '(内容なし)';
-          const box = ensurePop();
+          const text = row.dataset.preview || '（内容なし）';
+          const box  = ensurePop();
           box.textContent = text;
           box.setAttribute('data-show', '1');
           position(e.clientX, e.clientY);
@@ -121,8 +117,8 @@
         function hide(){ if (pop) pop.removeAttribute('data-show'); }
 
         // マウスオーバーで表示
-        document.addEventListener('mouseenter', (e) => {
-          const btn = e.target.closest?.('.cgtn-more[data-act="preview"]');
+        document.addEventListener('mouseenter', (e) => {//cgtn-preview-btn
+          const btn = e.target.closest?.('.cgtn-preview-btn');
           if (!btn) return;
           show(btn, e);
         }, true);
@@ -137,57 +133,13 @@
 
         // マウスが外れたら閉じる
         document.addEventListener('mouseleave', (e) => {
-          if (e.target.closest?.('.cgtn-more[data-act="preview"]')) hide();
+          if (e.target.closest?.('.cgtn-preview-btn')) hide();
         }, true);
 
         // スクロール・ウィンドウ外れ・Esc で閉じる（任意）
         document.addEventListener('scroll', hide, {capture:true, passive:true});
         window.addEventListener('blur', hide);
         document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') hide(); });
-      })();
-
-      // content.js initialize() 内、EV.bindEvents(); の直後あたり
-      (function bindPreviewEvents(){
-        if (document._cgtnPreviewBound) return;
-        document._cgtnPreviewBound = true;
-
-        document.addEventListener('mouseover', (e) => {
-          const btn = e.target.closest('.cgtn-preview-btn');
-          if (!btn) return;
-
-          // 既存popupを消す
-          document.querySelectorAll('.cgtn-preview-popup').forEach(n => n.remove());
-
-          const row = btn.closest('.row');
-          if (!row) return;
-
-          // 本文を取得
-          const turnKey = row.dataset.turn;
-          const art = window.CGTN_LOGIC?.ST?.all?.find(a => window.CGTN_LOGIC?.getTurnKey?.(a) === turnKey);
-          if (!art) return;
-          const head = window.CGTN_LOGIC?.listHeadNodeOf?.(art) || art;
-          const text = (head.innerText || '').replace(/\s+/g,' ').trim();
-
-          // popup生成
-          const popup = document.createElement('div');
-          popup.className = 'cgtn-preview-popup';
-          popup.textContent = text || '（内容なし）';
-
-          document.body.appendChild(popup);
-
-          // ボタンの位置に配置
-          const r = btn.getBoundingClientRect();
-          popup.style.left = (window.scrollX + r.right + 8) + 'px';
-          popup.style.top  = (window.scrollY + r.top) + 'px';
-        });
-
-        document.addEventListener('mouseout', (e) => {
-          if (e.target.closest('.cgtn-preview-btn')) {
-            setTimeout(() => {
-              document.querySelectorAll('.cgtn-preview-popup').forEach(n => n.remove());
-            }, 200);
-          }
-        });
       })();
 
       // === 基準線の自動追従（リサイズ/DevTools開閉/回転/可視状態変更） ===
@@ -253,20 +205,24 @@
     });
   }
 
-//基準線の追従
-  const debounce = (fn, ms=50) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
-  const redraw = debounce(()=> window.CGTN_SHARED?.redrawBaseline?.(), 50);
+  
+  if (window._cgtnBaselineBound) { /* 二重バインド防止 */ } else {
+    window._cgtnBaselineBound = true;
+    //基準線の追従
+    const debounce = (fn, ms=50) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
+    const redraw = debounce(()=> window.CGTN_SHARED?.redrawBaseline?.(), 50);
 
-  window.addEventListener('resize', redraw, { passive:true });
-  window.addEventListener('orientationchange', redraw);
-  document.addEventListener('visibilitychange', redraw);
+    window.addEventListener('resize', redraw, { passive:true });
+    window.addEventListener('orientationchange', redraw);
+    document.addEventListener('visibilitychange', redraw);
 
-  try{
-    const sc = document.scrollingElement || document.documentElement;
-    const ro = new ResizeObserver(redraw);
-    ro.observe(sc);
-  }catch{}
-//基準線の追従ここまで
+    try{
+      const sc = document.scrollingElement || document.documentElement;
+      const ro = new ResizeObserver(redraw);
+      ro.observe(sc);
+    }catch{}
+    //基準線の追従ここまで
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize, { once:true });

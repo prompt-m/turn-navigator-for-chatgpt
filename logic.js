@@ -227,6 +227,7 @@
 
   // [追記] 本文からプレビュー用テキストを抽出（改行・空白を整理、長すぎるときはカット）
   function extractPreviewText(node){
+//console.log("プレビュー用テキストnode:",node);
     try {
       const raw = (node?.innerText || node?.textContent || '').trim();
       // 行頭・行末の連続空白を整理し、内部の過剰連続空白も縮める
@@ -234,6 +235,7 @@
                       .replace(/[ \t]+\n/g, '\n')
                       .replace(/\n{3,}/g, '\n\n')
                       .replace(/[ \t]{2,}/g, ' ');
+//console.log("プレビュー用テキストnorm:",norm);
       return norm.length > 2000 ? norm.slice(0, 2000) + '…' : norm;
     } catch {
       return '';
@@ -758,10 +760,20 @@ function refreshPinUIForTurn(turnKey, forcedState){
 
       const attachLine = buildAttachmentLine(art, maxChars);
       const bodyLine   = extractBodySnippet(head, maxChars);
+console.log("★bodyLine:",bodyLine);
 
       // 🔖をどちらに出すか：添付があれば添付行、無ければ本文行
       const showClipOnAttach = !!attachLine;
       const showClipOnBody   = !attachLine && !!bodyLine;
+
+      // ★追記: プレビュー用（長め）テキストを生成
+      //   - 長さは 1200 文字を基準（設定があればそれを優先）
+      //   - body優先、無ければattachを採用
+      const PREVIEW_MAX =
+        Math.max(600, Math.min(2000, (window.CGTN_SHARED?.getCFG?.()?.list?.previewMax || 1200)));
+      const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
+      const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
+      const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
 
       // 添付行
       if (attachLine){
@@ -777,7 +789,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         row.innerHTML = `
           <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           <span class="txt"></span>
-          <button class="cgtn-preview-btn" title="プレビュー">…</button>
+          <button class="cgtn-preview-btn">…</button>
         `;
         row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
@@ -787,6 +799,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
 //        paintPinRow(row, isPinned(art));
         paintPinRow(row,  isPinnedByKey(turnKey));
         if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
+        if (row)  row.dataset.preview  = previewText;
         body.appendChild(row);
       }
 
@@ -804,20 +817,18 @@ function refreshPinUIForTurn(turnKey, forcedState){
         row2.innerHTML = `
           <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           <span class="txt"></span>
-          <button class="cgtn-preview-btn" title="プレビュー">…</button> 
+          <button class="cgtn-preview-btn">…</button> 
         `;
         row2.querySelector('.txt').textContent = bodyLine;
         row2.addEventListener('click', () => scrollToHead(art));
         row2.dataset.turn = turnKey;
         row2.dataset.kind = 'body';
 
-//        paintPinRow(row2, isPinned(art));
         paintPinRow(row2, isPinnedByKey(turnKey));
         if (showClipOnBody) bindClipPin(row2.querySelector('.clip'), art);
 
-        const previewText = extractPreviewText(art || articleNode);
-        row.dataset.preview = previewText;
-        if (row2) row2.dataset.preview = previewText; 
+//        const previewText = extractPreviewText(window.CGTN_LOGIC?.listHeadNodeOf?.(art) || art);
+        if (row2) row2.dataset.preview = previewText;
         body.appendChild(row2);
       }
     }

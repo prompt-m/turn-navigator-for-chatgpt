@@ -178,7 +178,7 @@
 /* === プレビュー吹き出し（追加） === */
 .cgtn-popover {
   position: fixed;
-  z-index: 2147483000;
+  z-index: 2147483647 !important;  /* ほぼ最大。モーダルより前面へ */
   max-width: 520px;
   max-height: 320px;
   padding: 10px 12px;
@@ -191,7 +191,9 @@
   font-size: 12px;
   line-height: 1.5;
   transform: translate(10px, 14px); /* マウスから少し離す */
-  white-space: normal;
+  white-space: pre-wrap; /* 改行を保持しつつ折り返し */
+  will-change: left, top, transform; /* 位置追従を滑らかに */
+  pointer-events: none;              /* ホバー中にポップに引っかからない */
 }
 .cgtn-popover[data-show="1"] { display: block; }
 
@@ -465,7 +467,7 @@
 
   function toggleLang(){
     LANG = LANG === 'ja' ? 'en' : 'ja';
-    console.log("★ui 日英切り替えクリックしました:LANG",LANG);
+//    console.log("★ui 日英切り替えクリックしました:LANG",LANG);
     applyLang();
   }
 
