@@ -19,6 +19,8 @@
   // ★ curLang() がこれを拾えるように resolver にも設定
   SH.setLangResolver?.(SH.getLang);
 
+  //付箋上にあるときのマウスポインタ＾
+  const pinCurURL = chrome.runtime.getURL('assets/fpointer_32.cur');
 
   function injectCss(css){
     const s = document.createElement('style');
@@ -29,7 +31,6 @@
   // 最低限の見た目（以前のCSSを凝縮）
   const BASE_CSS = `
   #cgpt-nav{position:fixed;right:12px;bottom:140px;display:flex;flex-direction:column;gap:12px;z-index:2147483647}
-  #cgpt-drag{width:92px;height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.55;cursor:grab;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
   .cgpt-nav-group{width:92px;border-radius:14px;padding:10px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.95);box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:6px}
   .cgpt-nav-label{text-align:center;font-weight:600;opacity:.9;margin-bottom:2px;font-size:12px}
   #cgpt-nav button{all:unset;height:34px;border-radius:10px;font:12px/1.1 system-ui,-apple-system,sans-serif;display:grid;place-items:center;cursor:pointer;background:#f2f2f7;color:#111;border:1px solid rgba(0,0,0,.08)}
@@ -48,7 +49,6 @@
   box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden;
 }
   #cgpt-list-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.1);padding:6px 10px}
-  #cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
   #cgpt-list-close{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:6px 8px;cursor:pointer}
   #cgpt-list-body{overflow:auto;padding:6px 8px}
   #cgpt-list-body .row{display:flex;gap:8px;align-items:center;padding:8px 6px;border-bottom:1px dashed rgba(0,0,0,.08);cursor:pointer}
@@ -57,18 +57,18 @@
   #cgpt-bias-line,#cgpt-bias-band{pointer-events:none!important}
   .cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
   .cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
-  /* つまみ（両パネルで統一） */
-  #cgpt-drag,#cgpt-list-grip{
-    background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
-  }
-  #cgpt-list-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-top:1px solid rgba(0,0,0,.08)}
+
+#cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
+#cgpt-list-grip.dragging .drag-handle { cursor: grabbing; }
+
+#cgpt-drag{width:92px;height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.55;cursor:grab;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+#cgpt-drag.dragging .drag-handle { cursor: grabbing; }
+
+#cgpt-list-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-top:1px solid rgba(0,0,0,.08)}
 /* パネルは縦フレックスで head / body / foot を上下に配置 */
 #cgpt-list-head{
   display:flex; align-items:center; gap:8px;
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
-}
-#cgpt-list-grip{ height:12px; border-radius:10px; flex:1;
-  background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%); opacity:.6; cursor:grab;
 }
 
 /* 畳む/開くボタン（閉じるの代わりに） */
@@ -99,7 +99,6 @@
 #cgpt-list-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.1);padding:6px 10px;position:sticky;top:0;background:rgba(255,255,255,.98)}
 #cgpt-list-close{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;cursor:pointer}
 #cgpt-list-collapse{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer}
-#cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
 
 /* 1ターン1個の付箋：ダミー枠は幅だけ確保（table風の見た目） */
 #cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
@@ -129,12 +128,12 @@
   box-shadow: none !important;
 }
 
-/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=グレー） */
+/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
 .cgtn-cursor-pin{
-  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjZTYwMDMzIiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer;
+  cursor: url("${pinCurURL}"), pointer;
 }
 .cgtn-cursor-pin.off{
-  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjOTc5Nzk3IiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer;
+  cursor: url("${pinCurURL}"), pointer;
 }
 
 /* 行の本文は従来どおり“指” */
@@ -142,10 +141,10 @@
 
 /* === 付箋カーソルを最優先で適用（!important で上書き） === */
 #cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {
-  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjZTYwMDMzIiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer !important;
+  cursor: url("${pinCurURL}"), pointer !important;
 }
 #cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
-  cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAxNiAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjOTc5Nzk3IiBkPSJNMyAxYTIgMiAwIDAgMSAyLTJoNiAyYTIgMiAwIDAgMSAyIDJ2MTRsLTUgMy01LTNWem0yLTBoNnYxMmwtMyAyLTMtMnYtMTJ6Ii8+PC9zdmc+"), pointer !important;
+  cursor: url("${pinCurURL}"), pointer !important;
 }
 
 /* === プレビュー吹き出し === */
@@ -208,7 +207,6 @@
 .cgtn-more:hover { background: rgba(255,255,255,.08); }
 
   `;
-
   injectCss(BASE_CSS);
 
 /*ｺｺｶﾗ*/

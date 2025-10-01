@@ -95,6 +95,7 @@
           document.body.appendChild(pop);
           return pop;
         }
+/*
         function position(x, y){
           if (!pop) return;
           const pad = 8;
@@ -105,6 +106,7 @@
           pop.style.left = left + 'px';
           pop.style.top  = top  + 'px';
         }
+*/
         // NOTE: preview は renderList 時点で row/row2 に埋めてあるので dataset から読むだけで良い。
         function show(btn, e){
           const row = btn.closest('.row'); if (!row) return;
@@ -112,7 +114,19 @@
           const box  = ensurePop();
           box.textContent = text;
           box.setAttribute('data-show', '1');
-          position(e.clientX, e.clientY);
+          //position(e.clientX, e.clientY);
+          // ★マウス追従ではなく「ボタンの横」に固定配置
+          const r = btn.getBoundingClientRect();
+          let left = window.scrollX + r.right + 12;
+          let top  = window.scrollY + r.top   - 8;
+          // 画面からはみ出さないように調整
+          const pad = 12;
+          const w = box.offsetWidth || 400; // 初回は0のことがあるので仮値
+          const h = box.offsetHeight || 240;
+          if (left + w + pad > window.scrollX + innerWidth)  left = window.scrollX + innerWidth - w - pad;
+          if (top  + h + pad > window.scrollY + innerHeight) top  = window.scrollY + innerHeight - h - pad;
+          box.style.left = left + 'px';
+          box.style.top  = top  + 'px';
         }
         function hide(){ if (pop) pop.removeAttribute('data-show'); }
 
@@ -124,21 +138,35 @@
         }, true);
 
         // マウス移動で追従（rAFで負荷軽減）
-        document.addEventListener('mousemove', (e) => {
-          if (!pop || pop.getAttribute('data-show') !== '1') return;
-          cancelAnimationFrame(raf);
-          const x = e.clientX, y = e.clientY;
-          raf = requestAnimationFrame(() => position(x, y));
-        }, true);
+//        document.addEventListener('mousemove', (e) => {
+//          if (!pop || pop.getAttribute('data-show') !== '1') return;
+//          cancelAnimationFrame(raf);
+//          const x = e.clientX, y = e.clientY;
+//          raf = requestAnimationFrame(() => position(x, y));
+//        }, true);
+
+        // どこかクリックしたら閉じる
+        document.addEventListener('click', (e) => {
+          if (pop && pop.getAttribute('data-show') === '1') {
+            // プレビュー自体やボタンをクリックした場合は閉じない
+            if (e.target.closest('.cgtn-popover') || e.target.closest('.cgtn-preview-btn')) return;
+            hide();
+          }
+        });
+
+        // Escキーでも閉じる
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') hide();
+        });
 
         // マウスが外れたら閉じる
-        document.addEventListener('mouseleave', (e) => {
-          if (e.target.closest?.('.cgtn-preview-btn')) hide();
-        }, true);
+        //document.addEventListener('mouseleave', (e) => {
+        //  if (e.target.closest?.('.cgtn-preview-btn')) hide();
+        //}, true);
 
         // スクロール・ウィンドウ外れ・Esc で閉じる（任意）
-        document.addEventListener('scroll', hide, {capture:true, passive:true});
-        window.addEventListener('blur', hide);
+        //document.addEventListener('scroll', hide, {capture:true, passive:true});
+        //window.addEventListener('blur', hide);
         document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') hide(); });
       })();
 

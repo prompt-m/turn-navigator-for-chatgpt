@@ -760,7 +760,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
 
       const attachLine = buildAttachmentLine(art, maxChars);
       const bodyLine   = extractBodySnippet(head, maxChars);
-console.log("★bodyLine:",bodyLine);
+//console.log("★bodyLine:",bodyLine);
 
       // 🔖をどちらに出すか：添付があれば添付行、無ければ本文行
       const showClipOnAttach = !!attachLine;
@@ -787,9 +787,10 @@ console.log("★bodyLine:",bodyLine);
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
         row.innerHTML = `
-          <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
-          <span class="txt"></span>
           <button class="cgtn-preview-btn">…</button>
+          <span class="txt"></span>
+          <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
+          
         `;
         row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
@@ -815,9 +816,10 @@ console.log("★bodyLine:",bodyLine);
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
         row2.innerHTML = `
-          <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
-          <span class="txt"></span>
           <button class="cgtn-preview-btn">…</button> 
+          <span class="txt"></span>
+          <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
+          
         `;
         row2.querySelector('.txt').textContent = bodyLine;
         row2.addEventListener('click', () => scrollToHead(art));

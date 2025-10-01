@@ -22,6 +22,12 @@
     } catch {}
 
     box.addEventListener('click', (e) => {
+console.log("クリック",e.target.closest);
+      if (e.target.closest('.cgtn-preview-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return; 
+      }
       const t = e.target.closest('*');
       if (!t) return;
 
