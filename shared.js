@@ -75,6 +75,9 @@ function curLang(){
     'list.pinonly' : { ja:'付箋のみ表示（Altでテーマ）', en:'Pinned only (Alt for theme)' },
     'row.pin'      : { ja:'このターンを付箋 ON/OFF',    en:'Toggle pin for this turn' },
     'row.preview'  : { ja:'プレビュー',                 en:'Preview' },
+    'row.previewBtn' : { 
+        ja:'クリックでプレビューを表示／もう一度クリックで閉じます', 
+        en:'Click to show preview / Click again to close'}
   };
 
 

@@ -205,6 +205,65 @@
   font-size: 14px;
 }
 .cgtn-more:hover { background: rgba(255,255,255,.08); }
+/* === 常駐プレビュー・ドック === */
+.cgtn-dock {
+  position: absolute;
+  z-index: 2147483647 !important;
+  width: 460px;
+  max-width: 80vw;
+  height: 300px;
+  max-height: 80vh;
+  background: rgba(20,20,20,.96);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+  border-radius: 10px;
+  display: none;                /* クリックで表示に切り替え */
+  overflow: hidden;             /* ヘッダー/ボディを内側で制御 */
+  user-select: none;
+}
+
+.cgtn-dock[data-show="1"] { display: block; }
+
+.cgtn-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.08);
+  cursor: move;                 /* ドラッグで移動 */
+}
+.cgtn-dock-title { font-weight: 600; font-size: 12px; opacity: .9; }
+.cgtn-dock-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.cgtn-dock-body {
+  height: calc(100% - 40px);    /* だいたいヘッダー分 */
+  overflow: auto;
+  padding: 10px 12px;
+  white-space: pre-wrap;         /* 改行保持しつつ折返し */
+  user-select: text;             /* 本文は選択可 */
+}
+
+/* 右下リサイズグリップ */
+.cgtn-dock-resize {
+  position: absolute;
+  right: 6px; bottom: 6px;
+  width: 14px; height: 14px;
+  cursor: nwse-resize;
+  opacity: .7;
+}
+
+/* 固定中の視覚フィードバック（任意） */
+.cgtn-dock[data-pinned="1"] .cgtn-dock-head {
+  background: rgba(255,255,255,.16);
+}
+
 
   `;
   injectCss(BASE_CSS);

@@ -599,7 +599,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
     })();
 
 
-    window.CGTN_SHARED?.applyTooltips?.({
+    SH?.applyTooltips?.({
       '#cgpt-list-collapse': 'list.collapse',
       '#cgpt-pin-filter'   : 'list.pinonly'
     }, listBox);
@@ -665,7 +665,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
           return;
         }
         //行上の付箋にまとめ適用
-        window.CGTN_SHARED?.applyTooltips?.({
+        SH?.applyTooltips?.({
           '#cgpt-list-body .cgtn-clip-pin' : 'row.pin'
         }, document);
 
@@ -760,7 +760,6 @@ function refreshPinUIForTurn(turnKey, forcedState){
 
       const attachLine = buildAttachmentLine(art, maxChars);
       const bodyLine   = extractBodySnippet(head, maxChars);
-//console.log("★bodyLine:",bodyLine);
 
       // 🔖をどちらに出すか：添付があれば添付行、無ければ本文行
       const showClipOnAttach = !!attachLine;
@@ -770,7 +769,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
       //   - 長さは 1200 文字を基準（設定があればそれを優先）
       //   - body優先、無ければattachを採用
       const PREVIEW_MAX =
-        Math.max(600, Math.min(2000, (window.CGTN_SHARED?.getCFG?.()?.list?.previewMax || 1200)));
+        Math.max(600, Math.min(2000, (SH?.getCFG?.()?.list?.previewMax || 1200)));
       const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
       const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
       const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
@@ -787,7 +786,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
         row.innerHTML = `
-          <button class="cgtn-preview-btn">…</button>
+          <button class="cgtn-preview-btn" title='rowpreview'>…</button>
           <span class="txt"></span>
           <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           
@@ -800,7 +799,12 @@ function refreshPinUIForTurn(turnKey, forcedState){
 //        paintPinRow(row, isPinned(art));
         paintPinRow(row,  isPinnedByKey(turnKey));
         if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
-        if (row)  row.dataset.preview  = previewText;
+        if (row)  row.dataset.preview  = previewText || attachLine || '';
+
+        SH?.applyTooltips?.({
+          '.cgtn-preview-btn': 'row.previewBtn',
+        }, row);
+
         body.appendChild(row);
       }
 
@@ -816,7 +820,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
         row2.innerHTML = `
-          <button class="cgtn-preview-btn">…</button> 
+          <button class="cgtn-preview-btn" title='row2preview'>…</button> 
           <span class="txt"></span>
           <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           
@@ -828,9 +832,12 @@ function refreshPinUIForTurn(turnKey, forcedState){
 
         paintPinRow(row2, isPinnedByKey(turnKey));
         if (showClipOnBody) bindClipPin(row2.querySelector('.clip'), art);
+        if (row2) row2.dataset.preview = previewText || bodyLine || '';
 
-//        const previewText = extractPreviewText(window.CGTN_LOGIC?.listHeadNodeOf?.(art) || art);
-        if (row2) row2.dataset.preview = previewText;
+        SH?.applyTooltips?.({
+          '.cgtn-preview-btn': 'row.previewBtn',
+        }, row2);
+
         body.appendChild(row2);
       }
     }
