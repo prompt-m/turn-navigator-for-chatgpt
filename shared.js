@@ -63,6 +63,9 @@ function curLang(){
 
   // 辞書（必要に応じて増やしてください）
   const TIPS = {
+    'row.previewBtn' : { 
+        ja:'クリックでプレビューを表示／もう一度クリックで閉じます', 
+        en:'Click to show preview / Click again to close'},
     'nav.top'      : { ja:'先頭へ',                    en:'Go to top' },
     'nav.bottom'   : { ja:'末尾へ',                    en:'Go to bottom' },
     'nav.prev'     : { ja:'前へ',                      en:'Previous' },
@@ -74,10 +77,7 @@ function curLang(){
     'list.collapse': { ja:'畳む / 開く',                en:'Collapse / Expand' },
     'list.pinonly' : { ja:'付箋のみ表示（Altでテーマ）', en:'Pinned only (Alt for theme)' },
     'row.pin'      : { ja:'このターンを付箋 ON/OFF',    en:'Toggle pin for this turn' },
-    'row.preview'  : { ja:'プレビュー',                 en:'Preview' },
-    'row.previewBtn' : { 
-        ja:'クリックでプレビューを表示／もう一度クリックで閉じます', 
-        en:'Click to show preview / Click again to close'}
+    'row.preview'  : { ja:'プレビュー',                 en:'Preview' }
   };
 
 
@@ -100,7 +100,6 @@ function curLang(){
     Object.entries(pairs).forEach(([sel, key])=>{
       root.querySelectorAll(sel).forEach(el => {
         const s = t(key);
-//        console.log("***applyTooltips sel:",sel," key:",key," LANG:",L," s:",s);
         if (s) el.title = s; 
       });
     });

@@ -80,163 +80,154 @@
 
       EV.bindEvents();
 
-// === 常駐プレビュードック（非表示で常に更新、クリックで表示 & 固定） ===
-(function bindPreviewDockOnce(){
-  if (document._cgtnPreviewDockBound) return;
-  document._cgtnPreviewDockBound = true;
+      // === 常駐プレビュードック（非表示で常に更新、クリックで表示 & 固定） ===
+      (function bindPreviewDockOnce(){
+        if (document._cgtnPreviewDockBound) return;
+        document._cgtnPreviewDockBound = true;
 
-  const LIST_SEL = '#cgpt-list-panel';
-  const BTN_SEL  = '.cgtn-preview-btn';   // 既存・新設どちらも拾える想定
+        const LIST_SEL = '#cgpt-list-panel';
+        const BTN_SEL  = '.cgtn-preview-btn';   // 既存・新設どちらも拾える想定
 
-  let dock, body, title;
-  let pinned = false;                     // クリックで固定
-  let dragging = false, dragDX = 0, dragDY = 0;
-  let resizing = false, baseW = 0, baseH = 0, baseX = 0, baseY = 0;
+        let dock, body, title;
+        let pinned = false;                     // クリックで固定
+        let dragging = false, dragDX = 0, dragDY = 0;
+        let resizing = false, baseW = 0, baseH = 0, baseX = 0, baseY = 0;
 
-  function ensureDock(){
-    if (dock) return dock;
-    dock = document.createElement('div');
-    dock.className = 'cgtn-dock';
-    dock.innerHTML = `
-      <div class="cgtn-dock-head">
-        <span class="cgtn-dock-title">Preview</span>
-        <button class="cgtn-dock-close" aria-label="Close">✕</button>
-      </div>
-      <div class="cgtn-dock-body"></div>
-      <div class="cgtn-dock-resize" title="Resize">⤡</div>
-    `;
-    document.body.appendChild(dock);
-    body  = dock.querySelector('.cgtn-dock-body');
-    title = dock.querySelector('.cgtn-dock-title');
+        function ensureDock(){
+          if (dock) return dock;
+          dock = document.createElement('div');
+          dock.className = 'cgtn-dock';
+          dock.innerHTML = `
+            <div class="cgtn-dock-head">
+              <span class="cgtn-dock-title">Preview</span>
+              <button class="cgtn-dock-close" aria-label="Close">✕</button>
+            </div>
+            <div class="cgtn-dock-body"></div>
+            <div class="cgtn-dock-resize" title="Resize">⤡</div>
+          `;
+          document.body.appendChild(dock);
+          body  = dock.querySelector('.cgtn-dock-body');
+          title = dock.querySelector('.cgtn-dock-title');
 
-    // 閉じる
-    dock.querySelector('.cgtn-dock-close').addEventListener('click', () => {
-      dock.removeAttribute('data-show');
-      dock.removeAttribute('data-pinned');
-      pinned = false;
-    });
+          // 閉じる
+          dock.querySelector('.cgtn-dock-close').addEventListener('click', () => {
+            dock.removeAttribute('data-show');
+            dock.removeAttribute('data-pinned');
+            pinned = false;
+          });
 
-    // 移動（ヘッダー掴み）
-    const head = dock.querySelector('.cgtn-dock-head');
-    head.addEventListener('mousedown', (e) => {
-      if (!pinned) return;           // 固定中のみ移動
-      dragging = true;
-      const r = dock.getBoundingClientRect();
-      dragDX = e.clientX - r.left;
-      dragDY = e.clientY - r.top;
-      e.preventDefault();
-    });
-    window.addEventListener('mousemove', (e) => {
-      if (!dragging) return;
-      const left = window.scrollX + e.clientX - dragDX;
-      const top  = window.scrollY + e.clientY - dragDY;
-      dock.style.left = left + 'px';
-      dock.style.top  = top  + 'px';
-    }, { passive: true });
-    window.addEventListener('mouseup', () => { dragging = false; });
+          // 移動（ヘッダー掴み）
+          const head = dock.querySelector('.cgtn-dock-head');
+          head.addEventListener('mousedown', (e) => {
+            if (!pinned) return;           // 固定中のみ移動
+            dragging = true;
+            const r = dock.getBoundingClientRect();
+            dragDX = e.clientX - r.left;
+            dragDY = e.clientY - r.top;
+            e.preventDefault();
+          });
+          window.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const left = window.scrollX + e.clientX - dragDX;
+            const top  = window.scrollY + e.clientY - dragDY;
+            dock.style.left = left + 'px';
+            dock.style.top  = top  + 'px';
+          }, { passive: true });
+          window.addEventListener('mouseup', () => { dragging = false; });
 
-    // リサイズ（右下グリップ）
-    const grip = dock.querySelector('.cgtn-dock-resize');
-    grip.addEventListener('mousedown', (e) => {
-      resizing = true;
-      const r = dock.getBoundingClientRect();
-      baseW = r.width; baseH = r.height;
-      baseX = e.clientX; baseY = e.clientY;
-      e.preventDefault();
-    });
-    window.addEventListener('mousemove', (e) => {
-      if (!resizing) return;
-      const dx = e.clientX - baseX;
-      const dy = e.clientY - baseY;
-      const w = Math.max(260, baseW + dx);
-      const h = Math.max(180, baseH + dy);
-      dock.style.width  = w + 'px';
-      dock.style.height = h + 'px';
-    }, { passive: true });
-    window.addEventListener('mouseup', () => { resizing = false; });
+          // リサイズ（右下グリップ）
+          const grip = dock.querySelector('.cgtn-dock-resize');
+          grip.addEventListener('mousedown', (e) => {
+            resizing = true;
+            const r = dock.getBoundingClientRect();
+            baseW = r.width; baseH = r.height;
+            baseX = e.clientX; baseY = e.clientY;
+            e.preventDefault();
+          });
+          window.addEventListener('mousemove', (e) => {
+            if (!resizing) return;
+            const dx = e.clientX - baseX;
+            const dy = e.clientY - baseY;
+            const w = Math.max(260, baseW + dx);
+            const h = Math.max(180, baseH + dy);
+            dock.style.width  = w + 'px';
+            dock.style.height = h + 'px';
+          }, { passive: true });
+          window.addEventListener('mouseup', () => { resizing = false; });
 
-    return dock;
-  }
+          return dock;
+        }
 
-  // 行からプレビュー文字列を受け取る（renderList で row.dataset.preview を仕込んでいる前提）
-  function textFromRow(row){
-    return row?.dataset?.preview || '（内容なし）';
-  }
+        // 行からプレビュー文字列を受け取る（renderList で row.dataset.preview を仕込んでいる前提）
+        function textFromRow(row){
+          return row?.dataset?.preview || '（内容なし）';
+        }
 
-  // 非表示のまま「中身と座標」を更新
-  function updateDock(btn){
+        // 非表示のまま「中身と座標」を更新
+        function updateDock(btn){
 //console.log("updateDock btn:",btn);
-    const row = btn.closest('.row'); if (!row) return;
-    const text = textFromRow(row);
-    const kind = row.getAttribute('data-kind') === 'attach' ? 'Attachments' : 'Preview';
+          const row = btn.closest('.row'); if (!row) return;
+          const text = textFromRow(row);
+          const kind = row.getAttribute('data-kind') === 'attach' ? 'Attachments' : 'Preview';
 
-    const box = ensureDock();
-    // 中身は常時更新（固定中でも内容は切り替える仕様）
-    body.textContent = text;
-    title.textContent = kind;
+          const box = ensureDock();
+          // 中身は常時更新（固定中でも内容は切り替える仕様）
+          body.textContent = text;
+          title.textContent = kind;
 
-    // 固定していなければボタン横に追従（表示はしない）
-    if (!pinned){
-      const r = btn.getBoundingClientRect();
-      const w = box.offsetWidth || 420, h = box.offsetHeight || 260, pad = 12;
-      let left = window.scrollX + r.right + 12;
-      let top  = window.scrollY + Math.max(r.top - 8, 8);
-      if (left + w + pad > window.scrollX + innerWidth)  left = window.scrollX + innerWidth  - w - pad;
-      if (top  + h + pad > window.scrollY + innerHeight) top  = window.scrollY + innerHeight - h - pad;
-      box.style.left = left + 'px';
-      box.style.top  = top  + 'px';
-    }
-  }
+          // 固定していなければボタン横に追従（表示はしない）
+          if (!pinned){
+            const r = btn.getBoundingClientRect();
+            const w = box.offsetWidth || 420, h = box.offsetHeight || 260, pad = 12;
+            let left = window.scrollX + r.right + 12;
+            let top  = window.scrollY + Math.max(r.top - 8, 8);
+            if (left + w + pad > window.scrollX + innerWidth)  left = window.scrollX + innerWidth  - w - pad;
+            if (top  + h + pad > window.scrollY + innerHeight) top  = window.scrollY + innerHeight - h - pad;
+            box.style.left = left + 'px';
+            box.style.top  = top  + 'px';
+          }
+        }
 
-  // A) マウスムーブ：常時差し替え（見せない）
-  //    → プレビューボタンクラスに当たったときだけ更新
-  let raf = 0;
-  document.addEventListener('mousemove', (e) => {
-    const btn = e.target.closest?.(BTN_SEL);
-    if (!btn) return;
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => updateDock(btn));
-  }, true);
+        // A) マウスムーブ：常時差し替え（見せない）
+        //    → プレビューボタンクラスに当たったときだけ更新
+        let raf = 0;
+        document.addEventListener('mousemove', (e) => {
+          const btn = e.target.closest?.(BTN_SEL);
+          if (!btn) return;
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(() => updateDock(btn));
+        }, true);
 
-  // B) クリック：表示/非表示トグル（固定ON/OFF）
-  document.addEventListener('click', (e) => {
+        // B) クリック：表示/非表示トグル（固定ON/OFF）
+        document.addEventListener('click', (e) => {
 //console.log("click:",e.target.closest);
-    const btn = e.target.closest?.(BTN_SEL);
-    if (!btn) return;
-    e.preventDefault(); e.stopPropagation();
+          const btn = e.target.closest?.(BTN_SEL);
+          if (!btn) return;
+          e.preventDefault(); e.stopPropagation();
 
-    const box = ensureDock();
-   // 表示トグル：表示にする時は固定ON、非表示にする時は固定OFF
-    const showing = box.getAttribute('data-show') === '1';
-    if (showing){
-      box.removeAttribute('data-show');
-      box.removeAttribute('data-pinned');
-      pinned = false;
-    } else {
-      updateDock(btn);              // 最終位置/内容を反映してから
-      box.setAttribute('data-show','1');
-      box.setAttribute('data-pinned','1');
-      pinned = true;
-    }
-  }, true);
+          const box = ensureDock();
+         // 表示トグル：表示にする時は固定ON、非表示にする時は固定OFF
+          const showing = box.getAttribute('data-show') === '1';
+          if (showing){
+            box.removeAttribute('data-show');
+            box.removeAttribute('data-pinned');
+            pinned = false;
+          } else {
+            updateDock(btn);              // 最終位置/内容を反映してから
+            box.setAttribute('data-show','1');
+            box.setAttribute('data-pinned','1');
+            pinned = true;
+          }
+        }, true);
 
-  // C) Esc で閉じる、外側クリックで閉じる（任意）
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') {
-    pinned = false;
-    ensureDock().removeAttribute('data-show');
-    ensureDock().removeAttribute('data-pinned');
-  }});
-  document.addEventListener('click', (e) => {
-    const box = ensureDock();
-    if (box.getAttribute('data-show') !== '1') return;
-    if (e.target.closest(BTN_SEL)) return;         // ボタン自身は除外
-    if (e.target.closest('.cgtn-dock')) return;   // ドック内は除外
-    pinned = false;
-    box.removeAttribute('data-show');
-    box.removeAttribute('data-pinned');
-  }, true);
+        // ★Escだけは残して、外側クリックでのクローズは無効化
+        document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') {
+          pinned = false;
+          ensureDock().removeAttribute('data-show');
+          ensureDock().removeAttribute('data-pinned');
+        }});
 
-})();
+      })();
 
 
       // [追記] リスト「…」プレビューのイベント委譲（1回だけ）
@@ -303,6 +294,7 @@
 //          const x = e.clientX, y = e.clientY;
 //          raf = requestAnimationFrame(() => position(x, y));
 //        }, true);
+
 
         // どこかクリックしたら閉じる
         document.addEventListener('click', (e) => {

@@ -524,8 +524,8 @@ function refreshPinUIForTurn(turnKey, forcedState){
     listBox.id = 'cgpt-list-panel';
     listBox.innerHTML = `
       <div id="cgpt-list-head">
-        <div id="cgpt-list-grip" title="ドラッグで移動"></div>
-        <button id="cgpt-pin-filter" type="button" title="付箋のみ/すべて切替" aria-pressed="false" style="cursor:pointer">🔖\uFE0E</button>
+        <div id="cgpt-list-grip"></div>
+        <button id="cgpt-pin-filter" type="button" aria-pressed="false" style="cursor:pointer">🔖\uFE0E</button>
         <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
       </div>
       <div id="cgpt-list-body"></div>
@@ -533,44 +533,55 @@ function refreshPinUIForTurn(turnKey, forcedState){
     `;
     document.body.appendChild(listBox);
 
-/*ｺｺｶﾗ*/
-// === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
-(function enforceNoFocusList(panel){
-  if (!panel || panel._cgtnFocusGuard) return;
-  panel._cgtnFocusGuard = true;
-
-  let lastWasKeyboard = false;
-  window.addEventListener('keydown',     () => { lastWasKeyboard = true;  }, {capture:true});
-  window.addEventListener('pointerdown', () => { lastWasKeyboard = false; }, {capture:true});
-
-  let park = document.getElementById('cgtn-focus-park');
-  if (!park) {
-    park = document.createElement('button');
-    park.id = 'cgtn-focus-park';
-    park.type = 'button';
-    park.tabIndex = -1;
-    park.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
-    document.body.appendChild(park);
-  }
-
-  const INTERACTIVE = 'button, label, input[type=checkbox]';
-  panel.addEventListener('focusin', (e) => {
-    const t = e.target && e.target.closest(INTERACTIVE);
-    if (t && !lastWasKeyboard) {
-      try { t.blur(); } catch {}
-      try { park.focus({ preventScroll:true }); } catch {}
+// この処理は、ensureListBoxのどこらへんにいれるのが正解？
+    if (!listBox._tipsBound) {
+      window.CGTN_SHARED?.applyTooltips?.({
+        '#cgpt-list-collapse'          : 'list.collapse',
+        '#cgpt-pin-filter'             : 'list.pinonly',
+        '#cgpt-list-grip'              : 'nav.drag'
+      }, listBox);
+      listBox._tipsBound = true; // ★重複登録防止
     }
-  }, true);
 
-  panel.addEventListener('mouseup', () => {
-    try {
-      if (document.activeElement && panel.contains(document.activeElement)) {
-        park.focus({ preventScroll:true });
+
+    /*ｺｺｶﾗ*/
+    // === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
+    (function enforceNoFocusList(panel){
+      if (!panel || panel._cgtnFocusGuard) return;
+      panel._cgtnFocusGuard = true;
+
+      let lastWasKeyboard = false;
+      window.addEventListener('keydown',     () => { lastWasKeyboard = true;  }, {capture:true});
+      window.addEventListener('pointerdown', () => { lastWasKeyboard = false; }, {capture:true});
+
+      let park = document.getElementById('cgtn-focus-park');
+      if (!park) {
+        park = document.createElement('button');
+        park.id = 'cgtn-focus-park';
+        park.type = 'button';
+        park.tabIndex = -1;
+        park.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;';
+        document.body.appendChild(park);
       }
-    } catch {}
-  }, { capture:true });
-})(listBox);
-/*ｺｺﾏﾃﾞ*/
+
+      const INTERACTIVE = 'button, label, input[type=checkbox]';
+      panel.addEventListener('focusin', (e) => {
+        const t = e.target && e.target.closest(INTERACTIVE);
+        if (t && !lastWasKeyboard) {
+          try { t.blur(); } catch {}
+          try { park.focus({ preventScroll:true }); } catch {}
+        }
+      }, true);
+
+      panel.addEventListener('mouseup', () => {
+        try {
+          if (document.activeElement && panel.contains(document.activeElement)) {
+            park.focus({ preventScroll:true });
+          }
+        } catch {}
+      }, { capture:true });
+    })(listBox);
+    /*ｺｺﾏﾃﾞ*/
     // === リスト側：マウス操作のフォーカス残りを抑止 ===
     (function suppressMouseFocusInList(){
       const root = listBox;
@@ -598,11 +609,6 @@ function refreshPinUIForTurn(turnKey, forcedState){
       }, { capture:true });
     })();
 
-
-    SH?.applyTooltips?.({
-      '#cgpt-list-collapse': 'list.collapse',
-      '#cgpt-pin-filter'   : 'list.pinonly'
-    }, listBox);
 
     // リストパネル内でもクリックでフォーカスを残さない
     (function suppressMouseFocusInList(panel){
@@ -664,10 +670,6 @@ function refreshPinUIForTurn(turnKey, forcedState){
           applyPinTheme?.();
           return;
         }
-        //行上の付箋にまとめ適用
-        SH?.applyTooltips?.({
-          '#cgpt-list-body .cgtn-clip-pin' : 'row.pin'
-        }, document);
 
         // 通常クリック：pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
@@ -786,7 +788,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
         row.innerHTML = `
-          <button class="cgtn-preview-btn" title='rowpreview'>…</button>
+          <button class="cgtn-preview-btn">…</button>
           <span class="txt"></span>
           <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           
@@ -801,9 +803,8 @@ function refreshPinUIForTurn(turnKey, forcedState){
         if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
         if (row)  row.dataset.preview  = previewText || attachLine || '';
 
-        SH?.applyTooltips?.({
-          '.cgtn-preview-btn': 'row.previewBtn',
-        }, row);
+        window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row);
+        window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
 
         body.appendChild(row);
       }
@@ -820,7 +821,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
         row2.innerHTML = `
-          <button class="cgtn-preview-btn" title='row2preview'>…</button> 
+          <button class="cgtn-preview-btn">…</button> 
           <span class="txt"></span>
           <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
           
@@ -834,9 +835,9 @@ function refreshPinUIForTurn(turnKey, forcedState){
         if (showClipOnBody) bindClipPin(row2.querySelector('.clip'), art);
         if (row2) row2.dataset.preview = previewText || bodyLine || '';
 
-        SH?.applyTooltips?.({
-          '.cgtn-preview-btn': 'row.previewBtn',
-        }, row2);
+        window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row2);
+        window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
+
 
         body.appendChild(row2);
       }

@@ -425,18 +425,15 @@
       '#cgpt-nav [data-role="user"]      [data-act="bottom"]' : 'nav.bottom',
       '#cgpt-nav [data-role="user"]      [data-act="prev"]'   : 'nav.prev',
       '#cgpt-nav [data-role="user"]      [data-act="next"]'   : 'nav.next',
-
       '#cgpt-nav [data-role="assistant"] [data-act="top"]'    : 'nav.top',
       '#cgpt-nav [data-role="assistant"] [data-act="bottom"]' : 'nav.bottom',
       '#cgpt-nav [data-role="assistant"] [data-act="prev"]'   : 'nav.prev',
       '#cgpt-nav [data-role="assistant"] [data-act="next"]'   : 'nav.next',
-      '#cgpt-drag'                : 'nav.drag',
+      '#cgpt-drag'               : 'nav.drag',
       '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
       '#cgpt-viz'                : 'nav.viz',
       '#cgpt-list-toggle'        : 'nav.list'
-      // ※ nav.pinonly は削除
     }, document);
-
 
 /*ｺｺｶﾗ*/
     // === フォーカスが残らない最終防御（モダリティ + パーキング） ===
@@ -526,6 +523,8 @@
     LANG = LANG === 'ja' ? 'en' : 'ja';
 //    console.log("★ui 日英切り替えクリックしました:LANG",LANG);
     applyLang();
+    //切替時に登録済みツールチップを一括再翻訳
+    window.CGTN_SHARED?.updateTooltips?.();
   }
 
   function clampPanelWithinViewport(){
