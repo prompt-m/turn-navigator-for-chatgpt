@@ -13,7 +13,13 @@
   function isOwnUI(node){
     const nav  = document.getElementById('cgpt-nav');
     const list = document.getElementById('cgpt-list-panel');
-    return (nav && (node===nav || nav.contains(node))) ||
+
+
+//    return (nav && (node===nav || nav.contains(node))) ||
+//           (list && (node===list || list.contains(node)));
+    // どれかの“自作UI”内なら監視対象外
+    if (node?.closest?.('[data-cgtn-ui]')) return true;
+    return (nav  && (node===nav  || nav.contains(node))) ||
            (list && (node===list || list.contains(node)));
   }
 
@@ -97,6 +103,7 @@
           if (dock) return dock;
           dock = document.createElement('div');
           dock.className = 'cgtn-dock';
+          dock.setAttribute('data-cgtn-ui','1'); // ← 自作UIフラグ
           dock.innerHTML = `
             <div class="cgtn-dock-head">
               <span class="cgtn-dock-title">Preview</span>
@@ -133,7 +140,8 @@
 
           // 保存済み状態を復元（呼ぶだけで反映）
           function restoreDockState() {
-            const st = SH?.getCFG?.()?.previewDock || {};
+//            const st = SH?.getCFG?.()?.previewDock || {};
+            const st = SH?.getCFG?.()?.previewDockPlace || {};
             const DEF = { w: 420, h: 260, x: 40, y: 40 };
 
             // ★初期デフォルト（設定が無い／ゼロ値っぽい時の下支え）
@@ -153,7 +161,7 @@
             }
 
 // デバッグ
- console.log("restoreDock pinned:",pinned," w:",dock.style.width," h:",dock.style.height," x:",dock.style.left," y:",dock.style.top);
+//console.log("restoreDock pinned:",pinned," w:",dock.style.width," h:",dock.style.height," x:",dock.style.left," y:",dock.style.top);
           }
 
 
@@ -364,20 +372,7 @@
           body.textContent = text;
           title.textContent = kind;
 
-          // 固定していなければボタン横に追従（表示はしない）
-          if (!pinned && !box.hasAttribute('data-show')){
-            const r = btn.getBoundingClientRect();
-            const w = box.offsetWidth || 420, h = box.offsetHeight || 260, pad = 12;
-            let left = window.scrollX + r.right + 12;
-            let top  = window.scrollY + Math.max(r.top - 8, 8);
-            if (left + w + pad > window.scrollX + innerWidth)  left = window.scrollX + innerWidth  - w - pad;
-            if (top  + h + pad > window.scrollY + innerHeight) top  = window.scrollY + innerHeight - h - pad;
-            box.style.left = left + 'px';
-            box.style.top  = top  + 'px';
-//console.log("updateDock pinned:",pinned," w:",box.style.width," h:",box.style.height," x:",box.style.left," y:",box.style.top);
-          }
-
-
+//console.log("updateDock pinned:",pinned);
         }
 
         // A) マウスムーブ：常時差し替え（見せない）
@@ -398,34 +393,26 @@
           e.preventDefault(); e.stopPropagation();
 
           const box = ensureDock();
-         // 表示トグル：表示にする時は固定ON、非表示にする時は固定OFF
           const showing = box.getAttribute('data-show') === '1';
           if (showing){
             box.removeAttribute('data-show');
             box.removeAttribute('data-pinned');
-//            pinned = false;
-            _savePlace(box); // 非表示時にも最終位置を残す（任意）
+            _savePlace(box);              // 非表示時も最終位置を保存
           } else {
-            updateDock(btn);              // 最終位置/内容を反映してから
-
-          // 1) 使い回せるなら前回位置を再利用
-          const saved = _loadPlace();
-          const nowSig = { vp:_vp(), lr:_listRect() };
-          if (saved && _sameVP(saved.sig?.vp, nowSig.vp) && _sameRect(saved.sig?.lr, nowSig.lr)) {
-            // 前回と同じ条件 → 前回の座標・サイズを尊重
-            if (Number.isFinite(saved.w)) box.style.width  = saved.w + 'px';
-            if (Number.isFinite(saved.h)) box.style.height = saved.h + 'px';
-            if (Number.isFinite(saved.x)) box.style.left   = saved.x + 'px';
-            if (Number.isFinite(saved.y)) box.style.top    = saved.y + 'px';
-          } else {
-            // 2) 条件が変わっている → ヒューリスティックで再配置
-            placeDockNearList(box);
-            _savePlace(dock)
-          }
-
+            updateDock(btn);              // ★中身だけ更新（位置は弄らない）
+            const saved = _loadPlace();
+            const nowSig = { vp:_vp(), lr:_listRect() };
+            if (saved && _sameVP(saved.sig?.vp, nowSig.vp) && _sameRect(saved.sig?.lr, nowSig.lr)) {
+              if (Number.isFinite(saved.w)) box.style.width  = saved.w + 'px';
+              if (Number.isFinite(saved.h)) box.style.height = saved.h + 'px';
+              if (Number.isFinite(saved.x)) box.style.left   = saved.x + 'px';
+              if (Number.isFinite(saved.y)) box.style.top    = saved.y + 'px';
+            } else {
+              placeDockNearList(box);     // ★ヒューリスティック
+              _savePlace(box);            // 新基準で保存
+            }
             box.setAttribute('data-show','1');
             box.setAttribute('data-pinned','1');
-//            pinned = true;
           }
         }, true);
 

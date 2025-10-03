@@ -31,6 +31,22 @@
       const t = e.target.closest('*');
       if (!t) return;
 
+// events.js 内：#cgpt-pin-filter クリック処理
+if (t.closest('#cgpt-pin-filter')) {
+  const btn = t.closest('#cgpt-pin-filter');
+  const cur = !!(SH.getCFG().list?.pinOnly);
+  const next = !cur;
+
+  SH.saveSettingsPatch({ list: { ...(SH.getCFG().list||{}), pinOnly: next }});
+  btn.setAttribute('aria-pressed', String(next));
+
+  // 画面反映
+  window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: next });
+  return;
+}
+
+
+
       // 一覧トグル
       if (t.closest('#cgpt-list-toggle')) {
         const on = t.closest('#cgpt-list-toggle').checked;

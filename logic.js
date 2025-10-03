@@ -698,6 +698,23 @@ function refreshPinUIForTurn(turnKey, forcedState){
         btn.setAttribute('aria-expanded', String(on));
       });
     }
+
+    // ensureListBox() の末尾あたり（listBox を生成した直後でOK）
+    if (!document.getElementById('cgtn-pinonly-style')) {
+      const st = document.createElement('style');
+      st.id = 'cgtn-pinonly-style';
+      st.textContent = `
+        #cgpt-pin-filter[aria-pressed="true"]{
+          background: #e60033 !important;
+          color: #333 !important;
+          border-color: #e60033 !important;
+          box-shadow: 0 0 0 2px rgba(245,179,0,.25) inset;
+        }
+      `;
+      document.head.appendChild(st);
+    }
+
+
     bindCollapseOnce(listBox);
 
     return listBox;
@@ -843,21 +860,47 @@ function refreshPinUIForTurn(turnKey, forcedState){
       }
     }
 
-// 最新にするボタン
-//const foot = listBox.querySelector('#cgpt-list-foot');
-if (foot && !foot.querySelector('#cgpt-list-refresh')) {
-  const btn = document.createElement('button');
-  btn.id = 'cgpt-list-refresh';
-  btn.className = 'cgtn-mini-btn';
-  btn.type = 'button';
-  btn.textContent = '↻';
-  foot.appendChild(btn);
+    // ... 全行描画が終わった直後あたり
+    //付箋有無チェック
+    const made = body.children.length;
+    if (made === 0 && pinOnly) {
+      const empty = document.createElement('div');
+      empty.className = 'cgtn-empty';
+      empty.innerHTML = `
+        <div class="msg">このチャットには付箋がありません。</div>
+        <button class="show-all" type="button">すべて表示</button>
+      `;
+      empty.style.cssText = 'padding:16px;opacity:.8;font-size:13px;';
+      body.appendChild(empty);
 
-  // ツールチップ登録（i18n）
-  window.CGTN_SHARED?.applyTooltips?.({
-    '#cgpt-list-refresh': 'list.refresh'
-  }, listBox);
-}
+      // ボタンクリックで pinOnly をOFFにして再描画
+      empty.querySelector('.show-all')?.addEventListener('click', () => {
+        try {
+          const cfg = SH.getCFG() || {};
+          SH.saveSettingsPatch({ list: { ...(cfg.list||{}), pinOnly:false }});
+          // ヘッダのボタン見た目も即同期
+          document.querySelector('#cgpt-pin-filter')?.setAttribute('aria-pressed','false');
+          // 再描画
+          window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride:false });
+        } catch {}
+      });
+    }
+
+    // 最新にするボタン
+    //const foot = listBox.querySelector('#cgpt-list-foot');
+    if (foot && !foot.querySelector('#cgpt-list-refresh')) {
+      const btn = document.createElement('button');
+      btn.id = 'cgpt-list-refresh';
+      btn.className = 'cgtn-mini-btn';
+      btn.type = 'button';
+      btn.textContent = '↻';
+      foot.appendChild(btn);
+
+      // ツールチップ登録（i18n）
+      window.CGTN_SHARED?.applyTooltips?.({
+        '#cgpt-list-refresh': 'list.refresh'
+      }, listBox);
+    }
 
     const info = document.createElement('div');
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
