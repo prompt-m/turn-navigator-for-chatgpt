@@ -63,6 +63,7 @@ function curLang(){
 
   // 辞書（必要に応じて増やしてください）
   const TIPS = {
+    'list.refresh': { ja: '一覧を最新にする', en: 'Refresh the list' },
     'row.previewBtn' : { 
         ja:'クリックでプレビューを表示／もう一度クリックで閉じます', 
         en:'Click to show preview / Click again to close'},

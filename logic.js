@@ -533,7 +533,7 @@ function refreshPinUIForTurn(turnKey, forcedState){
     `;
     document.body.appendChild(listBox);
 
-// この処理は、ensureListBoxのどこらへんにいれるのが正解？
+    // ツールチップ用titleを登録
     if (!listBox._tipsBound) {
       window.CGTN_SHARED?.applyTooltips?.({
         '#cgpt-list-collapse'          : 'list.collapse',
@@ -842,6 +842,22 @@ function refreshPinUIForTurn(turnKey, forcedState){
         body.appendChild(row2);
       }
     }
+
+// 最新にするボタン
+//const foot = listBox.querySelector('#cgpt-list-foot');
+if (foot && !foot.querySelector('#cgpt-list-refresh')) {
+  const btn = document.createElement('button');
+  btn.id = 'cgpt-list-refresh';
+  btn.className = 'cgtn-mini-btn';
+  btn.type = 'button';
+  btn.textContent = '↻';
+  foot.appendChild(btn);
+
+  // ツールチップ登録（i18n）
+  window.CGTN_SHARED?.applyTooltips?.({
+    '#cgpt-list-refresh': 'list.refresh'
+  }, listBox);
+}
 
     const info = document.createElement('div');
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';

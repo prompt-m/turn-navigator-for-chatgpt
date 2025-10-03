@@ -147,6 +147,8 @@
   cursor: url("${pinCurURL}"), pointer !important;
 }
 
+
+
 /* === プレビュー吹き出し === */
 .cgtn-preview-popup {
   position: absolute;
@@ -170,8 +172,8 @@
   color: #555;
 }
 .cgtn-preview-btn:hover {
-  color: #000;
-  background: rgba(0,0,0,0.05);
+  color: #FFF;
+  background: rgba(21,21,21,21);
 }
 
 /* === プレビュー吹き出し（追加） === */
@@ -264,7 +266,16 @@
   background: rgba(255,255,255,.16);
 }
 
-
+/*リストを最新にする*/
+#cgpt-list-refresh.cgtn-mini-btn{
+  all: unset;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+#cgpt-list-refresh.cgtn-mini-btn:hover{
+  background: rgba(0,0,0,.08);
+}
   `;
   injectCss(BASE_CSS);
 
