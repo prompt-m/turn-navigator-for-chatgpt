@@ -46,7 +46,6 @@ if (t.closest('#cgpt-pin-filter')) {
 }
 
 
-
       // 一覧トグル
       if (t.closest('#cgpt-list-toggle')) {
         const on = t.closest('#cgpt-list-toggle').checked;

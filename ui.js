@@ -32,11 +32,11 @@
   const BASE_CSS = `
   #cgpt-nav{position:fixed;right:12px;bottom:140px;display:flex;flex-direction:column;gap:12px;z-index:2147483647}
   .cgpt-nav-group{width:92px;border-radius:14px;padding:10px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.95);box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:6px}
-  .cgpt-nav-label{text-align:center;font-weight:600;opacity:.9;margin-bottom:2px;font-size:12px}
+  .cgpt-nav-label{text-align:center;font-weight:600;opacity:.9;margin-bottom:2px;font-size:12px;color:#000}
   #cgpt-nav button{all:unset;height:34px;border-radius:10px;font:12px/1.1 system-ui,-apple-system,sans-serif;display:grid;place-items:center;cursor:pointer;background:#f2f2f7;color:#111;border:1px solid rgba(0,0,0,.08)}
   #cgpt-nav button:hover{background:#fff}
   .cgpt-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  #cgpt-nav .cgpt-lang-btn{height:28px;margin-top:4px}
+  #cgpt-nav .cgpt-lang-btn{height:28px;margin-top:4px;color:#000}
   #cgpt-nav input[type=checkbox] {cursor: pointer;}
   .cgpt-viz-toggle,.cgpt-list-toggle{margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:flex-start;font-size:12px;cursor:pointer}
   .cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{cursor:pointer;opacity:.9}
@@ -57,6 +57,7 @@
   #cgpt-bias-line,#cgpt-bias-band{pointer-events:none!important}
   .cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
   .cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
+  .cgpt-nav-group button{box-shadow:0 6px 24px;}
 
 #cgpt-list-grip{height:12px;border-radius:10px;background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);opacity:.6;cursor:grab;flex:1}
 #cgpt-list-grip.dragging .drag-handle { cursor: grabbing; }
@@ -71,9 +72,9 @@
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
 }
 
-/* 畳む/開くボタン（閉じるの代わりに） */
+/* 畳む/開くボタン */
 #cgpt-list-collapse{
-  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px;
+  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px;color:#000;
   padding:6px 8px; cursor:pointer; display:inline-grid; place-items:center;
 }
 
@@ -97,8 +98,8 @@
 #cgpt-list-panel.collapsed #cgpt-list-foot { display:none; }
 
 #cgpt-list-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.1);padding:6px 10px;position:sticky;top:0;background:rgba(255,255,255,.98)}
-#cgpt-list-close{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;cursor:pointer}
-#cgpt-list-collapse{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer}
+#cgpt-list-close{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;cursor:pointer;}
+#cgpt-list-collapse{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer;}
 
 /* 1ターン1個の付箋：ダミー枠は幅だけ確保（table風の見た目） */
 #cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
@@ -146,8 +147,6 @@
 #cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
   cursor: url("${pinCurURL}"), pointer !important;
 }
-
-
 
 /* === プレビュー吹き出し === */
 .cgtn-preview-popup {
@@ -207,6 +206,7 @@
   font-size: 14px;
 }
 .cgtn-more:hover { background: rgba(255,255,255,.08); }
+
 /* === 常駐プレビュー・ドック === */
 .cgtn-dock {
   position: absolute;
@@ -276,6 +276,135 @@
 #cgpt-list-refresh.cgtn-mini-btn:hover{
   background: rgba(0,0,0,.08);
 }
+
+/* リストパネル内の行（ライト読みやすさ重視） */
+#cgpt-list-panel .row{
+  background: #fafafa;     /* 真っ白よりわずかに落とす */
+  color: #0b0d12;
+}
+
+/* 交互やホバーがあれば微差で */
+#cgpt-list-panel .row:hover{
+  background:#f2f5f8;
+}
+
+/* プレビュー本体 */
+.cgtn-dock{
+  /* ライト基調（少し濃いめのグレー） */
+  background: #eceff3;              /* ← 前より一段濃く */
+  color: #0b0d12;                   /* ほぼ黒 */
+  border: 1px solid #cfd6de;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
+  backdrop-filter: none;             /* 透過系を無効化（にじみ防止） */
+}
+
+/* タイトルバー：つまみ色に合わせる（少し濃いめ） */
+.cgtn-dock .cgtn-dock-head{
+  background: #dfe5ec;              /* つまみと同系でワントーン濃く */
+  color: #0b0d12;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid #cfd6de;
+}
+
+/* 本文とスクロール */
+.cgtn-dock .cgtn-dock-body{
+  padding: 10px 12px;
+  line-height: 1.6;
+  overflow: auto;
+  max-height: 60vh;
+}
+
+/* 閉じる/リサイズアイコン */
+.cgtn-dock .cgtn-dock-close,
+.cgtn-dock .cgtn-dock-resize{
+  color: #2c313a;
+  opacity: .9;
+}
+.cgtn-dock .cgtn-dock-close:hover,
+.cgtn-dock .cgtn-dock-resize:hover{
+  opacity: 1;
+}
+
+/* トグルラベルの文字色を黒固定 */
+.cgpt-viz-toggle span[data-i18n="line"] {
+  color: #000;
+}
+.cgpt-list-toggle span[data-i18n="list"] {
+  color: #000;
+}
+#cgpt-list-foot,      /* リストパネルのフッタ */
+#cgpt-list-refresh,   /* 最新にする */
+#cgpt-pin-filter,     /* 畳む/開くボタン */
+#cgpt-list-collapse { /* 付箋フィルターボタン */
+  color:#000
+}
+
+/* リスト本体のスクロールバー */
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar{
+  width: 10px;
+}
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar-track{
+  background: rgba(0,0,0,.05);
+  border-radius: 10px;
+}
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar-thumb{
+  background: rgba(0,0,0,.28);
+  border-radius: 10px;
+  border: 1px solid transparent; /* ちょい細く見せる */
+  background-clip: padding-box;
+}
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar-thumb:hover{
+  background: rgba(0,0,0,.45);
+}
+
+/* ナビボタンに軽い立体感をつける */
+#cgpt-nav .cgpt-nav-group > button{
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+
+/* 押下中の沈み込み */
+#cgpt-nav .cgpt-nav-group > button:active{
+  box-shadow: 0 2px 8px rgba(0,0,0,.18) inset, 0 2px 8px rgba(0,0,0,.08);
+}
+
+/* ダーク時だけ少し強め（必要なら） */
+@media (prefers-color-scheme: dark){
+  #cgpt-nav .cgpt-nav-group > button{
+    background: #1d1f23;
+    border-color: rgba(255,255,255,.06);
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    color: #e8eaed;
+  }
+}
+
+/* ダーク環境でも読める最低限（影は弱めに） */
+@media (prefers-color-scheme: dark){
+  .cgtn-dock{
+    background: #1e2126;
+    color: #eef2f6;
+    border-color: #313842;
+    box-shadow: 0 8px 20px rgba(0,0,0,.35);  /* ダークで影が消えやすいので少し残す */
+  }
+  .cgtn-dock .cgtn-dock-head{
+    background:#2a2f36;
+    color:#eef2f6;
+    border-bottom-color:#313842;
+  }
+  .cgtn-dock .cgtn-dock-close,
+  .cgtn-dock .cgtn-dock-resize{
+    color:#cfd8e3;
+  }
+}
+
   `;
   injectCss(BASE_CSS);
 

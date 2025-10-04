@@ -10,6 +10,57 @@
 
   const clamp = (n, lo, hi) => Math.min(Math.max(Number(n), lo), hi);
 
+async function renderPinsManager(){
+    const box = document.getElementById('pins-table'); if (!box) return;
+    const cfg = SH.getCFG?.() || {};
+    const map = cfg.pinsByChat || {};
+    const rows = Object.entries(map).map(([cid, rec]) => {
+      const title = (rec?.title || '(無題)').replace(/\s+/g,' ').slice(0,120);
+      const count = rec?.pins ? Object.keys(rec.pins).length : 0;
+      const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
+      return { cid, title, count, date };
+    }).sort((a,b)=> b.count - a.count || (a.title>b.title?1:-1));
+
+    // 素朴なテーブル生成
+    const html = [
+      '<table class="cgtn-pins-table">',
+      '<thead><tr><th>チャット</th><th>付箋数</th><th>更新</th><th></th></tr></thead>',
+      '<tbody>',
+      ...rows.map(r => `
+        <tr data-cid="${r.cid}">
+          <td class="title">${escapeHtml(r.title)}</td>
+          <td class="count" style="text-align:right">${r.count}</td>
+          <td class="date">${r.date}</td>
+          <td class="ops"><button class="del" data-cid="${r.cid}">削除</button></td>
+        </tr>
+      `),
+      '</tbody></table>'
+    ].join('');
+    box.innerHTML = html;
+
+    // 削除ボタン
+    box.querySelectorAll('button.del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cid = btn.getAttribute('data-cid');
+        if (!cid) return;
+        if (!confirm('このチャットの付箋データを削除します。よろしいですか？')) return;
+        SH.deletePinsForChat?.(cid);
+        renderPinsManager();
+      });
+    });
+  }
+
+  // ユーティリティ
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // 初期化フック（既存の options 初期化完了後に呼ぶ）
+  window.addEventListener('DOMContentLoaded', () => {
+    try { renderPinsManager(); } catch {}
+  });
+
+  // 他の設定保存後にも再描画したい場合は公開
+  window.CGTN_OPTIONS = Object.assign(window.CGTN_OPTIONS||{}, { renderPinsManager });
+
   function sanitize(raw){
     // DEFAULTS をベースに安全マージ
     const base = structuredClone(DEF);

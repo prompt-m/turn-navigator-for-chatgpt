@@ -25,41 +25,116 @@
     pins: {}// ← 付箋（key: true）
   });
 
+  // === pinsByChat 保存レイヤ ===
+  // chatId の抽出（/c/<id> を最優先、なければパス全体をフォールバック）
+  NS.getChatId = function(){
+    try {
+      const m = (location.pathname||'').match(/\/c\/([a-z0-9-]+)/i);
+      if (m) return m[1];
+      // Copilot/Gemini 等への将来拡張のための素朴フォールバック
+      return (location.host + location.pathname).toLowerCase();
+    } catch { return 'unknown'; }
+  };
 
+  // 表示名（options 用に記録）
+  NS.getChatTitle = function(){
+    try {
+      // ChatGPT系は document.title の先頭で十分
+      return (document.title || '').trim().slice(0,120);
+    } catch { return ''; }
+  };
+
+  function _ensurePinsByChat(cfg){
+    cfg.pinsByChat = cfg.pinsByChat || {};
+    return cfg.pinsByChat;
+  }
+
+  // 取得
+  NS.getPinsForChat = function(chatId = NS.getChatId()){
+    const cfg = NS.getCFG?.() || {};
+    const map = _ensurePinsByChat(cfg);
+    return map[chatId]?.pins || {};
+  };
+
+  // 上書き保存
+  NS.setPinsForChat = function(pinsObj, chatId = NS.getChatId()){
+    const cfg = NS.getCFG?.() || {};
+    const map = _ensurePinsByChat(cfg);
+    const title = NS.getChatTitle?.() || map[chatId]?.title || '';
+    map[chatId] = {
+      pins: { ...(pinsObj||{}) },
+      title,
+      updatedAt: Date.now()
+    };
+    NS.saveSettingsPatch?.({ pinsByChat: map });
+  };
+
+  // 1件トグル（true=ON/false=OFF の次状態を返す）
+  NS.togglePinForChat = function(turnId, chatId = NS.getChatId()){
+    const cur = NS.getPinsForChat(chatId);
+    const next = { ...cur };
+    const k = String(turnId);
+    const on = !next[k];
+    if (on) next[k] = true; else delete next[k];
+    NS.setPinsForChat(next, chatId);
+    return on;
+  };
+
+  // 件数
+  NS.countPinsForChat = function(chatId = NS.getChatId()){
+    const cur = NS.getPinsForChat(chatId);
+    return Object.keys(cur).length;
+  };
+
+  // メタだけ更新（タイトル刷新等）
+  NS.touchChatMeta = function(chatId = NS.getChatId(), title = NS.getChatTitle()){
+    const cfg = NS.getCFG?.() || {};
+    const map = _ensurePinsByChat(cfg);
+    const rec = map[chatId] || {};
+    map[chatId] = {
+      pins: rec.pins || {},
+      title: title || rec.title || '',
+      updatedAt: Date.now()
+    };
+    NS.saveSettingsPatch?.({ pinsByChat: map });
+  };
+
+  // エントリ削除（options の「削除」ボタン用）
+  NS.deletePinsForChat = function(chatId){
+    const cfg = NS.getCFG?.() || {};
+    const map = _ensurePinsByChat(cfg);
+    if (!map[chatId]) return;
+    delete map[chatId];
+    NS.saveSettingsPatch?.({ pinsByChat: map });
+  };
 
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   NS.setLangResolver = (fn) => { langResolver = fn; };
 
-function curLang(){
-  try {
-    // ★ 最優先：拡張UIが公開する現在言語
-    const u = NS.getLang?.();
-    const ur = String(u).toLowerCase();
-//    console.log("◆◆◆ ★ 最優先",ur,"◆◆◆")
-    if (u) return ur;
+  function curLang(){
+    try {
+      // ★ 最優先：拡張UIが公開する現在言語
+      const u = NS.getLang?.();
+      const ur = String(u).toLowerCase();
+      if (u) return ur;
 
-    // 互換：従来の resolver もサポート
-    const r = langResolver?.();
-//    console.log("◆◇◇互換：従来の resolver:",r,"◆◇◇")
-    if (r) return String(r).toLowerCase();
+      // 互換：従来の resolver もサポート
+      const r = langResolver?.();
+      if (r) return String(r).toLowerCase();
 
-    const cfg = NS.getCFG?.() || {};
-    if (cfg.lang){
-//      console.log("◆◇◇CFG")
-      return String(cfg.lang).toLowerCase();
+      const cfg = NS.getCFG?.() || {};
+      if (cfg.lang){
+        return String(cfg.lang).toLowerCase();
+      }
+      if (cfg.english) {
+        return 'en';
+      }
+      return String(document.documentElement.lang || 'ja').toLowerCase();
+    } catch {
+      return 'ja';
     }
-    if (cfg.english) {
-//      console.log("◆◇◇EG")
-      return 'en';
-    }
-//    console.log("◆◇◇JA")
-    return String(document.documentElement.lang || 'ja').toLowerCase();
-  } catch {
-//    console.log("◆◇◇Catch JA")
-    return 'ja';
   }
-}
 
   // 辞書（必要に応じて増やしてください）
   const TIPS = {

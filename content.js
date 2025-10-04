@@ -26,6 +26,8 @@
   function initialize(){
     SH.loadSettings(() => {
       UI.installUI();
+      // メタ更新
+      try { window.CGTN_SHARED?.touchChatMeta?.(); } catch {}
 
       // 1回だけ作る不可視パーキング
       (function ensureFocusPark(){
@@ -499,6 +501,66 @@
       if (!btn) return;
       e.preventDefault(); e.stopPropagation();
 
+      const sc   = document.querySelector('#cgpt-list-body');
+      const rows = sc ? [...sc.querySelectorAll('.row')] : [];
+      const top  = sc ? sc.scrollTop : 0;
+
+      // 1) フォーカス中の行を最優先
+      let anchor = document.activeElement?.closest?.('#cgpt-list-body .row') || null;
+
+      // 2) なければ _currentTurnKey を採用
+      if (!anchor) {
+        const k = window.CGTN_LOGIC?._currentTurnKey;
+        if (k) anchor = sc?.querySelector(`.row[data-turn="${k}"]`) || null;
+      }
+
+      // 3) それでも無ければ可視領域の先頭行
+      if (!anchor) {
+        anchor = rows.find(r => (r.offsetTop + r.offsetHeight) > top) || rows[0] || null;
+      }
+
+      // 相対オフセット（行先頭からの距離）
+      const delta = anchor ? (top - anchor.offsetTop) : 0;
+      const aKey  = anchor?.dataset?.turn || null;
+      const aKind = anchor?.dataset?.kind || null;
+
+      // 再スキャン & 再描画
+      window.CGTN_LOGIC?.rebuild?.();
+      window.CGTN_LOGIC?.renderList?.(true);
+
+      // 復元
+      requestAnimationFrame(() => {
+        const sc2 = document.querySelector('#cgpt-list-body');
+        if (!sc2) return;
+
+        let target = null;
+
+        // まずはフォーカス/選択と同じ行を探す（turn+kind が取れていればそれで特定）
+        if (aKey && aKind) {
+          target = sc2.querySelector(`.row[data-turn="${aKey}"][data-kind="${aKind}"]`);
+        }
+        // だめなら turn だけで探す
+        if (!target && aKey) {
+          target = sc2.querySelector(`.row[data-turn="${aKey}"]`);
+        }
+
+        if (target) {
+          sc2.scrollTop = Math.max(0, target.offsetTop + delta);
+        } else {
+          // 最後の保険：現在ターンへ
+          const k = window.CGTN_LOGIC?._currentTurnKey;
+          if (k) window.CGTN_LOGIC?.scrollListToTurn?.(k);
+        }
+      });
+    }, true);
+
+
+/*
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest?.('#cgpt-list-refresh');
+      if (!btn) return;
+      e.preventDefault(); e.stopPropagation();
+
     //NS.scrollListToTurn(NS._currentTurnKey);
 
       // スクロール位置・選択行のキーを温存してから再描画
@@ -507,7 +569,7 @@
       window.CGTN_LOGIC?.renderList?.(true); // 再描画（必要なら pinOnlyOverride も）
       if (curKey) window.CGTN_LOGIC?.scrollListToTurn?.(curKey);
     }, true);
-
+*/
     // ★ URL変化・履歴遷移でプレビューを閉じる
     (function closeDockOnUrlChange(){
       let last = location.pathname + location.search;
@@ -517,6 +579,12 @@
         if (cur !== last){
           last = cur;
           window.CGTN_PREVIEW?.hide?.('url-change');
+          try {
+            window.CGTN_LOGIC?.hydratePinsCache?.(); // 新しいチャットのピンをロード
+            // pinOnly の状態は既存CFGを尊重
+            window.CGTN_LOGIC?.rebuild?.();
+            window.CGTN_LOGIC?.renderList?.(true);
+          } catch {}
         }
       };
 

@@ -24,6 +24,13 @@
     button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }
     @media (prefers-color-scheme: dark){ button{ background:#3a3a40; } }
     #msg{ margin-left:6px; }
+.cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
+.cgtn-pins-table th, .cgtn-pins-table td{ border-bottom:1px solid rgba(0,0,0,.08); padding:6px 8px; }
+.cgtn-pins-table .ops button{ padding:4px 8px; cursor:pointer; }
+.cgtn-pins-table tr:hover{ background:rgba(0,0,0,.03); }
+.cgtn-pins-table tr[data-count="0"]{ opacity:.6; }
+
+
   </style>
 </head>
 <body>
@@ -55,6 +62,13 @@
             <span>表示/非表示を切替（ロード時は非表示）</span>
           </label>
         </div>
+      </div>
+
+      <div class="row">
+       <section id="pins-manager">
+         <h3>付箋データ管理</h3>
+         <div id="pins-table"></div>
+       </section>
       </div>
 
       <details class="row">
