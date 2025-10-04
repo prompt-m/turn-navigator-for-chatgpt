@@ -21,9 +21,11 @@
   // ピンの ON/OFF（呼び元は既存 bindClipPin / togglePin からそのまま呼べる）
   NS.togglePin = function(turnId){
     const on = SH.togglePinForChat(turnId, SH.getChatId());
+console.log("togglePinForChat turnId: ".turnId);
     // ローカルキャッシュも合わせる
     if (!_pinsCache) _pinsCache = {};
-    if (on) _pinsCache[String(turnId)] = true; else delete _pinsCache[String(turnId)];
+    if (on) _pinsCache[String(turnId)] = true;
+    else delete _pinsCache[String(turnId)];
     return on;
   };
 
@@ -289,7 +291,7 @@
   }
 
   // === PINS: sync cache ===
-  let PINS = new Set();
+//  let PINS = new Set();
   let _pinsInited = false;
 
   function _pinsSetFromCFG(cfg){
@@ -312,17 +314,18 @@
   function initPinsCache(){ PINS = _pinsSetFromCFG(SH.getCFG() || {}); }
 
   // キーAPI（ここが“真実”）
-  function isPinnedByKey(k){ return PINS.has(String(k)); }
-  function setPinnedByKey(k, val){
-    const s = new Set(PINS); const ks = String(k);
-    if (val) s.add(ks); else s.delete(ks);
-    _savePinsSet(s); return val;
-  }
-  function togglePinnedByKey(k){
-    const s = new Set(PINS); const ks = String(k);
-    const next = !s.has(ks); if (next) s.add(ks); else s.delete(ks);
-    _savePinsSet(s); return next; // ← 次状態を返すのが超重要
-  }
+//  function isPinnedByKey(k){ return PINS.has(String(k)); }
+//  function setPinnedByKey(k, val){
+//    const s = new Set(PINS); const ks = String(k);
+//    if (val) s.add(ks); else s.delete(ks);
+//    _savePinsSet(s); return val;
+//  }
+
+//  function togglePinnedByKey(k){
+//    const s = new Set(PINS); const ks = String(k);
+//    const next = !s.has(ks); if (next) s.add(ks); else s.delete(ks);
+//    _savePinsSet(s); return next; // ← 次状態を返すのが超重要
+//  }
 
   function getPins(){ return Array.from(PINS); }
   function isPinned(artOrKey){
@@ -384,6 +387,51 @@
     clip.setAttribute('aria-pressed', String(!!pinned));
   }
 
+function bindClipPin(clip, art){
+  if (!clip) return;
+  if (clip._cgtnPinBound) return;
+  clip._cgtnPinBound = true;
+
+  if (!clip.textContent) clip.textContent = '🔖\uFE0E';
+  clip.classList.add('cgtn-clip-pin','cgtn-cursor-pin');
+
+  const turnKey = getTurnKey(art);
+  clip.classList.toggle('off', !isPinnedByKey(turnKey));
+  clip.style.cursor = 'pointer';
+  clip.style.userSelect = 'none';
+  clip.style.padding = '2px 6px';
+
+  let busy = false;
+  clip.addEventListener('click', (ev)=>{
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (busy) return;
+    busy = true;
+
+    // pinsByChat へ保存（shared.js のAPI）
+    const next = SH.togglePinForChat(turnKey, SH.getChatId());
+    // ローカルキャッシュも同期
+    if (!_pinsCache) _pinsCache = {};
+    if (next) _pinsCache[String(turnKey)] = true;
+    else delete _pinsCache[String(turnKey)];
+
+    // 自身と相方行を即反映
+    clip.setAttribute('aria-pressed', String(next));
+    clip.classList.toggle('off', !next);
+    refreshPinUIForTurn(turnKey, next);
+
+    // pinOnly中でOFFになったら該当行を削除
+    const cur = SH.getCFG() || {};
+    if (cur.list?.pinOnly && !next){
+      rowsByTurn(turnKey).forEach(n => n.remove());
+    }
+
+    setTimeout(()=>{ busy = false; }, 0);
+  }, {passive:false});
+}
+
+
+/*
   // ここ変えたよ：左🔖クリックのハンドラは click だけ、再入＆二重バインドガード付き
   function bindClipPin(clip, art){
     if (!clip) return;
@@ -433,6 +481,7 @@
     // ★ click だけを登録（pointerdown は絶対に付けない）
     clip.addEventListener('click', handler, {passive:false});
   }
+*/
 
   // 相方行のUI更新（ここ変えたよ：強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){
