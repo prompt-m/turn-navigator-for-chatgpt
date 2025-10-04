@@ -23,85 +23,90 @@
     .actions{ display:flex; gap:10px; margin-top:18px; align-items:center; }
     button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }
     @media (prefers-color-scheme: dark){ button{ background:#3a3a40; } }
-    #msg{ margin-left:6px; }
-.cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
-.cgtn-pins-table th, .cgtn-pins-table td{ border-bottom:1px solid rgba(0,0,0,.08); padding:6px 8px; }
-.cgtn-pins-table .ops button{ padding:4px 8px; cursor:pointer; }
-.cgtn-pins-table tr:hover{ background:rgba(0,0,0,.03); }
-.cgtn-pins-table tr[data-count="0"]{ opacity:.6; }
 
-
+    /* 付箋テーブル */
+    .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
+    .cgtn-pins-table th, .cgtn-pins-table td{ border-bottom:1px solid rgba(0,0,0,.08); padding:6px 8px; }
+    .cgtn-pins-table .ops button{ padding:4px 8px; cursor:pointer; }
+    .cgtn-pins-table tr:hover{ background:rgba(0,0,0,.03); }
+    .cgtn-pins-table tr[data-count="0"]{ opacity:.6; }
   </style>
 </head>
 <body>
   <h1>ChatGPT Turn Navigator 設定</h1>
+  <p class="desc">よく使うのは「付箋データ管理」と「一覧パネルの表示設定」です。その他の数値や基準線は詳細設定にまとめました。</p>
 
   <form id="cgtn-options" class="card" autocomplete="off">
     <div class="group">
-      <div class="row">
-        <label for="centerBias"><b>表示位置の基準 (Center Bias)</b></label>
-        <div>
-          <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
-          <div class="hint">記事の頭を画面のどこに揃えるか。0=上端 / 0.5=中央（推奨 0.40–0.55）</div>
-        </div>
+
+      <!-- ===== メイン1：付箋データ管理 ===== -->
+      <div class="row" style="border-top:none;">
+        <section id="pins-manager" style="grid-column:1 / -1;">
+          <h3 style="margin:0 0 8px;">付箋データ管理</h3>
+          <div id="pins-table"></div>
+          <p class="hint" style="margin-top:6px;">各チャットの付箋（pinsByChat）を一覧。不要になったチャットは削除できます。</p>
+        </section>
       </div>
 
+      <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
       <div class="row">
-        <label for="eps"><b>ゆらぎ幅 (EPS Hysteresis)</b></label>
-        <div>
-          <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
-          <div class="hint">「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。目安 5–50。</div>
-        </div>
+        <label for="listMaxItems"><b>一覧パネル：表示件数</b></label>
+        <input id="listMaxItems" name="listMaxItems" type="number" min="10" max="200" step="10">
+      </div>
+      <div class="row">
+        <label for="listMaxChars"><b>一覧パネル：1行の最大文字数</b></label>
+        <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
+      </div>
+      <div class="row">
+        <label for="listFontSize"><b>一覧パネル：フォントサイズ(px)</b></label>
+        <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
       </div>
 
-      <div class="row">
-        <label for="showViz"><b>基準線</b></label>
-        <div>
-          <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
-            <input id="showViz" name="showViz" type="checkbox" />
-            <span>表示/非表示を切替（ロード時は非表示）</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="row">
-       <section id="pins-manager">
-         <h3>付箋データ管理</h3>
-         <div id="pins-table"></div>
-       </section>
-      </div>
-
-      <details class="row">
-        <summary style="cursor:pointer;"><b>一覧パネル（表示に関わる設定）</b></summary>
+      <!-- ===== 詳細設定（折りたたみ） ===== -->
+      <details class="row" open="false" style="grid-column:1 / -1;">
+        <summary style="cursor:pointer;"><b>詳細設定（基準線とスクロール挙動）</b></summary>
         <div style="padding-top:10px;display:grid;gap:10px;">
-          <div class="row" style="border-top:none;padding:0;">
-            <label for="listMaxItems">表示件数</label>
-            <input id="listMaxItems" name="listMaxItems" type="number" min="10" max="200" step="10">
-          </div>
-          <div class="row" style="border-top:none;padding:0;">
-            <label for="listMaxChars">1行の最大文字数</label>
-            <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
-          </div>
-          <div class="row" style="border-top:none;padding:0;">
-            <label for="listFontSize">フォントサイズ(px)</label>
-            <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
-          </div>
-        </div>
-      </details>
 
-      <details class="row">
-        <summary style="cursor:pointer;"><b>詳細設定（通常は変更不要）</b></summary>
-        <div style="padding-top:10px;display:grid;gap:10px;">
+          <!-- 基準線：ON/OFF -->
           <div class="row" style="border-top:none;padding:0;">
-            <label for="headerPx">ヘッダー補正 (px)</label>
+            <label for="showViz"><b>基準線の表示</b></label>
+            <div>
+              <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
+                <input id="showViz" name="showViz" type="checkbox" />
+                <span>基準線を表示/非表示</span>
+              </label>
+              <div class="hint">表示中はスクロールの基準位置が視覚化されます。</div>
+            </div>
+          </div>
+
+          <!-- Center Bias / EPS -->
+          <div class="row" style="border-top:none;padding:0;">
+            <label for="centerBias"><b>表示位置の基準 (Center Bias)</b></label>
+            <div>
+              <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
+              <div class="hint">記事の頭を画面のどこに揃えるか。0=上端 / 0.5=中央（推奨 0.40–0.55）</div>
+            </div>
+          </div>
+          <div class="row" style="border-top:none;padding:0;">
+            <label for="eps"><b>ゆらぎ幅 (EPS Hysteresis)</b></label>
+            <div>
+              <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
+              <div class="hint">「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。目安 5–50。</div>
+            </div>
+          </div>
+
+          <!-- その他の挙動 -->
+          <div class="row" style="border-top:none;padding:0;">
+            <label for="headerPx"><b>ヘッダー補正 (px)</b></label>
             <input id="headerPx" name="headerPx" type="number" step="1" min="0" max="2000" />
           </div>
           <div class="row" style="border-top:none;padding:0;">
-            <label for="lockMs">スクロールロック (ms)</label>
+            <label for="lockMs"><b>スクロールロック (ms)</b></label>
             <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
           </div>
         </div>
       </details>
+
     </div>
 
     <div class="actions">

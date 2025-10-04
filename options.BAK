@@ -28,6 +28,8 @@
 .cgtn-pins-table th, .cgtn-pins-table td{ border-bottom:1px solid rgba(0,0,0,.08); padding:6px 8px; }
 .cgtn-pins-table .ops button{ padding:4px 8px; cursor:pointer; }
 .cgtn-pins-table tr:hover{ background:rgba(0,0,0,.03); }
+.cgtn-pins-table tr[data-count="0"]{ opacity:.6; }
+
 
   </style>
 </head>

@@ -946,6 +946,9 @@ function bindClipPin(clip, art){
     const made = body.children.length;
     if (made === 0 && pinOnly) {
       const empty = document.createElement('div');
+      const lang = (window.CGTN_SHARED?.getLang?.() || 'ja');
+      const msg = lang==='en' ? 'No pins in this chat.' : 'このチャットには付箋がありません。';
+      emptyRow.textContent = msg;
       empty.className = 'cgtn-empty';
       empty.innerHTML = `
         <div class="msg">このチャットには付箋がありません。</div>
