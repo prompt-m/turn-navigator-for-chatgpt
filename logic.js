@@ -3,6 +3,7 @@
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
   const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
+  function _L(){ return (SH?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
 
   // ★チャット別ピン・キャッシュ
   let _pinsCache = null;   // { [turnId]: true }
@@ -21,7 +22,7 @@
   // ピンの ON/OFF（呼び元は既存 bindClipPin / togglePin からそのまま呼べる）
   NS.togglePin = function(turnId){
     const on = SH.togglePinForChat(turnId, SH.getChatId());
-console.log("togglePinForChat turnId: ".turnId);
+console.log("togglePinForChat turnId: ",turnId);
     // ローカルキャッシュも合わせる
     if (!_pinsCache) _pinsCache = {};
     if (on) _pinsCache[String(turnId)] = true;
@@ -387,48 +388,48 @@ console.log("togglePinForChat turnId: ".turnId);
     clip.setAttribute('aria-pressed', String(!!pinned));
   }
 
-function bindClipPin(clip, art){
-  if (!clip) return;
-  if (clip._cgtnPinBound) return;
-  clip._cgtnPinBound = true;
+  function bindClipPin(clip, art){
+    if (!clip) return;
+    if (clip._cgtnPinBound) return;
+    clip._cgtnPinBound = true;
 
-  if (!clip.textContent) clip.textContent = '🔖\uFE0E';
-  clip.classList.add('cgtn-clip-pin','cgtn-cursor-pin');
+    if (!clip.textContent) clip.textContent = '🔖\uFE0E';
+    clip.classList.add('cgtn-clip-pin','cgtn-cursor-pin');
 
-  const turnKey = getTurnKey(art);
-  clip.classList.toggle('off', !isPinnedByKey(turnKey));
-  clip.style.cursor = 'pointer';
-  clip.style.userSelect = 'none';
-  clip.style.padding = '2px 6px';
+    const turnKey = getTurnKey(art);
+    clip.classList.toggle('off', !isPinnedByKey(turnKey));
+    clip.style.cursor = 'pointer';
+    clip.style.userSelect = 'none';
+    clip.style.padding = '2px 6px';
 
-  let busy = false;
-  clip.addEventListener('click', (ev)=>{
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (busy) return;
-    busy = true;
+    let busy = false;
+    clip.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (busy) return;
+      busy = true;
 
-    // pinsByChat へ保存（shared.js のAPI）
-    const next = SH.togglePinForChat(turnKey, SH.getChatId());
-    // ローカルキャッシュも同期
-    if (!_pinsCache) _pinsCache = {};
-    if (next) _pinsCache[String(turnKey)] = true;
-    else delete _pinsCache[String(turnKey)];
+      // pinsByChat へ保存（shared.js のAPI）
+      const next = SH.togglePinForChat(turnKey, SH.getChatId());
+      // ローカルキャッシュも同期
+      if (!_pinsCache) _pinsCache = {};
+      if (next) _pinsCache[String(turnKey)] = true;
+      else delete _pinsCache[String(turnKey)];
 
-    // 自身と相方行を即反映
-    clip.setAttribute('aria-pressed', String(next));
-    clip.classList.toggle('off', !next);
-    refreshPinUIForTurn(turnKey, next);
+      // 自身と相方行を即反映
+      clip.setAttribute('aria-pressed', String(next));
+      clip.classList.toggle('off', !next);
+      refreshPinUIForTurn(turnKey, next);
 
-    // pinOnly中でOFFになったら該当行を削除
-    const cur = SH.getCFG() || {};
-    if (cur.list?.pinOnly && !next){
-      rowsByTurn(turnKey).forEach(n => n.remove());
-    }
+      // pinOnly中でOFFになったら該当行を削除
+      const cur = SH.getCFG() || {};
+      if (cur.list?.pinOnly && !next){
+        rowsByTurn(turnKey).forEach(n => n.remove());
+      }
 
-    setTimeout(()=>{ busy = false; }, 0);
-  }, {passive:false});
-}
+      setTimeout(()=>{ busy = false; }, 0);
+    }, {passive:false});
+  }
 
 
 /*
@@ -941,7 +942,34 @@ function bindClipPin(clip, art){
       }
     }
 
-    // ... 全行描画が終わった直後あたり
+    // 付箋有無チェック（pinOnly中で0件なら空表示）
+    madeRows = body.querySelectorAll('.row').length;
+    if (madeRows === 0 && pinOnly) {
+      const L = _L();
+      const msg    = L==='en' ? 'No pins in this chat.' : 'このチャットには付箋がありません。';
+      const showAll= tShowAll();
+
+      const empty = document.createElement('div');
+      empty.className = 'cgtn-empty';
+      empty.style.cssText = 'padding:16px;opacity:.85;font-size:13px;';
+      empty.innerHTML = `
+        <div class="msg" style="margin-bottom:6px;" data-kind="msg">${msg}</div>
+        <button class="show-all" type="button">${showAll}</button>
+      `;
+      body.appendChild(empty);
+
+      empty.querySelector('.show-all')?.addEventListener('click', () => {
+        try {
+          const cfg = SH.getCFG() || {};
+          SH.saveSettingsPatch({ list: { ...(cfg.list||{}), pinOnly:false } });
+          document.querySelector('#cgpt-pin-filter')?.setAttribute('aria-pressed','false');
+          window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride:false });
+        } catch {}
+      });
+    }
+
+
+/*
     //付箋有無チェック
     const made = body.children.length;
     if (made === 0 && pinOnly) {
@@ -969,7 +997,7 @@ function bindClipPin(clip, art){
         } catch {}
       });
     }
-
+*/
     // 最新にするボタン
     //const foot = listBox.querySelector('#cgpt-list-foot');
     if (foot && !foot.querySelector('#cgpt-list-refresh')) {
@@ -986,10 +1014,26 @@ function bindClipPin(clip, art){
       }, listBox);
     }
 
+    // フッタ行数表記
+    const info = document.createElement('div');
+    info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;';
+
+    const dataRows = body.querySelectorAll('.row').length; // データ行のみ
+    const L = _L();
+    info.textContent = (L==='en')
+      ? `${dataRows} rows (of ${ST.all.length} turns)`
+      : `${dataRows}行（${ST.all.length}ターン中）`;
+
+    foot.appendChild(info);
+
+
+/*
     const info = document.createElement('div');
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px';
     info.textContent = `${body.children.length}行（${ST.all.length}ターン中）`;
     foot.appendChild(info);
+*/
+
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
   }

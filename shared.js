@@ -101,9 +101,11 @@
 
   // エントリ削除（options の「削除」ボタン用）
   NS.deletePinsForChat = function(chatId){
+console.log("deletePinsForChat chatId:",chatId);
     const cfg = NS.getCFG?.() || {};
     const map = _ensurePinsByChat(cfg);
     if (!map[chatId]) return;
+console.log("deletePinsForChat cfg:",cfg," map",map);
     delete map[chatId];
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
@@ -224,6 +226,7 @@
   function saveSettingsPatch(patch){
     try{
       chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings })=>{
+//console.log("saveSettingsPatch patch:",patch);
         const next = structuredClone(DEFAULTS);
         if (cgNavSettings) deepMerge(next, cgNavSettings);
         if (!next.list) next.list = structuredClone(DEFAULTS.list);

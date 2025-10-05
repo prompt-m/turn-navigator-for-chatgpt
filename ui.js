@@ -28,6 +28,12 @@
     document.head.appendChild(s);
   }
 
+  function _L(){ return (window.CGTN_SHARED?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
+  function tPreview(){ return _L()==='en' ? 'Preview' : 'プレビュー'; }
+  function tAttachments(){ return _L()==='en' ? 'Attachments' : '添付'; }
+  function tPinOnly(){ return _L()==='en' ? 'Pins only' : '付箋のみ'; }
+  function tShowAll(){ return _L()==='en' ? 'Show all' : 'すべて表示'; }
+
   // 最低限の見た目（以前のCSSを凝縮）
   const BASE_CSS = `
   #cgpt-nav{position:fixed;right:12px;bottom:140px;display:flex;flex-direction:column;gap:12px;z-index:2147483647}
@@ -663,6 +669,8 @@
     LANG = LANG === 'ja' ? 'en' : 'ja';
 //    console.log("★ui 日英切り替えクリックしました:LANG",LANG);
     applyLang();
+    // 共有設定に保存（options 画面でも拾える）
+    try { window.CGTN_SHARED?.saveSettingsPatch?.({ lang: LANG }); } catch {}
     //切替時に登録済みツールチップを一括再翻訳
     window.CGTN_SHARED?.updateTooltips?.();
   }
