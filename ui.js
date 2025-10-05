@@ -628,24 +628,8 @@
     })();
 /*ｺｺﾏﾃﾞ*/
 
-
   }
 
-/*
-  function applyLang(){
-    const box = document.getElementById('cgpt-nav');
-    if (!box) return;
-    const t = I18N[LANG] || I18N.ja;
-    box.querySelectorAll('[data-i18n]').forEach(el => {
-      const k = el.getAttribute('data-i18n');
-      if (t[k]){
-        el.textContent = t[k];
-      }
-    });
-    box.querySelector('#cgpt-drag').title = t.dragTitle;
-    box.querySelector('.cgpt-lang-btn').textContent = t.langBtn;
-  }
-*/
   function applyLang(){
     const box = document.getElementById('cgpt-nav');
     if (!box) return;
@@ -663,12 +647,16 @@
     // ドラッグも I18N で title を直付け
     const drag = box.querySelector('#cgpt-drag');
     if (drag) drag.title = t.dragTitle || t.drag || '';
+
   }
 
   function toggleLang(){
     LANG = LANG === 'ja' ? 'en' : 'ja';
-//    console.log("★ui 日英切り替えクリックしました:LANG",LANG);
+//console.log("★ui 日英切り替えクリックしました:LANG",LANG);
     applyLang();
+    // リストパネルフッタ更新
+    window.CGTN_LOGIC?.updateListFooterInfo();
+
     // 共有設定に保存（options 画面でも拾える）
     try { window.CGTN_SHARED?.saveSettingsPatch?.({ lang: LANG }); } catch {}
     //切替時に登録済みツールチップを一括再翻訳
