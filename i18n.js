@@ -18,7 +18,7 @@
       line: '基準線',
       list: '一覧',
       // === リスト／プレビュー関連 ===
-      image: '（画像）',
+      image: '（image）',
       "list.showAll": "すべて表示",
       "list.noPins": "このチャットには付箋がありません。",
       "listRows": "行",
@@ -108,9 +108,13 @@
     }
   };
 
-  // 言語取得＋翻訳関数
-  const getLang = () => (window.CGTN_SHARED?.getCFG?.()?.lang) ||
-    ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+  NS._forceLang = null;
+
+  const getLang = () => {
+    if (NS._forceLang) return NS._forceLang; // ← 即反映
+    return (window.CGTN_SHARED?.getCFG?.()?.lang) ||
+      ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+  };
 
   const t = (key) => {
     const L = getLang();

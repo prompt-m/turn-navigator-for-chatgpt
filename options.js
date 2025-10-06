@@ -1,54 +1,45 @@
-// options.js — using shared.js renderViz for common baseline
-(function(){
+// options.js — 設定画面（i18n.js/ shared.js に統一）
+(() => {
   'use strict';
 
   const SH = window.CGTN_SHARED || {};
+  const T  = (k)=> window.CGTN_I18N?.t?.(k) || k;
+
   const $  = (id) => document.getElementById(id);
   const exists = (id) => !!$(id);
-  const escapeHtml = (s) => String(s||'').replace(/[&<>"']/g, m => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[m]));
+  const clamp = (n, lo, hi) => Math.min(Math.max(Number(n), lo), hi);
 
-  // --- Lang ---
-  const curLang = () =>
-    (typeof SH.getLang === 'function' && SH.getLang()) ||
-    (SH.getCFG && SH.getCFG()?.lang) ||
-    ((navigator.language||'').toLowerCase().startsWith('ja') ? 'ja' : 'en');
-
-  const t = window.CGTN_I18N?.t || ((k)=>k);
-
-  // --- Defaults fallback ---
+  // 既定値（shared側の DEFAULTS があれば尊重）
   const DEF = (SH.DEFAULTS) || {
     centerBias: 0.40, headerPx: 0, eps: 20, lockMs: 700, showViz: false,
     panel:{ x:null, y:null },
-    list:{ enabled:false, maxItems:30, maxChars:40, fontSize:12, w:null, h:null, x:null, y:null }
+    list:{ enabled:false, pinOnly:false, maxItems:30, maxChars:40, fontSize:12, w:null, h:null, x:null, y:null }
   };
-  const clamp = (n, lo, hi) => Math.min(Math.max(Number(n), lo), hi);
 
   function sanitize(raw){
-    const base = structuredClone ? structuredClone(DEF) : JSON.parse(JSON.stringify(DEF));
+    const base = JSON.parse(JSON.stringify(DEF));
     const v = {
-      centerBias : clamp(raw.centerBias ?? base.centerBias, 0, 1),
-      headerPx   : clamp(raw.headerPx   ?? base.headerPx,   0, 2000),
-      eps        : clamp(raw.eps        ?? base.eps,        0, 120),
-      lockMs     : clamp(raw.lockMs     ?? base.lockMs,     0, 3000),
-      showViz    : !!raw.showViz,
-      panel      : raw.panel || base.panel,
+      centerBias : clamp(raw?.centerBias ?? base.centerBias, 0, 1),
+      headerPx   : clamp(raw?.headerPx   ?? base.headerPx,   0, 2000),
+      eps        : clamp(raw?.eps        ?? base.eps,        0, 120),
+      lockMs     : clamp(raw?.lockMs     ?? base.lockMs,     0, 3000),
+      showViz    : !!raw?.showViz,
+      panel      : raw?.panel || base.panel,
       list: {
-        enabled : raw.list?.enabled ?? base.list.enabled,
-        maxItems: clamp(raw.listMaxItems ?? raw.list?.maxItems ?? base.list.maxItems, 1, 200),
-        maxChars: clamp(raw.listMaxChars ?? raw.list?.maxChars ?? base.list.maxChars, 10, 400),
-        fontSize: clamp(raw.listFontSize ?? raw.list?.fontSize ?? base.list.fontSize, 8, 24),
-        w: raw.list?.w ?? base.list.w,
-        h: raw.list?.h ?? base.list.h,
-        x: raw.list?.x ?? base.list.x,
-        y: raw.list?.y ?? base.list.y
+        enabled : !!(raw?.list?.enabled ?? base.list.enabled),
+        pinOnly : !!(raw?.list?.pinOnly ?? base.list.pinOnly),
+        maxItems: clamp(raw?.list?.maxItems ?? base.list.maxItems, 1, 200),
+        maxChars: clamp(raw?.list?.maxChars ?? base.list.maxChars, 10, 400),
+        fontSize: clamp(raw?.list?.fontSize ?? base.list.fontSize, 8, 24),
+        w: raw?.list?.w ?? base.list.w,
+        h: raw?.list?.h ?? base.list.h,
+        x: raw?.list?.x ?? base.list.x,
+        y: raw?.list?.y ?? base.list.y
       }
     };
     return v;
   }
 
-  // --- UI sync (IDで確実に) ---
   function applyToUI(cfg){
     const v = sanitize(cfg||{});
     try{
@@ -58,11 +49,14 @@
       if (exists('lockMs'))       $('lockMs').value       = v.lockMs;
       if (exists('showViz'))      $('showViz').checked    = !!v.showViz;
 
+      if (exists('listEnabled'))  $('listEnabled').checked= !!v.list.enabled;
+      if (exists('pinOnly'))      $('pinOnly').checked    = !!v.list.pinOnly;
       if (exists('listMaxItems')) $('listMaxItems').value = v.list.maxItems;
       if (exists('listMaxChars')) $('listMaxChars').value = v.list.maxChars;
       if (exists('listFontSize')) $('listFontSize').value = v.list.fontSize;
     }catch(e){ console.warn('applyToUI failed', e); }
   }
+
   function uiToCfg(){
     return sanitize({
       centerBias   : $('centerBias')?.value,
@@ -70,19 +64,23 @@
       eps          : $('eps')?.value,
       lockMs       : $('lockMs')?.value,
       showViz      : $('showViz')?.checked,
-      listMaxItems : $('listMaxItems')?.value,
-      listMaxChars : $('listMaxChars')?.value,
-      listFontSize : $('listFontSize')?.value,
+      list: {
+        enabled : $('listEnabled')?.checked,
+        pinOnly : $('pinOnly')?.checked,
+        maxItems: $('listMaxItems')?.value,
+        maxChars: $('listMaxChars')?.value,
+        fontSize: $('listFontSize')?.value
+      }
     });
   }
 
   function showMsg(txt){
     const box = $('msg'); if (!box) return;
-    box.textContent = txt; box.style.display='block';
+    box.textContent = txt;
+    box.style.display='block';
     setTimeout(()=> box.style.display='none', 1200);
   }
 
-  // --- Pins table ---
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
@@ -92,7 +90,7 @@
     const nowOpen  = cfg.currentChatId || null;
 
     const rows = Object.entries(pins).map(([cid, rec])=>{
-      const title = (rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
+      const title = String(rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
       const count = rec?.pins ? Object.keys(rec.pins).length : 0;
       const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
       const existsInSidebar = !!aliveMap[cid];
@@ -104,25 +102,30 @@
     if (!rows.length){
       box.innerHTML = `
         <div class="empty" style="padding:14px 8px; color:var(--muted);">
-          <div style="font-weight:700; margin-bottom:4px;">${t('emptyPinsTitle')}</div>
-          <div>${t('emptyPinsDesc')}</div>
+          <div style="font-weight:700; margin-bottom:4px;">${T('options.emptyPinsTitle')}</div>
+          <div>${T('options.emptyPinsDesc')}</div>
         </div>`;
       return;
     }
 
     const html = [
       '<table class="cgtn-pins-table">',
-      `<thead><tr><th>${t('thChat')}</th><th>${t('thCount')}</th><th>${t('thUpdated')}</th><th>${t('thOps')}</th></tr></thead>`,
+      `<thead><tr>
+        <th>${T('options.thChat')}</th>
+        <th>${T('options.thCount')}</th>
+        <th>${T('options.thUpdated')}</th>
+        <th>${T('options.thOps')}</th>
+      </tr></thead>`,
       '<tbody>',
       ...rows.map(r => {
-        const why = r.isNowOpen ? t('nowOpen') : (r.existsInSidebar ? t('stillExists') : '');
+        const why = r.isNowOpen ? T('options.nowOpen') : (r.existsInSidebar ? T('options.stillExists') : '');
         return `
           <tr data-cid="${r.cid}" data-count="${r.count}">
-            <td class="title">${escapeHtml(r.title)}</td>
+            <td class="title">${titleEscape(r.title)}</td>
             <td class="count" style="text-align:right">${r.count}</td>
             <td class="date">${r.date}</td>
             <td class="ops">
-              <button class="del" data-cid="${r.cid}" ${r.canDelete?'':`disabled title="${escapeHtml(why)}"`}>${t('delBtn')}</button>
+              <button class="del" data-cid="${r.cid}" ${r.canDelete?'':`disabled title="${titleEscape(why)}"`}>${T('options.delBtn')}</button>
             </td>
           </tr>`;
       }),
@@ -130,10 +133,11 @@
     ].join('');
     box.innerHTML = html;
 
+    // 削除ボタン
     box.querySelectorAll('button.del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const cid = btn.getAttribute('data-cid'); if (!cid) return;
-        if (!confirm(t('delConfirm'))) return;
+        if (!confirm(T('options.delConfirm'))) return;
         try { SH.deletePinsForChat?.(cid); } catch(e){}
         await new Promise(r=>setTimeout(r, 80));
         await renderPinsManager();
@@ -141,44 +145,36 @@
     });
   }
 
-  // --- Init ---
+  function titleEscape(s){
+    return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // 初期化
   document.addEventListener('DOMContentLoaded', async () => {
     try{
-      // タイトル・ヒント（日英）
+      // 見出し＆ヒント
       const sec = $('pins-manager') || document;
-      const h3 = sec.querySelector('h3'); if (h3) h3.textContent = t('pinsTitle');
-      const hint = sec.querySelector('.hint'); if (hint) hint.textContent = t('pinsHint');
+      const h3 = sec.querySelector('h3'); if (h3) h3.textContent = T('options.pinsTitle');
+      const hint = sec.querySelector('.hint'); if (hint) hint.textContent = T('options.pinsHint');
 
       // 設定ロード→UI反映
       await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
       const cfg = (SH.getCFG && SH.getCFG()) || DEF;
       applyToUI(cfg);
-
-      // 初期描画（shared.js の renderViz 使用）
-      try { SH.renderViz?.(cfg, !!cfg.showViz); } catch(e){ console.warn('renderViz init fail', e); }
+      try { SH.renderViz?.(cfg, !!cfg.showViz); } catch {}
 
       // 付箋テーブル
       await renderPinsManager();
 
-      // 入力で即保存＋基準線描画
+      // 入力で即保存
       const form = $('cgtn-options');
       form?.addEventListener('input', ()=>{
         try{
           const c2 = uiToCfg();
           SH.saveSettingsPatch?.(c2);
-          SH.renderViz?.(c2, !!c2.showViz);
-          showMsg(t('saved'));
+          try { SH.renderViz?.(c2, undefined); } catch {}
+          showMsg(T('options.saved'));
         }catch(e){ console.warn('input handler failed', e); }
-      });
-
-      // showViz のチェック変更
-      $('showViz')?.addEventListener('change', ()=>{
-        try{
-          const c2 = uiToCfg();
-          SH.saveSettingsPatch?.(c2);
-          SH.renderViz?.(c2, !!c2.showViz);
-          showMsg(t('saved'));
-        }catch(e){ console.warn('showViz change failed', e); }
       });
 
       // submit（明示保存）
@@ -189,7 +185,7 @@
           applyToUI(c3);
           SH.saveSettingsPatch?.(c3);
           SH.renderViz?.(c3, !!c3.showViz);
-          showMsg(t('saved'));
+          showMsg(T('options.saved'));
         }catch(e){ console.warn('submit failed', e); }
       });
 
@@ -199,22 +195,17 @@
         applyToUI(def);
         SH.saveSettingsPatch?.(def);
         SH.renderViz?.(def, false);
-        showMsg(t('reset'));
+        showMsg(T('options.reset'));
         await renderPinsManager();
       });
 
       // タブ復帰で再描画
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          renderPinsManager();
-          try { SH.renderViz?.(SH.getCFG?.(), !!SH.getCFG?.().showViz); } catch{}
-        }
+        if (document.visibilityState === 'visible') renderPinsManager();
       });
 
     }catch(e){
       console.error('options init failed', e);
     }
   });
-
-  window.CGTN_OPTIONS = Object.assign(window.CGTN_OPTIONS||{}, { renderPinsManager });
 })();

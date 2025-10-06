@@ -1,8 +1,11 @@
 // ui.js — パネルUI生成 / 言語 / 位置クランプ
 (() => {
-  const SH = window.CGTN_SHARED;
+  'use strict';
+
   const NS = (window.CGTN_UI = window.CGTN_UI || {});
-  const t = window.CGTN_I18N?.t || ((k)=>k);
+  const SH = window.CGTN_SHARED || {};
+  const LG = window.CGTN_LOGIC || {};
+  const T  = (k)=> window.CGTN_I18N?.t?.(k) || k;
 
   // 初期言語をブラウザの設定から決める
   let LANG = (navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
@@ -507,9 +510,11 @@
     })();
 
     // 初期表示：文言と保存状態
+console.log("installUI applyLang");
     applyLang();
     try { box.querySelector('#cgpt-viz').checked = !!SH.getCFG().showViz; } catch {}
 
+/*
     // クリックでフォーカスを残さない（ボタン/ラベル/チェックボックス対象）
     (function suppressMouseFocusInNav(){
       const root = document.getElementById('cgpt-nav');
@@ -526,13 +531,13 @@
         if (t && el.blur) el.blur();
       }, { passive: true });
     })();
-
     // クリック後のフォーカス残りを軽減（念押し）
     box.addEventListener('mouseup', () => {
       try {
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       } catch {}
     }, {capture:true});
+*/
 
     // === チェック群の初期反映とイベント ===
     try {
@@ -628,7 +633,8 @@
   function applyLang(){
     const box = document.getElementById('cgpt-nav');
     if (!box) return;
-
+const cur = (SH.getCFG?.() || {}).lang;
+console.log("applyLang cur:",cur);
     // 共通翻訳関数を取得
     const t = window.CGTN_I18N?.t || ((k)=>k);
 
@@ -636,38 +642,54 @@
     box.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
       const txt = t(key);
-console.log("key:",key," txt:",txt);
-      if (txt) {
-        el.textContent = txt;
-        el.title = txt;
-      }
+      if (!key || !txt) return;
+      // テキスト＆タイトルを同時更新（title不要な要素は上書きしても無害）
+      el.textContent = txt;
+      el.title = txt;
     });
 
     // 言語ボタン
     const langBtn = box.querySelector('.cgpt-lang-btn');
-    if (langBtn) langBtn.textContent = t('langBtn');
+    if (langBtn) langBtn.textContent = T('langBtn');
 
     // ドラッグタイトル
     const drag = box.querySelector('#cgpt-drag');
-    if (drag) drag.title = t('nav.drag');
+    if (drag) drag.title = T('nav.drag');
 
     // プレビュータイトル
     const h = document.querySelector('#cgtn-preview-title');
-    if (h) h.textContent = t('preview');
+    if (h) h.textContent = T('preview');
   }
 
 
-  function toggleLang(){
-    LANG = LANG === 'ja' ? 'en' : 'ja';
-//console.log("★ui 日英切り替えクリックしました:LANG",LANG);
-    applyLang();
-    // 共有設定に保存（options 画面でも拾える）
-    try { window.CGTN_SHARED?.saveSettingsPatch?.({ lang: LANG }); } catch {}
-    //切替時に登録済みツールチップを一括再翻訳
-    window.CGTN_SHARED?.updateTooltips?.();
-    window.CGTN_LOGIC?.renderList?.(true);
+function toggleLang() {
+  // 現在の言語を取得（設定がなければ ja をデフォルトに）
+  const cur = (SH.getCFG?.() || {}).lang || 'ja';
+  const next = (cur && String(cur).toLowerCase().startsWith('en')) ? 'ja' : 'en';
+  console.log("toggleLang cur:", cur, " next:", next);
 
+  // --- 言語設定の共有と即時反映 ---
+  try {
+    SH.saveSettingsPatch?.({ lang: next }); // ← LANG ではなく next
+    if (window.CGTN_I18N) {
+      window.CGTN_I18N._forceLang = next; // ← 即反映
+    }
+  } catch (e) {
+    console.warn("toggleLang error", e);
   }
+
+  // --- UI反映 ---
+  applyLang();
+
+  // --- ツールチップ再翻訳 ---
+  SH.updateTooltips?.();
+
+  /* #if MANUAL_REDRAW
+  if (window.CGTN_LOGIC?.isListVisible?.()) {
+    window.CGTN_LOGIC.renderList(true);
+  }
+  #endif */
+}
 
   function clampPanelWithinViewport(){
     const box = document.getElementById('cgpt-nav'); if (!box) return;
@@ -684,8 +706,13 @@ console.log("key:",key," txt:",txt);
     box.style.top  = `${y}px`;
   }
 
+  // 公開API
   NS.installUI = installUI;
+  NS.clampPanelWithinViewport = clampPanelWithinViewport;
   NS.applyLang = applyLang;
   NS.toggleLang = toggleLang;
-  NS.clampPanelWithinViewport = clampPanelWithinViewport;
+
+  // 起動直後に一度だけ適用（navがまだ無ければ無害）
+  document.addEventListener('DOMContentLoaded', applyLang);
+
 })();

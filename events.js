@@ -1,9 +1,10 @@
 // events.js — クリック配線 / チェック連動（UIのdata-act / data-roleに対応）
 (() => {
-  const SH = window.CGTN_SHARED;
-  const UI = window.CGTN_UI;
-  const LG = window.CGTN_LOGIC;
+  'use strict';
 
+  const SH = window.CGTN_SHARED || {};
+  const UI = window.CGTN_UI || {};
+  const LG = window.CGTN_LOGIC || {};
   const NS = (window.CGTN_EVENTS = window.CGTN_EVENTS || {});
 
   function bindEvents(){
@@ -12,46 +13,46 @@
 
     // 初期チェック状態を反映
     try {
-      box.querySelector('#cgpt-viz').checked  = !!SH.getCFG().showViz;
-      box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG().list?.enabled);
+      box.querySelector('#cgpt-viz').checked  = !!SH.getCFG()?.showViz;
+      box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG()?.list?.enabled);
       const pinOnlyChk = document.getElementById('cgpt-pinonly');
       if (pinOnlyChk){
-        pinOnlyChk.checked  = !!(SH.getCFG().list?.pinOnly);
-        pinOnlyChk.disabled = !SH.getCFG().list?.enabled;
+        pinOnlyChk.checked  = !!(SH.getCFG()?.list?.pinOnly);
+        pinOnlyChk.disabled = !SH.getCFG()?.list?.enabled;
       }
     } catch {}
 
     box.addEventListener('click', (e) => {
-//console.log("クリック",e.target.closest);
+      // プレビューボタンは行内で処理（ここでは素通りにせず即終了）
       if (e.target.closest('.cgtn-preview-btn')) {
         e.preventDefault();
         e.stopPropagation();
-        return; 
+        return;
       }
-      const t = e.target.closest('*');
-      if (!t) return;
 
-// events.js 内：#cgpt-pin-filter クリック処理
-if (t.closest('#cgpt-pin-filter')) {
-  const btn = t.closest('#cgpt-pin-filter');
-  const cur = !!(SH.getCFG().list?.pinOnly);
-  const next = !cur;
+      const el = e.target.closest('*');
+      if (!el) return;
 
-  SH.saveSettingsPatch({ list: { ...(SH.getCFG().list||{}), pinOnly: next }});
-  btn.setAttribute('aria-pressed', String(next));
+      // --- 「付箋のみ」ボタン（上部トグル） ---
+      if (el.closest('#cgpt-pin-filter')) {
+        const btn = el.closest('#cgpt-pin-filter');
+        const cur = !!(SH.getCFG()?.list?.pinOnly);
+        const next = !cur;
 
-  // 画面反映
-  window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: next });
-  return;
-}
+        SH.saveSettingsPatch({ list: { ...(SH.getCFG()?.list||{}), pinOnly: next }});
+        btn.setAttribute('aria-pressed', String(next));
 
+        // 画面反映
+        window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: next });
+        return;
+      }
 
-      // 一覧トグル
-      if (t.closest('#cgpt-list-toggle')) {
-        const on = t.closest('#cgpt-list-toggle').checked;
-        LG.setListEnabled(on);
+      // --- 一覧トグル ---
+      if (el.closest('#cgpt-list-toggle')) {
+        const on = el.closest('#cgpt-list-toggle').checked;
+        LG.setListEnabled?.(on);
 
-        // 一覧をOFFにしたら付箋もOFF & 無効化
+        // 一覧OFFなら付箋もOFF & 無効化
         const pinOnlyChk = document.getElementById('cgpt-pinonly');
         if (!on && pinOnlyChk){
           const cur = SH.getCFG() || {};
@@ -62,30 +63,30 @@ if (t.closest('#cgpt-pin-filter')) {
         return;
       }
 
-      // 基準線トグル
-      if (t.closest('#cgpt-viz')) {
-        const on = t.closest('#cgpt-viz').checked;
-        SH.toggleViz(on);
-        SH.saveSettingsPatch({ showViz: !!on });
+      // --- 基準線トグル ---
+      if (el.closest('#cgpt-viz')) {
+        const on = el.closest('#cgpt-viz').checked;
+        SH.toggleViz?.(on);
+        SH.saveSettingsPatch?.({ showViz: !!on });
         return;
       }
 
-      // 言語トグル
-      if (t.closest('.cgpt-lang-btn')) {
-        UI.toggleLang();
+      // --- 言語トグル ---
+      if (el.closest('.cgpt-lang-btn')) {
+        UI.toggleLang?.();
         return;
       }
 
-      // ナビボタン（Top/Bottom/Prev/Next）
-      const btn = t.closest('button[data-act]');
+      // --- ナビゲーション（Top/Bottom/Prev/Next） ---
+      const btn = el.closest('button[data-act]');
       if (btn) {
         const act = btn.dataset.act;
         const role = btn.closest('.cgpt-nav-group')?.dataset.role || 'all';
         switch (act) {
-          case 'top':    LG.goTop(role);    break;
-          case 'bottom': LG.goBottom(role); break;
-          case 'next':   LG.goNext(role);   break;
-          case 'prev':   LG.goPrev(role);   break;
+          case 'top':    LG.goTop?.(role);    break;
+          case 'bottom': LG.goBottom?.(role); break;
+          case 'next':   LG.goNext?.(role);   break;
+          case 'prev':   LG.goPrev?.(role);   break;
         }
       }
     }, false);

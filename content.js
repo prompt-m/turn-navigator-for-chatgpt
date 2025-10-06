@@ -544,12 +544,14 @@
   // ========= 9) 初期セットアップ =========
   function initialize(){
     SH.loadSettings(() => {
+console.log("initialize1 UI.installUI()");
       UI.installUI();
       SH?.touchChatMeta?.();   // あればメタ更新（try不要な場合のみ）
 
       ensureFocusPark();
       installFocusStealGuard();
 
+console.log("initialize2");
       UI.applyLang();
       UI.clampPanelWithinViewport();
 
