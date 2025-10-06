@@ -2,6 +2,9 @@
 (() => {
   const NS = (window.CGTN_SHARED = window.CGTN_SHARED || {});
 
+  const t = (key) => window.CGTN_I18N?.t?.(key) || key;
+  window.CGTN_SHARED = Object.assign(window.CGTN_SHARED || {}, { t });
+
   // === 既定値（options / content と完全一致） ===
   const DEFAULTS = Object.freeze({
     centerBias: 0.40,
@@ -138,34 +141,6 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
     }
   }
 
-  // 辞書（必要に応じて増やしてください）
-  const TIPS = {
-    'list.refresh': { ja: '一覧を最新にする', en: 'Refresh the list' },
-    'row.previewBtn' : { 
-        ja:'クリックでプレビューを表示／もう一度クリックで閉じます', 
-        en:'Click to show preview / Click again to close'},
-    'nav.top'      : { ja:'先頭へ',                    en:'Go to top' },
-    'nav.bottom'   : { ja:'末尾へ',                    en:'Go to bottom' },
-    'nav.prev'     : { ja:'前へ',                      en:'Previous' },
-    'nav.next'     : { ja:'次へ',                      en:'Next' },
-    'nav.lang'     : { ja:'English / 日本語',          en:'English / 日本語' },
-    'nav.viz'      : { ja:'基準線の表示/非表示',        en:'Show/Hide guide line' },
-    'nav.list'     : { ja:'一覧の表示/非表示',          en:'Show/Hide list' },
-    'nav.drag'     : { ja:'ドラッグで移動',             en:'Drag to move' },
-    'list.collapse': { ja:'畳む / 開く',                en:'Collapse / Expand' },
-    'list.pinonly' : { ja:'付箋のみ表示（Altでテーマ）', en:'Pinned only (Alt for theme)' },
-    'row.pin'      : { ja:'このターンを付箋 ON/OFF',    en:'Toggle pin for this turn' },
-    'row.preview'  : { ja:'プレビュー',                 en:'Preview' }
-  };
-
-
-  function t(key){
-    const entry = TIPS[key];
-    if (!entry) return '';
-    const L = (curLang() || 'ja').startsWith('en') ? 'en' : 'ja';
-//    console.log("◆◇◆ t(key) L: ",L," entry:",entry);
-    return entry[L] || entry.ja || '';
-  }
 
   // 直近の登録を覚えておいて、言語切替時に再適用
   const _registrations = [];

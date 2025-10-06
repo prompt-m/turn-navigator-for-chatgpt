@@ -15,31 +15,7 @@
     (SH.getCFG && SH.getCFG()?.lang) ||
     ((navigator.language||'').toLowerCase().startsWith('ja') ? 'ja' : 'en');
 
-  const I18N = {
-    ja: {
-      pinsTitle:'付箋データ管理',
-      pinsHint:'各チャットの付箋（pinsByChat）を一覧。不要になったチャットは削除できます。',
-      thChat:'チャット', thCount:'付箋数', thUpdated:'更新', thOps:'',
-      delBtn:'削除', delConfirm:'このチャットの付箋データを削除します。よろしいですか？',
-      emptyPinsTitle:'付箋データはまだありません',
-      emptyPinsDesc:'一覧パネルで🔖をONにすると、ここに表示されます。',
-      saved:'保存しました', reset:'規定に戻しました',
-      nowOpen:'表示中のチャットは削除できません。',
-      stillExists:'チャットがサイドバーに存在します（更新で反映）。'
-    },
-    en: {
-      pinsTitle:'Pinned Data',
-      pinsHint:'List of pins (pinsByChat) per chat. You can delete data for a specific chat.',
-      thChat:'Chat', thCount:'Pins', thUpdated:'Updated', thOps:'',
-      delBtn:'Delete', delConfirm:'Delete pin data for this chat. Are you sure?',
-      emptyPinsTitle:'No pinned data yet',
-      emptyPinsDesc:'Turn on the 🔖 icon in the list panel and chats will appear here.',
-      saved:'Saved', reset:'Reset to defaults',
-      nowOpen:'Now open chat cannot be deleted.',
-      stillExists:'Chat still exists in the sidebar. Reload to update.'
-    }
-  };
-  const t = (k)=> (I18N[curLang()]||I18N.ja)[k] || k;
+  const t = window.CGTN_I18N?.t || ((k)=>k);
 
   // --- Defaults fallback ---
   const DEF = (SH.DEFAULTS) || {

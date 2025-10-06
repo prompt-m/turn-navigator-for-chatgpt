@@ -3,6 +3,7 @@
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
   const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
+  const t = window.CGTN_I18N?.t || ((k)=>k);
   function _L(){ return (SH?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
 
   // ★チャット別ピン・キャッシュ
@@ -206,6 +207,29 @@ console.log("togglePinForChat turnId: ",turnId);
 
   function buildAttachmentLine(root, maxChars){
     const el = root || document;
+
+    const kinds = Array.from(new Set(detectAttachmentKinds(el) || []));
+    const order = ['🖼','🎞','📝'];
+    kinds.sort((a,b)=> order.indexOf(a) - order.indexOf(b));
+    const kindsStr = kinds.join('');
+
+    const hasImg = !!el.querySelector('img, picture img');
+    const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
+    const namesStr = names.join(' ');
+
+    // ★I18N経由で（画像）/(image)
+    const imgLabel = (!namesStr && hasImg)
+      ? (window.CGTN_UI?.t?.('image') || '(image)')
+      : '';
+
+    const line = [kindsStr, imgLabel, namesStr].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+    const max = Math.max(10, Number(maxChars)||0);
+    return max ? (line.length > max ? line.slice(0, max) : line) : line;
+  }
+
+/*
+  function buildAttachmentLine(root, maxChars){
+    const el = root || document;
     const L = (_L && _L()==='en') ? 'en' : 'ja';  // 既存の _L() が使えるなら
 
     // 種別（既存の detectAttachmentKinds は 🖼/🎞/📝 を返す想定）
@@ -228,7 +252,7 @@ console.log("togglePinForChat turnId: ",turnId);
     const max = Math.max(10, Number(maxChars)||0);
     return max ? (line.length > max ? line.slice(0, max) + '' : line) : line; // ← 末尾"…"は付けない
   }
-
+*/
   // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
   // ここ変えたよ：トリム＆maxChars 厳密適用
   function extractBodySnippet(head, maxChars){
@@ -309,20 +333,6 @@ console.log("togglePinForChat turnId: ",turnId);
   }
 
   function initPinsCache(){ PINS = _pinsSetFromCFG(SH.getCFG() || {}); }
-
-  // キーAPI（ここが“真実”）
-//  function isPinnedByKey(k){ return PINS.has(String(k)); }
-//  function setPinnedByKey(k, val){
-//    const s = new Set(PINS); const ks = String(k);
-//    if (val) s.add(ks); else s.delete(ks);
-//    _savePinsSet(s); return val;
-//  }
-
-//  function togglePinnedByKey(k){
-//    const s = new Set(PINS); const ks = String(k);
-//    const next = !s.has(ks); if (next) s.add(ks); else s.delete(ks);
-//    _savePinsSet(s); return next; // ← 次状態を返すのが超重要
-//  }
 
   function getPins(){ return Array.from(PINS); }
   function isPinned(artOrKey){
@@ -427,59 +437,6 @@ console.log("togglePinForChat turnId: ",turnId);
     }, {passive:false});
   }
 
-
-/*
-  // ここ変えたよ：左🔖クリックのハンドラは click だけ、再入＆二重バインドガード付き
-  function bindClipPin(clip, art){
-    if (!clip) return;
-
-    // 再描画での二重バインド防止
-    if (clip._cgtnPinBound) return;
-    clip._cgtnPinBound = true;
-
-    if (!clip.textContent) clip.textContent = '🔖\uFE0E'; // モノクロ字形で color が効く
-    clip.classList.add('cgtn-clip-pin');
-    clip.classList.add('cgtn-cursor-pin');
-    clip.classList.toggle('off', !isPinned(art));
-    clip.style.cursor = 'pointer';
-    clip.style.userSelect = 'none';
-    clip.style.padding = '2px 6px';
-
-    let busy = false;
-    const handler = (ev)=>{
-      ev.preventDefault();           // フォーカスや既定動作を抑止
-      ev.stopPropagation();          // 行側のクリック（スクロール）へバブルさせない
-      if (busy) return;              // デバウンス（同フレーム二重発火防止）
-      busy = true;
-
-      const k = getTurnKey(art);
-      const next = togglePinnedByKey(k);   // ← 次状態（true/false）を確定
-
-      // 自分を即時反映
-      clip.setAttribute('aria-pressed', String(next));
-      clip.classList.toggle('off', !next);
-
-      const cfg = SH.getCFG() || {};
-      if (cfg.list?.pinOnly && !next){
-        // 付箋のみ表示中でOFF → 同ターンの2行を即削除
-        rowsByTurn(k).forEach(n => n.remove());
-      } else {
-        // 相方行の色も“確定値”で更新
-        refreshPinUIForTurn(k, next);
-      }
-
-      // 次ティックでロック解除（同フレーム多重を防ぐ）
-      setTimeout(()=>{ busy = false; }, 0);
-
-//console.debug('[PIN]', k, 'next=', next, 'PINS=', Array.from(PINS));
-
-    };
-
-    // ★ click だけを登録（pointerdown は絶対に付けない）
-    clip.addEventListener('click', handler, {passive:false});
-  }
-*/
-
   // 相方行のUI更新（ここ変えたよ：強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){
     const state = (typeof forcedState === 'boolean') ? forcedState : PINS.has(String(turnKey));
@@ -556,28 +513,41 @@ console.log("togglePinForChat turnId: ",turnId);
 
     if (isLocked && isLocked()) return;
 
-    // 会話スレッドが切り替わったらリストは閉じる
-    (function(){
-      let _lastUrl = location.pathname + location.search;
-      window.addEventListener('popstate', ()=>{ _lastUrl = location.pathname + location.search; });
-      const _ensureOffOnThreadChange = () => {
-        const now = location.pathname + location.search;
-        if (now !== _lastUrl) {
-          _lastUrl = now;
-          try {
-            const chk = document.getElementById('cgpt-list-toggle');
-            if (chk) chk.checked = false;
-            window.CGTN_LOGIC?.setListEnabled?.(false, false);
-          } catch {}
+    // --- 会話スレッドが切り替わったらリストは閉じる（★一度だけインストール） ---
+    if (!window.CGTN_LOGIC?._threadHooked) {
+      (function(){
+        let _lastUrl = location.pathname + location.search;
+
+        // idempotent にする（過去のハンドラを外してから入れる）
+        if (window.CGTN_LOGIC._popHandler) {
+          window.removeEventListener('popstate', window.CGTN_LOGIC._popHandler);
         }
-      };
-      // rebuild の最初で呼ぶ
-      const _origRebuild = window.CGTN_LOGIC?.rebuild;
-      window.CGTN_LOGIC.rebuild = function(){
-        _ensureOffOnThreadChange();
-        return _origRebuild?.apply(this, arguments);
-      };
-    })();
+        window.CGTN_LOGIC._popHandler = () => {
+          _lastUrl = location.pathname + location.search;
+        };
+        window.addEventListener('popstate', window.CGTN_LOGIC._popHandler);
+//      window.addEventListener('popstate', ()=>{ _lastUrl = location.pathname + location.search; });
+
+        const _ensureOffOnThreadChange = () => {
+          const now = location.pathname + location.search;
+          if (now !== _lastUrl) {
+            _lastUrl = now;
+            try {
+              const chk = document.getElementById('cgpt-list-toggle');
+              if (chk) chk.checked = false;
+              window.CGTN_LOGIC?.setListEnabled?.(false, false);
+            } catch {}
+          }
+        };
+        // rebuild の最初で呼ぶ
+        const _origRebuild = window.CGTN_LOGIC?.rebuild;
+        window.CGTN_LOGIC.rebuild = function(){
+          _ensureOffOnThreadChange();
+          return _origRebuild?.apply(this, arguments);
+        };
+      })();
+      window.CGTN_LOGIC._threadHooked = true; // ★これで以降は再インストールされない
+    }
     // 会話スレッドが切り替わったらリストは閉じる ここまで
 
     NS._scroller = getTrueScroller();
@@ -962,7 +932,7 @@ console.log("togglePinForChat turnId: ",turnId);
     if (madeRows === 0 && pinOnly) {
       const L = _L();
       const msg    = L==='en' ? 'No pins in this chat.' : 'このチャットには付箋がありません。';
-      const showAll= tShowAll();
+      const showAll= window.CGTN_SHARED.t('list.showAll');
 
       const empty = document.createElement('div');
       empty.className = 'cgtn-empty';
@@ -997,25 +967,37 @@ console.log("togglePinForChat turnId: ",turnId);
       }, listBox);
     }
 /*
-    // フッタ行数表記
-    const info = document.createElement('div');
-    info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;';
-
-    const dataRows = body.querySelectorAll('.row').length; // データ行のみ
-    //const L = _L();
-    const L = (window.CGTN_SHARED?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en' : 'ja';
-
-    info.textContent = (L==='en')
-      ? `${dataRows} rows (of ${ST.all.length} turns)`
-      : `${dataRows}行（${ST.all.length}ターン中）`;
-
-    foot.appendChild(info);
-*/
+    // フッタ登録(fmt＋即席IIFE）
     const info = document.createElement('div');
     info.id = 'cgpt-list-foot-info';
     info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;';
     foot.appendChild(info);
-    updateListFooterInfo();
+
+    const dataRows = body.querySelectorAll('.row').length;
+    const allTurns = ST?.all?.length ?? dataRows;
+
+    info.textContent =
+      (window.CGTN_UI?.fmt?.('list.footer.fmt', { rows: dataRows, turns: allTurns })) ||
+      (() => {
+        const t = window.CGTN_UI?.t || (k => k);
+        const L = (window.CGTN_SHARED?.getLang?.() || 'ja').startsWith('en') ? 'en' : 'ja';
+        return (L === 'en')
+          ? `${dataRows} ${t('listRows')} (of ${allTurns} ${t('listTurns')})`
+          : `${dataRows}${t('listRows')}（${allTurns}${t('listTurns')}）`;
+      })();
+*/
+    // フッタ登録（シンプル版）
+    let info = document.getElementById('cgpt-list-foot-info');
+    if (!info) {
+      info = document.createElement('div');
+      info.id = 'cgpt-list-foot-info';
+      info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;';
+      foot.appendChild(info);
+    }
+    const t = window.CGTN_UI?.t || ((k)=>k);
+    const rows = body.querySelectorAll('.row').length;
+    const allturns = ST?.all?.length ?? rows;
+    info.textContent = `${rows}${t('listRows')}（${allturns}${t('listTurns')}）`;
 
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);

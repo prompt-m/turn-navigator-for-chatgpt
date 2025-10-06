@@ -117,12 +117,6 @@
       <p class="desc hint" id="msg" style="display:none;">保存しました</p>
     </div>
   </form>
-<div id="viz-overlay"
-     style="position:relative; height:0;">
-  <div id="viz-line"
-       style="position:absolute; left:0; right:0; top:calc(var(--bias, 0.5) * 100%);
-              border-top:2px solid #e53935; box-shadow:0 0 0 1px rgba(229,57,53,.15);"></div>
-</div>
 
   <script src="shared.js"></script>
   <script src="options.js"></script>

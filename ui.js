@@ -2,19 +2,21 @@
 (() => {
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_UI = window.CGTN_UI || {});
-
-  const I18N = {
-    ja: { user:'ユーザー', assistant:'アシスタント', all:'全体', top:'先頭', prev:'前へ', next:'次へ', bottom:'末尾', langBtn:'English', dragTitle:'ドラッグで移動', line:'基準線', list:'一覧' },
-    en: { user:'User', assistant:'Assistant', all:'All', top:'Top', prev:'Prev', next:'Next', bottom:'Bottom', langBtn:'日本語', dragTitle:'Drag to move', line:'Guide', list:'List' }
-  };
+  const t = window.CGTN_I18N?.t || ((k)=>k);
 
   // 初期言語をブラウザの設定から決める
   let LANG = (navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
   // いつでも <html lang> を真とする（fallback は LANG）
   document.documentElement.lang = LANG;
+
 //  SH.setLangResolver?.(() => LANG);
-  SH.setLangResolver?.(SH.getLang);
+//  SH.setLangResolver?.(SH.getLang);
+//  SH.getLang = () => LANG;
+
+  // 外部から現在言語を取得できるように公開
+  NS.getLang = () => LANG;
   SH.getLang = () => LANG;
+  SH.setLangResolver?.(SH.getLang);   // shared.js 側の言語解決に供給
 
   // ★ curLang() がこれを拾えるように resolver にも設定
   SH.setLangResolver?.(SH.getLang);
@@ -27,12 +29,6 @@
     s.textContent = css;
     document.head.appendChild(s);
   }
-
-  function _L(){ return (window.CGTN_SHARED?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
-  function tPreview(){ return _L()==='en' ? 'Preview' : 'プレビュー'; }
-  function tAttachments(){ return _L()==='en' ? 'Attachments' : '添付'; }
-  function tPinOnly(){ return _L()==='en' ? 'Pins only' : '付箋のみ'; }
-  function tShowAll(){ return _L()==='en' ? 'Show all' : 'すべて表示'; }
 
   // 最低限の見た目（以前のCSSを凝縮）
   const BASE_CSS = `
@@ -476,7 +472,6 @@
           <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
-        <!-- ※ ナビ側「付箋のみ」は完全削除 -->
       </div>
     `;
     document.body.appendChild(box);
@@ -522,13 +517,13 @@
       root._cgtnNoMouseFocus = true;
 
       root.addEventListener('mousedown', (e) => {
-        const t = e.target.closest('button, label, input[type=checkbox]');
-        if (t) e.preventDefault();
+        const el = e.target.closest('button, label, input[type=checkbox]');
+        if (el) e.preventDefault();
       }, { passive: false });
 
       root.addEventListener('click', (e) => {
-        const t = e.target.closest('button, label, input[type=checkbox]');
-        if (t && t.blur) t.blur();
+        const el = e.target.closest('button, label, input[type=checkbox]');
+        if (t && el.blur) el.blur();
       }, { passive: true });
     })();
 
@@ -608,10 +603,10 @@
 
       // マウス系で root 内に focusin したら即座に追い出す
       root.addEventListener('focusin', (e) => {
-        const t = e.target && e.target.closest(INTERACTIVE);
-        if (t && !lastWasKeyboard) {
+        const el = e.target && e.target.closest(INTERACTIVE);
+        if (el && !lastWasKeyboard) {
           // クリック・ドラッグ等で入ったフォーカスは排除
-          try { t.blur(); } catch {}
+          try { el.blur(); } catch {}
           try { park.focus({ preventScroll:true }); } catch {}
         }
       }, true); // ← capture
@@ -633,34 +628,45 @@
   function applyLang(){
     const box = document.getElementById('cgpt-nav');
     if (!box) return;
-    const t = I18N[LANG] || I18N.ja;
-    // ラベルは text だけ更新
+
+    // 共通翻訳関数を取得
+    const t = window.CGTN_I18N?.t || ((k)=>k);
+
+    // data-i18n属性を持つ要素すべてに適用
     box.querySelectorAll('[data-i18n]').forEach(el => {
-      const k = el.getAttribute('data-i18n');
-      if (t[k]){
-        el.textContent = t[k]; 
-        el.title = t[k]; 
-       }
+      const key = el.getAttribute('data-i18n');
+      const txt = t(key);
+console.log("key:",key," txt:",txt);
+      if (txt) {
+        el.textContent = txt;
+        el.title = txt;
+      }
     });
-    box.querySelector('.cgpt-lang-btn').textContent = t.langBtn;
 
-    // ドラッグも I18N で title を直付け
+    // 言語ボタン
+    const langBtn = box.querySelector('.cgpt-lang-btn');
+    if (langBtn) langBtn.textContent = t('langBtn');
+
+    // ドラッグタイトル
     const drag = box.querySelector('#cgpt-drag');
-    if (drag) drag.title = t.dragTitle || t.drag || '';
+    if (drag) drag.title = t('nav.drag');
 
+    // プレビュータイトル
+    const h = document.querySelector('#cgtn-preview-title');
+    if (h) h.textContent = t('preview');
   }
+
 
   function toggleLang(){
     LANG = LANG === 'ja' ? 'en' : 'ja';
 //console.log("★ui 日英切り替えクリックしました:LANG",LANG);
     applyLang();
-    // リストパネルフッタ更新
-    window.CGTN_LOGIC?.updateListFooterInfo();
-
     // 共有設定に保存（options 画面でも拾える）
     try { window.CGTN_SHARED?.saveSettingsPatch?.({ lang: LANG }); } catch {}
     //切替時に登録済みツールチップを一括再翻訳
     window.CGTN_SHARED?.updateTooltips?.();
+    window.CGTN_LOGIC?.renderList?.(true);
+
   }
 
   function clampPanelWithinViewport(){
