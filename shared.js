@@ -141,6 +141,13 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
     }
   }
 
+  // 言語切替フックの登録先
+  const _langHooks = new Set();
+
+  /** 言語切替時に再実行したい処理を登録 */
+  NS.onLangChange = function onLangChange(fn){
+    if (typeof fn === 'function') _langHooks.add(fn);
+  };
 
   // 直近の登録を覚えておいて、言語切替時に再適用
   const _registrations = [];
@@ -158,6 +165,27 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
     });
   };
 
+  /** 既存: ツールチップの再適用 */
+  NS.updateTooltips = function(){
+    const L = (NS.curLang?.() || 'ja');
+
+    // 既存のツールチップ再適用
+    _registrations.forEach(({ root, pairs }) => {
+      Object.entries(pairs||{}).forEach(([sel, key]) => {
+        root.querySelectorAll(sel).forEach(el => {
+          const s = t(key);
+          if (s) el.title = s;
+        });
+      });
+    });
+
+    // ★ 新規：言語切替フックを一斉実行
+    _langHooks.forEach(fn => {
+      try { fn(); } catch(e){ console.warn('onLangChange hook failed', e); }
+    });
+  };
+
+/*
   NS.updateTooltips = function(key){
     const L = (NS.curLang?.() || 'ja');
     for (const reg of _registrations){
@@ -170,7 +198,7 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
       });
     }
   };
-
+*/
   let CFG = structuredClone(DEFAULTS);
 
   const isNum = v => Number.isFinite(Number(v));

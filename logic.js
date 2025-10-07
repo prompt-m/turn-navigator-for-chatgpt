@@ -137,8 +137,8 @@ console.log("togglePinForChat turnId: ",turnId);
 
     // “ファイルチップ”内の表示名（hrefが無いケース）
     el.querySelectorAll('.border.rounded-xl .truncate.font-semibold').forEach(n => {
-      const t = (n.textContent || '').trim();
-      if (t) names.add(t);
+      const tx = (n.textContent || '').trim();
+      if (tx) names.add(tx);
     });
 
     return [...names];
@@ -227,32 +227,6 @@ console.log("togglePinForChat turnId: ",turnId);
     return max ? (line.length > max ? line.slice(0, max) : line) : line;
   }
 
-/*
-  function buildAttachmentLine(root, maxChars){
-    const el = root || document;
-    const L = (_L && _L()==='en') ? 'en' : 'ja';  // 既存の _L() が使えるなら
-
-    // 種別（既存の detectAttachmentKinds は 🖼/🎞/📝 を返す想定）
-    const kinds = Array.from(new Set(detectAttachmentKinds(el) || []));
-    // 表示順を固定（画像→動画→文書ほか）
-    const order = ['🖼','🎞','📝'];
-    kinds.sort((a,b)=> order.indexOf(a) - order.indexOf(b));
-    const kindsStr = kinds.join('');
-
-    const hasImg = !!el.querySelector('img, picture img');
-    const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
-    const namesStr = names.join(' ');
-
-    // ★ “（画像）/ (image)” は「名前が取れない時だけ」補助として付ける
-    const imgLabel = hasImg && !namesStr
-        ? (L==='en' ? '(image)' : '（画像）')
-        : '';
-
-    const line = [kindsStr, imgLabel, namesStr].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
-    const max = Math.max(10, Number(maxChars)||0);
-    return max ? (line.length > max ? line.slice(0, max) + '' : line) : line; // ← 末尾"…"は付けない
-  }
-*/
   // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
   // ここ変えたよ：トリム＆maxChars 厳密適用
   function extractBodySnippet(head, maxChars){
@@ -567,6 +541,7 @@ console.log("togglePinForChat turnId: ",turnId);
     if (listBox && document.body.contains(listBox)) return listBox;
     listBox = document.createElement('div');
     listBox.id = 'cgpt-list-panel';
+
     listBox.innerHTML = `
       <div id="cgpt-list-head">
         <div id="cgpt-list-grip"></div>
@@ -574,8 +549,12 @@ console.log("togglePinForChat turnId: ",turnId);
         <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
       </div>
       <div id="cgpt-list-body"></div>
-      <div id="cgpt-list-foot"></div>
+      <div id="cgpt-list-foot">
+        <button id="cgpt-list-refresh" class="cgtn-mini-btn" type="button">↻</button>
+        <div id="cgpt-list-foot-info" style="margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;"></div>
+      </div>
     `;
+
     document.body.appendChild(listBox);
 
     // ツールチップ用titleを登録
@@ -583,11 +562,22 @@ console.log("togglePinForChat turnId: ",turnId);
       window.CGTN_SHARED?.applyTooltips?.({
         '#cgpt-list-collapse'          : 'list.collapse',
         '#cgpt-pin-filter'             : 'list.pinonly',
-        '#cgpt-list-grip'              : 'nav.drag'
+        '#cgpt-list-grip'              : 'nav.drag',
+        '#cgpt-list-refresh'           : 'list.refresh'
       }, listBox);
       listBox._tipsBound = true; // ★重複登録防止
     }
 
+    // ↻ クリックで再描画（重複バインド防止）
+    const refreshBtn = listBox.querySelector('#cgpt-list-refresh');
+    if (refreshBtn && !refreshBtn._cgtnBound) {
+      refreshBtn._cgtnBound = true;
+      refreshBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try { window.CGTN_LOGIC?.renderList?.(true); } catch {}
+      }, { passive: true });
+    }
 
     /*ｺｺｶﾗ*/
     // === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
@@ -611,9 +601,9 @@ console.log("togglePinForChat turnId: ",turnId);
 
       const INTERACTIVE = 'button, label, input[type=checkbox]';
       panel.addEventListener('focusin', (e) => {
-        const t = e.target && e.target.closest(INTERACTIVE);
-        if (t && !lastWasKeyboard) {
-          try { t.blur(); } catch {}
+        const el = e.target && e.target.closest(INTERACTIVE);
+        if (el && !lastWasKeyboard) {
+          try { el.blur(); } catch {}
           try { park.focus({ preventScroll:true }); } catch {}
         }
       }, true);
@@ -635,14 +625,14 @@ console.log("togglePinForChat turnId: ",turnId);
 
       // マウス押下時にフォーカス移動を阻止
       root.addEventListener('mousedown', (e) => {
-        const t = e.target && e.target.closest('button, label, input[type=checkbox]');
-        if (t) e.preventDefault();
+        const el = e.target && e.target.closest('button, label, input[type=checkbox]');
+        if (el) e.preventDefault();
       }, { passive: false });
 
       // クリック後は念のため blur（キーボード操作には影響なし）
       root.addEventListener('click', (e) => {
-        const t = e.target && e.target.closest('button, label, input[type=checkbox]');
-        if (t && t.blur) t.blur();
+        const el = e.target && e.target.closest('button, label, input[type=checkbox]');
+        if (el && el.blur) el.blur();
       }, { passive: true });
 
       // マウスアップ捕捉で“今フォーカス中”も外す（より強固に）
@@ -661,13 +651,13 @@ console.log("togglePinForChat turnId: ",turnId);
       panel._cgtnNoMouseFocus = true;
 
       panel.addEventListener('mousedown', (e) => {
-        const t = e.target.closest('button, label, input[type=checkbox]');
-        if (t) e.preventDefault();
+        const el = e.target.closest('button, label, input[type=checkbox]');
+        if (el) e.preventDefault();
       }, { passive: false });
 
       panel.addEventListener('click', (e) => {
-        const t = e.target.closest('button, label, input[type=checkbox]');
-        if (t && t.blur) t.blur();
+        const el = e.target.closest('button, label, input[type=checkbox]');
+        if (el && el.blur) el.blur();
       }, { passive: true });
     })(listBox);
 
@@ -805,7 +795,7 @@ console.log("togglePinForChat turnId: ",turnId);
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
-    foot.innerHTML = '';
+//    foot.innerHTML = '';
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
@@ -857,17 +847,9 @@ console.log("togglePinForChat turnId: ",turnId);
         row.innerHTML = `
           <button class="cgtn-preview-btn">…</button>
           <span class="txt"></span>
-          <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
+          <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
         `;
 
-/*
-        row.innerHTML = `
-          <button class="cgtn-preview-btn">…</button>
-          <span class="txt"></span>
-          <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
-          
-        `;
-*/
         row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
         row.dataset.turn = turnKey;
@@ -902,14 +884,6 @@ console.log("togglePinForChat turnId: ",turnId);
           <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
         `;
 
-/*
-        row2.innerHTML = `
-          <button class="cgtn-preview-btn">…</button> 
-          <span class="txt"></span>
-          <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}" style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
-          
-        `;
-*/
         row2.querySelector('.txt').textContent = bodyLine;
         row2.addEventListener('click', () => scrollToHead(art));
         row2.dataset.turn = turnKey;
@@ -929,10 +903,12 @@ console.log("togglePinForChat turnId: ",turnId);
 
     // 付箋有無チェック（pinOnly中で0件なら空表示）
     madeRows = body.querySelectorAll('.row').length;
+
     if (madeRows === 0 && pinOnly) {
-      const L = _L();
-      const msg    = L==='en' ? 'No pins in this chat.' : 'このチャットには付箋がありません。';
-      const showAll= window.CGTN_SHARED.t('list.showAll');
+      const t = window.CGTN_I18N?.t || ((k) => k);
+
+      const msg = t('list.noPins') || 'No pins in this chat.';
+      const showAll = t('list.showAll') || 'Show all';
 
       const empty = document.createElement('div');
       empty.className = 'cgtn-empty';
@@ -943,62 +919,20 @@ console.log("togglePinForChat turnId: ",turnId);
       `;
       body.appendChild(empty);
 
+      // 「すべて表示」ボタンの動作
       empty.querySelector('.show-all')?.addEventListener('click', () => {
         try {
           const cfg = SH.getCFG() || {};
-          SH.saveSettingsPatch({ list: { ...(cfg.list||{}), pinOnly:false } });
-          document.querySelector('#cgpt-pin-filter')?.setAttribute('aria-pressed','false');
-          window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride:false });
-        } catch {}
+          SH.saveSettingsPatch({ list: { ...(cfg.list || {}), pinOnly: false } });
+          document.querySelector('#cgpt-pin-filter')?.setAttribute('aria-pressed', 'false');
+          window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: false });
+        } catch (e) {
+          console.warn('show-all click failed', e);
+        }
       });
     }
 
-    if (foot && !foot.querySelector('#cgpt-list-refresh')) {
-      const btn = document.createElement('button');
-      btn.id = 'cgpt-list-refresh';
-      btn.className = 'cgtn-mini-btn';
-      btn.type = 'button';
-      btn.textContent = '↻';
-      foot.appendChild(btn);
-
-      // ツールチップ登録（i18n）
-      window.CGTN_SHARED?.applyTooltips?.({
-        '#cgpt-list-refresh': 'list.refresh'
-      }, listBox);
-    }
-/*
-    // フッタ登録(fmt＋即席IIFE）
-    const info = document.createElement('div');
-    info.id = 'cgpt-list-foot-info';
-    info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;';
-    foot.appendChild(info);
-
-    const dataRows = body.querySelectorAll('.row').length;
-    const allTurns = ST?.all?.length ?? dataRows;
-
-    info.textContent =
-      (window.CGTN_UI?.fmt?.('list.footer.fmt', { rows: dataRows, turns: allTurns })) ||
-      (() => {
-        const t = window.CGTN_UI?.t || (k => k);
-        const L = (window.CGTN_SHARED?.getLang?.() || 'ja').startsWith('en') ? 'en' : 'ja';
-        return (L === 'en')
-          ? `${dataRows} ${t('listRows')} (of ${allTurns} ${t('listTurns')})`
-          : `${dataRows}${t('listRows')}（${allTurns}${t('listTurns')}）`;
-      })();
-*/
-    // フッタ登録（シンプル版）
-    let info = document.getElementById('cgpt-list-foot-info');
-    if (!info) {
-      info = document.createElement('div');
-      info.id = 'cgpt-list-foot-info';
-      info.style.cssText = 'margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;';
-      foot.appendChild(info);
-    }
-    const t = window.CGTN_UI?.t || ((k)=>k);
-    const rows = body.querySelectorAll('.row').length;
-    const allturns = ST?.all?.length ?? rows;
-    info.textContent = `${rows}${t('listRows')}（${allturns}${t('listTurns')}）`;
-
+    updateListFooterInfo();
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
   }
@@ -1006,13 +940,16 @@ console.log("togglePinForChat turnId: ",turnId);
   function setListEnabled(on){
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
-  
+    //チャット名を取得しておく
+    window.CGTN_SHARED?.touchChatMeta?.();
+
     const panel = ensureListBox();
     panel.style.display = on ? 'flex' : 'none';
   
     // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
     if (on) {
       ensurePinsCache();  // ← 追加
+
       // ①まず即時スキャン（ある程度は出る）★★★
       rebuild();
       panel.classList.remove('collapsed');
@@ -1026,6 +963,23 @@ console.log("togglePinForChat turnId: ",turnId);
         setTimeout(()=>{ rebuild(); renderList(true); }, 180);
       }));
     } else {
+    }
+  }
+
+  function updateListFooterInfo(){
+    try {
+      const t    = window.CGTN_I18N?.t || ((k)=>k);
+      const info = document.getElementById('cgpt-list-foot-info'); // ← 既存のみ
+      const body = document.getElementById('cgpt-list-body');
+      if (!info || !body) return; // ここで新規作成しないのがポイント
+
+      const rows  = body.querySelectorAll('.row').length;
+      const ST    = window.CGTN_LOGIC?.STATE;
+      const turns = (ST && Array.isArray(ST.all)) ? ST.all.length : rows;
+
+      info.textContent = `${rows}${t('listRows')}（${turns}${t('listTurns')}）`;
+    } catch(e){
+      console.warn('updateListFooterInfo failed', e);
     }
   }
 
@@ -1068,6 +1022,7 @@ console.log("togglePinForChat turnId: ",turnId);
   }
 
   // --- expose ---
+  NS.updateListFooterInfo = updateListFooterInfo;
   NS.renderList = renderList;
   NS.rebuild = rebuild;
   NS.setListEnabled = setListEnabled;

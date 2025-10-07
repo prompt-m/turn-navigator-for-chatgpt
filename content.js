@@ -69,7 +69,7 @@
       dock.setAttribute('data-cgtn-ui','1'); // ← 自作UIフラグ
       dock.innerHTML = `
         <div class="cgtn-dock-head">
-          <span class="cgtn-dock-title">Preview</span>
+          <span class="cgtn-dock-title"></span>
           <button class="cgtn-dock-close" aria-label="Close">✕</button>
         </div>
         <div class="cgtn-dock-body"></div>
@@ -184,6 +184,23 @@
         dock.style.width  = w + 'px';
         dock.style.height = h + 'px';
       }, { passive: true });
+
+      // === 言語切り替え対応：タイトルを再翻訳 ===
+      (function setupDockTitleI18N(){
+        const titleEl = dock.querySelector('.cgtn-dock-title');
+        if (!titleEl) return;
+
+        const applyDockTitle = () => {
+          const t = window.CGTN_I18N?.t || (k=>k);
+          titleEl.textContent = t('preview.title');
+        };
+
+        // 初期設定
+        applyDockTitle();
+
+        // 言語切替時の再反映
+        window.CGTN_SHARED?.onLangChange?.(applyDockTitle);
+      })();
 
       return dock;
     }

@@ -410,6 +410,9 @@
   }
 }
 
+#cgpt-list-foot { display:flex; align-items:center; gap:6px; }
+#cgpt-list-foot-info { margin-left:auto; }
+
   `;
   injectCss(BASE_CSS);
 
@@ -651,7 +654,6 @@ console.log("applyLang cur:",cur);
     // 言語ボタン
     const langBtn = box.querySelector('.cgpt-lang-btn');
     if (langBtn) langBtn.textContent = T('langBtn');
-
     // ドラッグタイトル
     const drag = box.querySelector('#cgpt-drag');
     if (drag) drag.title = T('nav.drag');
@@ -684,11 +686,14 @@ function toggleLang() {
   // --- ツールチップ再翻訳 ---
   SH.updateTooltips?.();
 
-  /* #if MANUAL_REDRAW
-  if (window.CGTN_LOGIC?.isListVisible?.()) {
+  // --- 必要な場合のみリスト再描画 ---
+  const isListVisible = window.CGTN_LOGIC?.isListVisible?.();
+  const isPinOnly = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
+
+  window.CGTN_LOGIC?.updateListFooterInfo?.();
+  if (isListVisible || isPinOnly) {
     window.CGTN_LOGIC.renderList(true);
   }
-  #endif */
 }
 
   function clampPanelWithinViewport(){
