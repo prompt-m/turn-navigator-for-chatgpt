@@ -344,13 +344,12 @@
     function updateDock(btn){
       const row = btn.closest('.row'); if (!row) return;
       const text = textFromRow(row);
-      const kind = row.getAttribute('data-kind') === 'attach' ? 'Attachments' : 'Preview';
 
       const box = ensureDock();
       // 中身は常時更新（固定中でも内容は切り替える仕様）
       body.textContent = text;
-      title.textContent = kind;
-
+      body.scrollTop = 0;
+ 
 //console.log("updateDock pinned:",pinned);
     }
 
@@ -561,14 +560,12 @@
   // ========= 9) 初期セットアップ =========
   function initialize(){
     SH.loadSettings(() => {
-console.log("initialize1 UI.installUI()");
       UI.installUI();
       SH?.touchChatMeta?.();   // あればメタ更新（try不要な場合のみ）
 
       ensureFocusPark();
       installFocusStealGuard();
 
-console.log("initialize2");
       UI.applyLang();
       UI.clampPanelWithinViewport();
 

@@ -781,6 +781,7 @@ console.log("togglePinForChat turnId: ",turnId);
   }
 
   function renderList(forceOn=false, opts={}){
+    ensurePinsCache();
     const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
     if (!enabled) return;
@@ -800,6 +801,7 @@ console.log("togglePinForChat turnId: ",turnId);
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
 
+    //pinOnly のときのフィルタは 最新の PINS セットで判定
     const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
@@ -982,6 +984,9 @@ console.log("togglePinForChat turnId: ",turnId);
       console.warn('updateListFooterInfo failed', e);
     }
   }
+  window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
+    updateListFooterInfo
+  });
 
   // --- navigation ---
   function goTop(role){

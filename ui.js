@@ -513,34 +513,8 @@
     })();
 
     // 初期表示：文言と保存状態
-console.log("installUI applyLang");
     applyLang();
     try { box.querySelector('#cgpt-viz').checked = !!SH.getCFG().showViz; } catch {}
-
-/*
-    // クリックでフォーカスを残さない（ボタン/ラベル/チェックボックス対象）
-    (function suppressMouseFocusInNav(){
-      const root = document.getElementById('cgpt-nav');
-      if (!root || root._cgtnNoMouseFocus) return;
-      root._cgtnNoMouseFocus = true;
-
-      root.addEventListener('mousedown', (e) => {
-        const el = e.target.closest('button, label, input[type=checkbox]');
-        if (el) e.preventDefault();
-      }, { passive: false });
-
-      root.addEventListener('click', (e) => {
-        const el = e.target.closest('button, label, input[type=checkbox]');
-        if (t && el.blur) el.blur();
-      }, { passive: true });
-    })();
-    // クリック後のフォーカス残りを軽減（念押し）
-    box.addEventListener('mouseup', () => {
-      try {
-        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-      } catch {}
-    }, {capture:true});
-*/
 
     // === チェック群の初期反映とイベント ===
     try {
@@ -668,7 +642,6 @@ function toggleLang() {
   // 現在の言語を取得（設定がなければ ja をデフォルトに）
   const cur = (SH.getCFG?.() || {}).lang || 'ja';
   const next = (cur && String(cur).toLowerCase().startsWith('en')) ? 'ja' : 'en';
-  console.log("toggleLang cur:", cur, " next:", next);
 
   // --- 言語設定の共有と即時反映 ---
   try {
