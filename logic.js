@@ -972,18 +972,23 @@ console.log("togglePinForChat turnId: ",turnId);
     try {
       const t    = window.CGTN_I18N?.t || ((k)=>k);
       const info = document.getElementById('cgpt-list-foot-info'); // ← 既存のみ
-      const body = document.getElementById('cgpt-list-body');
-      if (!info || !body) return; // ここで新規作成しないのがポイント
+//      const body = document.getElementById('cgpt-list-body');
+//      if (!info || !body) return; // ここで新規作成しないのがポイント
+      if (!info) return;
 
-      const rows  = body.querySelectorAll('.row').length;
-      const ST    = window.CGTN_LOGIC?.STATE;
-      const turns = (ST && Array.isArray(ST.all)) ? ST.all.length : rows;
+      //const turns = window.CGTN_LOGIC?.STATE?.all?.length ?? 0;       // ターン数
+      //const turns = window.CGTN_LOGIC?.STATE?.all?.length ?? 0;
+      const turns = ST.all.length;
+console.log(" turns:",turns);
+      info.textContent = `（${turns}${t('listTurns')}）`;
 
-      info.textContent = `${rows}${t('listRows')}（${turns}${t('listTurns')}）`;
+
+
     } catch(e){
       console.warn('updateListFooterInfo failed', e);
     }
   }
+
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
     updateListFooterInfo
   });

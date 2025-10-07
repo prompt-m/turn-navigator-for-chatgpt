@@ -24,7 +24,7 @@
       'list.collapse': '畳む / 開く',
       'list.refresh': '一覧を最新にする',
       'listRows': "行",
-      'listTurns': "ターン中",
+      'listTurns': "ターン",
       'preview': "プレビュー",
       'preview.title': "プレビュー",
       'attachments': "添付",

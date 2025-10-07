@@ -530,8 +530,11 @@
         const patch = on
           ? { list:{ ...(cur.list||{}), enabled:true } }
           : { list:{ ...(cur.list||{}), enabled:false, pinOnly:false } };
+
         SH.saveSettingsPatch(patch);
+
         window.CGTN_LOGIC?.setListEnabled?.(on);
+
         // フォーカスを外して“カーソル残り”を防ぐ ★★★★
         try{ listChk.blur(); }catch{}
       });
