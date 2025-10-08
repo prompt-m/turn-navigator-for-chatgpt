@@ -557,6 +557,50 @@
     } catch {}
   }
 
+  // --- chatId 監視して付箋キャッシュを再読込 ---
+  function watchChatIdChange(){
+    let prev = null;
+    setInterval(() => {
+      const cur = CGTN_SHARED.getChatId?.();
+      if (cur && cur !== prev) {
+        prev = cur;
+        CGTN_LOGIC.hydratePinsCache();
+  
+        // チャット切替時は一旦リストを閉じる（強制OFF）
+        const cfg = CGTN_SHARED.getCFG?.() || {};
+        if (cfg.list?.enabled) {
+          cfg.list.enabled = false;
+          CGTN_SHARED.saveSettingsPatch({ list: { enabled: false } });
+          // UI即時反映
+          const listPanel = document.getElementById('cgpt-list-panel');
+          if (listPanel) listPanel.style.display = 'none';
+        }
+  
+        // 少し待ってから再描画（pinOnly維持用）
+        setTimeout(() => {
+          CGTN_LOGIC.renderList?.();
+        }, 500);
+      }
+    }, 800);
+  }
+
+/*  function watchChatIdChange(){
+    let prev = null;
+    setInterval(() => {
+      const cur = CGTN_SHARED.getChatId?.();
+      if (cur && cur !== prev) {
+        prev = cur;
+        // ストレージ→ランタイムキャッシュ同期
+        CGTN_LOGIC.hydratePinsCache();
+        // ✅ DOM構築完了まで少し待つ
+        setTimeout(() => {
+          // リストを現在のキャッシュで再描画（pinOnly 状態も維持）
+          CGTN_LOGIC.renderList?.();
+        }, 500);
+      }
+    }, 800); // ChatGPT は SPA なので緩めのポーリングで十分堅い
+  }
+*/
   // ========= 9) 初期セットアップ =========
   function initialize(){
     SH.loadSettings(() => {
@@ -587,6 +631,7 @@
 
       // ★★★ 起動時1回：サイドバー会話一覧を保存（あなたの運用ポリシー） ★★★
       setTimeout(refreshChatIndexOnce, 400);
+      watchChatIdChange();
     });
 
     // viewport 変化でナビ位置クランプ

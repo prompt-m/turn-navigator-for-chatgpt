@@ -13,6 +13,9 @@
   NS.hydratePinsCache = function(){
     const cid = SH.getChatId();
     _pinsCache = { ...(SH.getPinsForChat(cid) || {}) };
+
+console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
+
   };
 
   function isPinnedByKey(turnId){
@@ -400,6 +403,8 @@ console.log("togglePinForChat turnId: ",turnId);
       clip.setAttribute('aria-pressed', String(next));
       clip.classList.toggle('off', !next);
       refreshPinUIForTurn(turnKey, next);
+console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
+
 
       // pinOnly中でOFFになったら該当行を削除
       const cur = SH.getCFG() || {};
@@ -413,7 +418,9 @@ console.log("togglePinForChat turnId: ",turnId);
 
   // 相方行のUI更新（ここ変えたよ：強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){
-    const state = (typeof forcedState === 'boolean') ? forcedState : PINS.has(String(turnKey));
+//    const state = (typeof forcedState === 'boolean') ? forcedState : PINS.has(String(turnKey));
+    const state = (typeof forcedState === 'boolean') ? forcedState : isPinnedByKey(turnKey);
+
     rowsByTurn(turnKey).forEach(row=>{
       const clipEl = row.querySelector('.cgtn-clip-pin');
       if (clipEl){
@@ -708,6 +715,7 @@ console.log("togglePinForChat turnId: ",turnId);
 
         // 通常クリック：pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
+console.debug('[pinFilter] next=%s (before renderList override)', next);
         SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
 
         btn.setAttribute('aria-pressed', String(next));
@@ -805,15 +813,16 @@ console.log("togglePinForChat turnId: ",turnId);
     const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
+console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
 
     const pinBtn = panel.querySelector('#cgpt-pin-filter');
     if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
     applyPinTheme?.();
 
     let turns = ST.all;
-    if (pinOnly) turns = turns.filter(isPinned);
-
-
+    //if (pinOnly) turns = turns.filter(isPinned);
+    if (pinOnly) turns = turns.filter(a => isPinnedByKey(getTurnKey(a)));
+console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object.keys(_pinsCache||{}).length);
     for (const art of turns){
       const turnKey = getTurnKey(art);
       const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
@@ -858,6 +867,7 @@ console.log("togglePinForChat turnId: ",turnId);
         row.dataset.kind = 'attach';
 
 //        paintPinRow(row, isPinned(art));
+        // 付箋の色設定
         paintPinRow(row,  isPinnedByKey(turnKey));
         if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
         if (row)  row.dataset.preview  = previewText || attachLine || '';
@@ -972,18 +982,10 @@ console.log("togglePinForChat turnId: ",turnId);
     try {
       const t    = window.CGTN_I18N?.t || ((k)=>k);
       const info = document.getElementById('cgpt-list-foot-info'); // ← 既存のみ
-//      const body = document.getElementById('cgpt-list-body');
-//      if (!info || !body) return; // ここで新規作成しないのがポイント
       if (!info) return;
 
-      //const turns = window.CGTN_LOGIC?.STATE?.all?.length ?? 0;       // ターン数
-      //const turns = window.CGTN_LOGIC?.STATE?.all?.length ?? 0;
       const turns = ST.all.length;
-console.log(" turns:",turns);
       info.textContent = `（${turns}${t('listTurns')}）`;
-
-
-
     } catch(e){
       console.warn('updateListFooterInfo failed', e);
     }

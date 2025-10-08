@@ -613,8 +613,8 @@
   function applyLang(){
     const box = document.getElementById('cgpt-nav');
     if (!box) return;
-const cur = (SH.getCFG?.() || {}).lang;
-console.log("applyLang cur:",cur);
+    const cur = (SH.getCFG?.() || {}).lang;
+//console.log("applyLang cur:",cur);
     // 共通翻訳関数を取得
     const t = window.CGTN_I18N?.t || ((k)=>k);
 

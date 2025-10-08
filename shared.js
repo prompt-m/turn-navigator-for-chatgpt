@@ -80,6 +80,9 @@
     const on = !next[k];
     if (on) next[k] = true; else delete next[k];
     NS.setPinsForChat(next, chatId);
+console.debug('[togglePinForChat] chat=%s turn=%s on=%s count=%d',
+  chatId, turnId, on, Object.keys(NS.getPinsForChat(chatId)).length);
+
     return on;
   };
 
