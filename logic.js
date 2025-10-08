@@ -10,6 +10,17 @@
   let _pinsCache = null;   // { [turnId]: true }
   NS._pinsCache = _pinsCache; // デバッグ用
 
+  function hydratePinsCache(chatId){
+    const cfg = SH.getCFG() || {};
+    const pinsArr = cfg.pinsByChat?.[chatId]?.pins || [];
+    _pinsCache = {};
+
+    for (let i = 0; i < pinsArr.length; i++){
+      if (pinsArr[i]) _pinsCache['turn:' + (i + 1)] = true;
+    }
+console.debug(`[hydratePinsCache] chat=${chatId} pins=${pinsArr.filter(v=>v).length}`);
+  }
+
 /*
   NS.hydratePinsCache = function(){
     const cid = SH.getChatId();
@@ -18,7 +29,7 @@
 console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
 
   };
-*/
+
 
   NS.hydratePinsCache = function hydratePinsCache(chatId){
     const map = SH.getPinsForChat(chatId);  // ← chatIdを必ず受け取る
@@ -26,7 +37,7 @@ console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
     console.debug('[hydratePinsCache] chat=%s keys=%d',
       chatId, Object.keys(_pinsCache).length);
   };
-
+*/
   function isPinnedByKey(turnId){
     return !!(_pinsCache && _pinsCache[String(turnId)]);
   }
@@ -34,7 +45,7 @@ console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
 
   // ピンの ON/OFF（呼び元は既存 bindClipPin / togglePin からそのまま呼べる）
   NS.togglePin = function(turnId){
-    const on = SH.togglePinForChat(turnId, SH.getChatId());
+    const on = NS.togglePinForChat(turnId, SH.getChatId());
 console.log("togglePinForChat turnId: ",turnId);
     // ローカルキャッシュも合わせる
     if (!_pinsCache) _pinsCache = {};
@@ -812,7 +823,8 @@ console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', S
     if (!enabled) return;
 
     // チャット別ピン・キャッシュ
-    if (!_pinsCache) NS.hydratePinsCache();
+//    if (!_pinsCache) NS.hydratePinsCache();
+    if (!_pinsCache) hydratePinsCache();
 
     const panel = ensureListBox();
     const body  = panel.querySelector('#cgpt-list-body');

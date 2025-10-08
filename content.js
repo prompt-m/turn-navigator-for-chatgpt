@@ -581,7 +581,7 @@ console.debug('[schedule] start chat=', chatId);
     let prev = null;
     setInterval(() => {
       const cur = SH.getChatId?.();
-console.debug('[watch] chat switch ->', cur);
+//console.debug('[watch] chat switch ->', cur);
       if (cur && cur !== prev) {
         prev = cur;
         // チャット切替時は一旦リストOFF（勝手に開かない）

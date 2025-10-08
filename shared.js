@@ -71,6 +71,21 @@
     };
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
+/*
+  function togglePinForChat(chatId, turnIndex, on){
+    const cfg = SH.getCFG() || {};
+    const chat = cfg.pinsByChat[chatId] || { pins: [] };
+
+    // 配列を必要に応じて拡張
+    if (chat.pins.length < turnIndex){
+      chat.pins.length = turnIndex;
+      chat.pins.fill(0, 0, turnIndex);
+    }
+
+    chat.pins[turnIndex - 1] = on ? 1 : 0; // indexは1始まり
+    cfg.pinsByChat[chatId] = chat;
+    SH.saveSettingsPatch({ pinsByChat: cfg.pinsByChat });
+  }
 
   // 1件トグル（true=ON/false=OFF の次状態を返す）
   NS.togglePinForChat = function(turnId, chatId = NS.getChatId()){
@@ -85,7 +100,7 @@ console.debug('[togglePinForChat] chat=%s turn=%s on=%s count=%d',
 
     return on;
   };
-
+*/
   // 件数
   NS.countPinsForChat = function(chatId = NS.getChatId()){
     const cur = NS.getPinsForChat(chatId);
@@ -237,6 +252,38 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
       cb?.();
     }
   }
+
+// --- 付箋ON/OFFをトグル保存（配列方式） ---
+NS.togglePinForChat = function (turnKey, chatId) {
+  try {
+    const cfg = SH.getCFG() || {};
+    const chat = cfg.pinsByChat?.[chatId] || { pins: [] };
+    const arr = Array.isArray(chat.pins) ? chat.pins : [];
+
+    // turnKey は "turn:12" のような形式を想定
+    const idx = Number(String(turnKey).replace('turn:', '')) - 1;
+    if (isNaN(idx)) return false;
+
+    // 必要に応じて配列拡張
+    if (arr.length <= idx) {
+      const old = arr.length;
+      arr.length = idx + 1;
+      arr.fill(0, old, idx + 1);
+    }
+
+    // トグル
+    const next = arr[idx] ? 0 : 1;
+    arr[idx] = next;
+
+    (cfg.pinsByChat || (cfg.pinsByChat = {}))[chatId] = { pins: arr };
+    SH.saveSettingsPatch({ pinsByChat: cfg.pinsByChat });
+    return !!next;
+  } catch (e) {
+    console.warn('togglePinForChat failed', e);
+    return false;
+  }
+}
+
 
   function saveSettingsPatch(patch){
     try{
