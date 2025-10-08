@@ -8,6 +8,26 @@
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
 
+  // --- チャット切替パイプライン（1回だけ動かすデバウンス付き） ---
+  let _switchingChatId = null;
+  function scheduleSyncForChat(chatId){
+console.debug('[schedule] start chat=', chatId);
+    if (!chatId) return;
+    if (_switchingChatId === chatId) return; // 同一IDでの多重起動防止
+    _switchingChatId = chatId;
+
+    setTimeout(async () => {
+      try {
+        LG.rebuild?.();                  // 1) ST.all を作る
+        LG.hydratePinsCache?.(chatId);   // 2) pins -> _pinsCache（引数で固定）
+        await Promise.resolve(LG.renderList?.()); // 3) 描画（末尾でフッター更新）
+      } finally {
+        _switchingChatId = null;
+      }
+    }, 250); // ChatGPT DOM置換待ち
+  }
+
+
   // ========= 小さなユーティリティ =========
   function inOwnUI(node){
     if (node?.closest?.('[data-cgtn-ui]')) return true;
@@ -557,50 +577,51 @@
     } catch {}
   }
 
-  // --- chatId 監視して付箋キャッシュを再読込 ---
+  function watchChatIdChange(){
+    let prev = null;
+    setInterval(() => {
+      const cur = SH.getChatId?.();
+console.debug('[watch] chat switch ->', cur);
+      if (cur && cur !== prev) {
+        prev = cur;
+        // チャット切替時は一旦リストOFF（勝手に開かない）
+        SH.saveSettingsPatch({ list:{ enabled:false } });
+        // スケジュール実行（chatIdを確定して渡す）
+        scheduleSyncForChat(cur);
+      }
+    }, 800);
+  }
+
+
+/*
   function watchChatIdChange(){
     let prev = null;
     setInterval(() => {
       const cur = CGTN_SHARED.getChatId?.();
       if (cur && cur !== prev) {
         prev = cur;
-        CGTN_LOGIC.hydratePinsCache();
-  
-        // チャット切替時は一旦リストを閉じる（強制OFF）
-        const cfg = CGTN_SHARED.getCFG?.() || {};
-        if (cfg.list?.enabled) {
-          cfg.list.enabled = false;
-          CGTN_SHARED.saveSettingsPatch({ list: { enabled: false } });
-          // UI即時反映
-          const listPanel = document.getElementById('cgpt-list-panel');
-          if (listPanel) listPanel.style.display = 'none';
-        }
-  
-        // 少し待ってから再描画（pinOnly維持用）
+
+        // 切替時は一旦リストOFF（勝手に開かないように）
+        CGTN_SHARED.saveSettingsPatch({ list: { enabled: false } });
+
+        // 1) DOM再解析で ST.all を作る
         setTimeout(() => {
-          CGTN_LOGIC.renderList?.();
-        }, 500);
+          CGTN_LOGIC.rebuild?.();          // ← これが先
+
+          // 2) ストレージ→キャッシュ
+          CGTN_LOGIC.hydratePinsCache();
+
+          // 3) 描画（pinOnly維持のまま）
+          setTimeout(() => {
+            CGTN_LOGIC.renderList?.();
+
+          }, 100); // rebuild直後の安定待ち
+        }, 250);   // ChatGPTのDOM置換待ち
       }
     }, 800);
   }
-
-/*  function watchChatIdChange(){
-    let prev = null;
-    setInterval(() => {
-      const cur = CGTN_SHARED.getChatId?.();
-      if (cur && cur !== prev) {
-        prev = cur;
-        // ストレージ→ランタイムキャッシュ同期
-        CGTN_LOGIC.hydratePinsCache();
-        // ✅ DOM構築完了まで少し待つ
-        setTimeout(() => {
-          // リストを現在のキャッシュで再描画（pinOnly 状態も維持）
-          CGTN_LOGIC.renderList?.();
-        }, 500);
-      }
-    }, 800); // ChatGPT は SPA なので緩めのポーリングで十分堅い
-  }
 */
+
   // ========= 9) 初期セットアップ =========
   function initialize(){
     SH.loadSettings(() => {

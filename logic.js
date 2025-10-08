@@ -10,12 +10,21 @@
   let _pinsCache = null;   // { [turnId]: true }
   NS._pinsCache = _pinsCache; // デバッグ用
 
+/*
   NS.hydratePinsCache = function(){
     const cid = SH.getChatId();
     _pinsCache = { ...(SH.getPinsForChat(cid) || {}) };
 
 console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
 
+  };
+*/
+
+  NS.hydratePinsCache = function hydratePinsCache(chatId){
+    const map = SH.getPinsForChat(chatId);  // ← chatIdを必ず受け取る
+    _pinsCache = map ? { ...map } : {};
+    console.debug('[hydratePinsCache] chat=%s keys=%d',
+      chatId, Object.keys(_pinsCache).length);
   };
 
   function isPinnedByKey(turnId){
@@ -410,6 +419,8 @@ console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
       const cur = SH.getCFG() || {};
       if (cur.list?.pinOnly && !next){
         rowsByTurn(turnKey).forEach(n => n.remove());
+        // フッター再計算
+        CGTN_LOGIC.updateListFooterInfo?.();
       }
 
       setTimeout(()=>{ busy = false; }, 0);
@@ -582,7 +593,7 @@ console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
       refreshBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        try { window.CGTN_LOGIC?.renderList?.(true); } catch {}
+        try { NS.renderList?.(true); } catch {}
       }, { passive: true });
     }
 
@@ -723,7 +734,7 @@ console.debug('[pinFilter] next=%s (before renderList override)', next);
         if (pinOnlyChk) pinOnlyChk.checked = next;
 
         // ★ オーバーライドで1クリック目から絞込み／解除を確定
-        renderList(true, { pinOnlyOverride: next });
+        NS.renderList(true, { pinOnlyOverride: next });
       }, {passive:true});
     })();
 
@@ -788,8 +799,14 @@ console.debug('[pinFilter] next=%s (before renderList override)', next);
     btn.addEventListener('click',        handler, {passive:true});
   }
 
-  function renderList(forceOn=false, opts={}){
-    ensurePinsCache();
+
+//  function renderList(forceOn=false, opts={}){
+//    await SH.whenLoaded?.();
+
+  NS.renderList = async function renderList(forceOn=false, opts={}){
+console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
+    await SH.whenLoaded?.();
+//    ensurePinsCache();
     const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
     if (!enabled) return;
@@ -868,6 +885,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
 //        paintPinRow(row, isPinned(art));
         // 付箋の色設定
+//console.log("row:",row,"isPinnedByKey(turnKey) ",isPinnedByKey(turnKey));
         paintPinRow(row,  isPinnedByKey(turnKey));
         if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
         if (row)  row.dataset.preview  = previewText || attachLine || '';
@@ -917,10 +935,10 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     madeRows = body.querySelectorAll('.row').length;
 
     if (madeRows === 0 && pinOnly) {
-      const t = window.CGTN_I18N?.t || ((k) => k);
+      const T = window.CGTN_I18N?.t || ((k) => k);
 
-      const msg = t('list.noPins') || 'No pins in this chat.';
-      const showAll = t('list.showAll') || 'Show all';
+      const msg = T('list.noPins');    // ← DICTにあるキーを利用
+      const showAll = T('list.showAll');
 
       const empty = document.createElement('div');
       empty.className = 'cgtn-empty';
@@ -937,16 +955,17 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           const cfg = SH.getCFG() || {};
           SH.saveSettingsPatch({ list: { ...(cfg.list || {}), pinOnly: false } });
           document.querySelector('#cgpt-pin-filter')?.setAttribute('aria-pressed', 'false');
-          window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: false });
+          NS.renderList?.(true, { pinOnlyOverride: false });
         } catch (e) {
           console.warn('show-all click failed', e);
         }
       });
     }
 
-    updateListFooterInfo();
+    NS.updateListFooterInfo();
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
+console.debug('[renderList 末尾] done pinsCount=', Object.keys(_pinsCache||{}).length);
   }
 
   function setListEnabled(on){
@@ -968,16 +987,46 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
       const btn = panel.querySelector('#cgpt-list-collapse');
       if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
   
-      renderList(true);
+      NS.renderList(true);
       // ②遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
       //    rAF×2 でペイント後、さらに少し待ってから確定
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
-        setTimeout(()=>{ rebuild(); renderList(true); }, 180);
+        setTimeout(()=>{ rebuild(); NS.renderList(true); }, 180);
       }));
     } else {
     }
   }
 
+function updateListFooterInfo(){
+  try {
+    const t    = window.CGTN_I18N?.t || ((k)=>k);
+    const info = document.getElementById('cgpt-list-foot-info');
+    if (!info) return;
+
+    const total   = ST.all.length; // 全ターン
+    const pinned  = ST.all.filter(a =>
+      CGTN_LOGIC.isPinnedByKey(CGTN_LOGIC.getTurnKey(a))
+    ).length;
+
+    const body = document.getElementById('cgpt-list-body');
+    // ← ★ 実ターンだけをカウント（placeholder除外）
+    const shown = body ? body.querySelectorAll('.row[data-turn]').length : 0;
+
+//    info.textContent = `${shown}${t('listRows')}（${pinned}/${total}${t('listTurns')}）`;
+    info.textContent = `${shown}${t('listRows')} ${total}${t('listTurns')}`;
+  } catch(e){
+    console.warn('updateListFooterInfo failed', e);
+  }
+}
+
+window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
+  updateListFooterInfo,
+  getTurnKey,
+  isPinnedByKey
+});
+
+
+/*
   function updateListFooterInfo(){
     try {
       const t    = window.CGTN_I18N?.t || ((k)=>k);
@@ -994,7 +1043,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
     updateListFooterInfo
   });
-
+*/
   // --- navigation ---
   function goTop(role){
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
@@ -1035,7 +1084,6 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
   // --- expose ---
   NS.updateListFooterInfo = updateListFooterInfo;
-  NS.renderList = renderList;
   NS.rebuild = rebuild;
   NS.setListEnabled = setListEnabled;
   NS.goTop = goTop; 

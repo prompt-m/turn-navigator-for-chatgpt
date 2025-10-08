@@ -89,6 +89,8 @@ console.debug('[togglePinForChat] chat=%s turn=%s on=%s count=%d',
   // 件数
   NS.countPinsForChat = function(chatId = NS.getChatId()){
     const cur = NS.getPinsForChat(chatId);
+console.debug('[getPinsForChat] chat=%s count=%d',
+  chatId, Object.keys((CFG.pinsByChat?.[chatId]?.pins)||{}).length);
     return Object.keys(cur).length;
   };
 
@@ -214,6 +216,10 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
     return dst;
   }
 
+
+  let _loaded = false, _resolves = [];
+  NS.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _resolves.push(r));
+
   function loadSettings(cb){
     try{
       chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings })=>{
@@ -221,10 +227,13 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
         if (cgNavSettings) deepMerge(next, cgNavSettings);
         if (!next.list) next.list = structuredClone(DEFAULTS.list);
         CFG = next;
+        _loaded = true; _resolves.splice(0).forEach(r=>r());
         cb?.();
+console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{})));
       });
     }catch{
       CFG = structuredClone(DEFAULTS);
+      _loaded = true; _resolves.splice(0).forEach(r=>r());
       cb?.();
     }
   }
