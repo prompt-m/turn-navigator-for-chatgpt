@@ -66,10 +66,6 @@ console.debug('[schedule] start chat=', chatId);
   }
 
   // ========= 2) プレビュードック =========
-  // ここに既存の「常駐プレビュー・ドック」IIFE本体を丸ごと移設
-  // （内部で ensureDock / updateDock / hideDock / placeDockNearList など定義）
-  // 最後に window.CGTN_PREVIEW = { hide } を公開
-  // === 常駐プレビュードック（非表示で常に更新、クリックで表示 & 固定） ===
   function bindPreviewDockOnce(){
     if (document._cgtnPreviewDockBound) return;
     document._cgtnPreviewDockBound = true;

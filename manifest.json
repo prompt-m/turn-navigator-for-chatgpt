@@ -24,8 +24,8 @@
       "js": [
         "i18n.js",
         "shared.js",
-        "ui.js",
         "logic.js",
+        "ui.js",
         "events.js",
         "content.js"
       ],
