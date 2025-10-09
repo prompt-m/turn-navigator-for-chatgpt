@@ -74,6 +74,21 @@
     });
   }
 
+  function migrateObsoleteKeys(cfg){
+    // 使っていないキーは保存前に除去
+    if (cfg?.list) {
+      delete cfg.list.maxItems;   // 表示件数
+      delete cfg.viz?.headOffset; // ヘッダ補正
+    }
+    return cfg;
+  }
+
+  function saveAll(){
+    let cfg = uiToCfg();
+    cfg = migrateObsoleteKeys(cfg);
+    SH.saveSettings(cfg, showSavedToast);
+  }
+
   function showMsg(txt){
     const box = $('msg'); if (!box) return;
     box.textContent = txt;
@@ -81,6 +96,48 @@
     setTimeout(()=> box.style.display='none', 1200);
   }
 
+  function renderPinsManager(){
+    const root = document.getElementById('pins-manager');
+    const cfg  = SH.getCFG() || {};
+    const by   = cfg.pinsByChat || {};
+    const meta = cfg.chatMeta || {};
+
+    const rows = Object.entries(by).map(([chatId, rec]) => {
+      const title = meta?.[chatId]?.title || '（無題チャット）';
+      const pins  = Array.isArray(rec?.pins) ? rec.pins : [];
+      const count = pins.reduce((a,b)=>a+(b?1:0),0);
+      const updated = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
+      return {chatId, title, count, updated};
+    });
+
+    root.innerHTML = `
+      <div class="pins-table">
+        <div class="hd">チャット</div>
+        <div class="hd">付箋数</div>
+        <div class="hd">更新</div>
+        <div class="hd">操作</div>
+        ${rows.map(r=>`
+          <div class="row" data-chat="${r.chatId}">
+            <div class="title">${SH.escapeHtml(r.title)}</div>
+            <div class="count">${r.count}</div>
+            <div class="updated">${r.updated}</div>
+            <div class="ops"><button class="del">削除</button></div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    root.querySelectorAll('.row .del').forEach(btn=>{
+      btn.addEventListener('click', ev=>{
+        const row   = ev.target.closest('.row');
+        const chatId= row?.dataset?.chat;
+        if (!chatId) return;
+        deletePinsFromOptions(chatId);
+      });
+    });
+  }
+
+/*
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
@@ -144,9 +201,49 @@
       });
     });
   }
-
+*/
   function titleEscape(s){
     return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.getElementById('lang-ja')?.addEventListener('click', ()=>{
+    SH.setLang?.('ja'); // i18n.js にある setter を想定（無ければ自前で保持）
+    applyToUI();        // 再レンダ
+    renderPinsManager();
+  });
+  document.getElementById('lang-en')?.addEventListener('click', ()=>{
+    SH.setLang?.('en');
+    applyToUI();
+    renderPinsManager();
+  });
+
+  document.getElementById('opt-viz-show')?.addEventListener('change', (ev)=>{
+    const on = !!ev.target.checked;
+    // 保存は通常フローでOK。即時反映の通知だけ投げる
+    chrome.tabs.query({ url: '*://chatgpt.com/*' }, tabs=>{
+      tabs.forEach(tab=>{
+        chrome.tabs.sendMessage(tab.id, { type:'cgtn:viz-toggle', on });
+      });
+    });
+  });
+
+  async function deletePinsFromOptions(chatId){
+    const yes = confirm('このチャットの付箋データを削除します。よろしいですか？');
+    if (!yes) return;
+
+    await SH.deletePinsForChat(chatId);
+
+    // 現在開いているタブ側を即時同期（同じchatならローカルキャッシュを捨てて再描画）
+    try {
+      chrome.tabs.query({ url: '*://chatgpt.com/*' }, tabs=>{
+        tabs.forEach(tab=>{
+          chrome.tabs.sendMessage(tab.id, { type:'cgtn:pins-deleted', chatId });
+        });
+      });
+    } catch {}
+
+    renderPinsManager();
+    showSavedToast('削除しました');
   }
 
   // 初期化

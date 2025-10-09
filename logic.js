@@ -18,26 +18,9 @@
     for (let i = 0; i < pinsArr.length; i++){
       if (pinsArr[i]) _pinsCache['turn:' + (i + 1)] = true;
     }
-console.debug(`[hydratePinsCache] chat=${chatId} pins=${pinsArr.filter(v=>v).length}`);
+//console.debug(`[hydratePinsCache] chat=${chatId} pins=${pinsArr.filter(v=>v).length}`);
   }
 
-/*
-  NS.hydratePinsCache = function(){
-    const cid = SH.getChatId();
-    _pinsCache = { ...(SH.getPinsForChat(cid) || {}) };
-
-console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
-
-  };
-
-
-  NS.hydratePinsCache = function hydratePinsCache(chatId){
-    const map = SH.getPinsForChat(chatId);  // ← chatIdを必ず受け取る
-    _pinsCache = map ? { ...map } : {};
-    console.debug('[hydratePinsCache] chat=%s keys=%d',
-      chatId, Object.keys(_pinsCache).length);
-  };
-*/
   function isPinnedByKey(turnId){
     return !!(_pinsCache && _pinsCache[String(turnId)]);
   }
@@ -46,7 +29,7 @@ console.debug('[hydratePinsCache] keys=%d', Object.keys(_pinsCache||{}).length);
   // ピンの ON/OFF（呼び元は既存 bindClipPin / togglePin からそのまま呼べる）
   NS.togglePin = function(turnId){
     const on = NS.togglePinByIndex(turnId, SH.getChatId());
-console.log("togglePinByIndex turnId: ",turnId);
+//console.log("togglePinByIndex turnId: ",turnId);
     // ローカルキャッシュも合わせる
     if (!_pinsCache) _pinsCache = {};
     if (on) _pinsCache[String(turnId)] = true;
@@ -438,7 +421,7 @@ function bindClipPinByIndex(clipEl, rowEl, chatId){
       clip.setAttribute('aria-pressed', String(next));
       clip.classList.toggle('off', !next);
       refreshPinUIForTurn(turnKey, next);
-console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
+//console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
 
 
       // pinOnly中でOFFになったら該当行を削除
@@ -752,7 +735,7 @@ console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
 
         // 通常クリック：pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
-console.debug('[pinFilter] next=%s (before renderList override)', next);
+//console.debug('[pinFilter] next=%s (before renderList override)', next);
         SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
 
         btn.setAttribute('aria-pressed', String(next));
@@ -825,7 +808,7 @@ console.debug('[pinFilter] next=%s (before renderList override)', next);
 
 
   NS.renderList = async function renderList(forceOn=false, opts={}){
-console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
+//console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
     await SH.whenLoaded?.();
 
 //    const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
@@ -849,7 +832,7 @@ console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', S
     const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
-console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
+//console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
 
     const pinBtn = panel.querySelector('#cgpt-pin-filter');
     if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
@@ -862,7 +845,7 @@ console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length)
     // pinOnly のときは「配列」でフィルタ
     if (pinOnly) turns = turns.filter((_, i) => !!pinsArr[i]);
 
-console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object.keys(_pinsCache||{}).length);
+//console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object.keys(_pinsCache||{}).length);
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
@@ -998,7 +981,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     NS.updateListFooterInfo();
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
-console.debug('[renderList 末尾] done pinsCount=', Object.keys(_pinsCache||{}).length);
+//console.debug('[renderList 末尾] done pinsCount=', Object.keys(_pinsCache||{}).length);
   }
 
   function setListEnabled(on){

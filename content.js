@@ -11,7 +11,7 @@
   // --- チャット切替パイプライン（1回だけ動かすデバウンス付き） ---
   let _switchingChatId = null;
   function scheduleSyncForChat(chatId){
-console.debug('[schedule] start chat=', chatId);
+//console.debug('[schedule] start chat=', chatId);
     if (!chatId) return;
     if (_switchingChatId === chatId) return; // 同一IDでの多重起動防止
     _switchingChatId = chatId;
@@ -538,6 +538,17 @@ console.debug('[schedule] start chat=', chatId);
     }, true);
   }
 
+// 基準線の表示ON/OFF 設定画面より受信
+  chrome.runtime.onMessage.addListener((msg)=>{
+    if (msg?.type === 'cgtn:viz-toggle') {
+      try{
+        const cfg = SH.getCFG() || {};
+        SH.renderViz?.(cfg, !!msg.on);
+      }catch(e){ console.warn('viz-toggle failed', e); }
+    }
+  });
+
+
   // ========= 8) サイドバーから会話一覧を1回収集 =========
   const C_ID_RE = /\/c\/([0-9a-f-]{8,})/i;
   function _pickChatId(href){
@@ -587,36 +598,6 @@ console.debug('[schedule] start chat=', chatId);
       }
     }, 800);
   }
-
-
-/*
-  function watchChatIdChange(){
-    let prev = null;
-    setInterval(() => {
-      const cur = CGTN_SHARED.getChatId?.();
-      if (cur && cur !== prev) {
-        prev = cur;
-
-        // 切替時は一旦リストOFF（勝手に開かないように）
-        CGTN_SHARED.saveSettingsPatch({ list: { enabled: false } });
-
-        // 1) DOM再解析で ST.all を作る
-        setTimeout(() => {
-          CGTN_LOGIC.rebuild?.();          // ← これが先
-
-          // 2) ストレージ→キャッシュ
-          CGTN_LOGIC.hydratePinsCache();
-
-          // 3) 描画（pinOnly維持のまま）
-          setTimeout(() => {
-            CGTN_LOGIC.renderList?.();
-
-          }, 100); // rebuild直後の安定待ち
-        }, 250);   // ChatGPTのDOM置換待ち
-      }
-    }, 800);
-  }
-*/
 
   // ========= 9) 初期セットアップ =========
   function initialize(){

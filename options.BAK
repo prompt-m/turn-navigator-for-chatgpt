@@ -30,7 +30,20 @@
     .cgtn-pins-table .ops button{ padding:4px 8px; cursor:pointer; }
     .cgtn-pins-table tr:hover{ background:rgba(0,0,0,.03); }
     .cgtn-pins-table tr[data-count="0"]{ opacity:.6; }
+    .pins-table{
+      display:grid;
+      grid-template-columns: 1fr 7rem 12rem 6rem; /* チャット / 付箋数 / 更新 / 操作 */
+      gap:10px 16px;
+      align-items:center;
+    }
+    .pins-table .hd{ font-weight:600; opacity:.8; }
+    .pins-table .row{ display:contents; } /* 各行＝4セル */
+    .pins-table .ops button{ width:100%; }
+    @media (max-width: 720px){
+      .pins-table{ grid-template-columns: 1fr 5rem 9rem 5rem; }
+    }
   </style>
+
 </head>
 <body>
   <h1>ChatGPT Turn Navigator 設定</h1>
@@ -49,19 +62,19 @@
       </div>
 
       <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
-      <div class="row">
-        <label for="listMaxItems"><b>一覧パネル：表示件数</b></label>
-        <input id="listMaxItems" name="listMaxItems" type="number" min="10" max="200" step="10">
-      </div>
-      <div class="row">
-        <label for="listMaxChars"><b>一覧パネル：1行の最大文字数</b></label>
-        <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
-      </div>
-      <div class="row">
-        <label for="listFontSize"><b>一覧パネル：フォントサイズ(px)</b></label>
-        <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
-      </div>
-
+      <details class="row" open="false" style="grid-column:1 / -1;">
+        <summary style="cursor:pointer;"><b>一覧パネル</b></summary>
+        <div style="padding-top:10px;display:grid;gap:10px;">
+          <div class="row" style="border-top:none;padding:0;">
+            <label for="listMaxChars"><b>1行の最大文字数</b></label>
+            <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
+          </div>
+          <div class="row" style="border-top:none;padding:0;">
+            <label for="listFontSize"><b>フォントサイズ(px)</b></label>
+            <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
+          </div>
+        </div>
+      </details>
       <!-- ===== 詳細設定（折りたたみ） ===== -->
       <details class="row" open="false" style="grid-column:1 / -1;">
         <summary style="cursor:pointer;"><b>詳細設定（基準線とスクロール挙動）</b></summary>
@@ -78,9 +91,6 @@
               <div class="hint">表示中はスクロールの基準位置が視覚化されます。</div>
             </div>
           </div>
-
-
-
           <!-- Center Bias / EPS -->
           <div class="row" style="border-top:none;padding:0;">
             <label for="centerBias"><b>表示位置の基準 (Center Bias)</b></label>
@@ -99,10 +109,6 @@
 
           <!-- その他の挙動 -->
           <div class="row" style="border-top:none;padding:0;">
-            <label for="headerPx"><b>ヘッダー補正 (px)</b></label>
-            <input id="headerPx" name="headerPx" type="number" step="1" min="0" max="2000" />
-          </div>
-          <div class="row" style="border-top:none;padding:0;">
             <label for="lockMs"><b>スクロールロック (ms)</b></label>
             <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
           </div>
@@ -116,8 +122,16 @@
       <button id="resetBtn" type="button">既定に戻す</button>
       <p class="desc hint" id="msg" style="display:none;">保存しました</p>
     </div>
-  </form>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h1>ChatGPT Turn Navigator 設定</h1>
+      <div>
+        <button id="lang-ja">日本語</button>
+        <button id="lang-en">English</button>
+      </div>
+    </div>
 
+  </form>
+  <script src="i18n.js"></script>
   <script src="shared.js"></script>
   <script src="options.js"></script>
 
