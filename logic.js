@@ -405,8 +405,7 @@ function bindClipPinByIndex(clipEl, rowEl, chatId){
     // if (cfg.list?.pinOnly) NS.renderList?.(true);
   }, { passive:false });
 }
-
-
+/*
   function bindClipPin(clip, art){
     if (!clip) return;
     if (clip._cgtnPinBound) return;
@@ -453,7 +452,7 @@ console.debug('[bindClipPin] turnKey=%s next=%s', turnKey, next);
       setTimeout(()=>{ busy = false; }, 0);
     }, {passive:false});
   }
-
+*/
   // 相方行のUI更新（ここ変えたよ：強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){
 //    const state = (typeof forcedState === 'boolean') ? forcedState : PINS.has(String(turnKey));
@@ -786,10 +785,7 @@ console.debug('[pinFilter] next=%s (before renderList override)', next);
       st.id = 'cgtn-pinonly-style';
       st.textContent = `
         #cgpt-pin-filter[aria-pressed="true"]{
-          background: #e60033 !important;
-          color: #333 !important;
-          border-color: #e60033 !important;
-          box-shadow: 0 0 0 2px rgba(245,179,0,.25) inset;
+          color: #e60033 !important;
         }
       `;
       document.head.appendChild(st);
@@ -923,10 +919,6 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
         if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.clip'), row, chatId);
 
-//        paintPinRow(row,  isPinnedByKey(turnKey));
-//        if (showClipOnAttach) bindClipPin(row.querySelector('.clip'), art);
-//        if (row)  row.dataset.preview  = previewText || attachLine || '';
-
         window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row);
         window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
 
@@ -963,11 +955,6 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         paintPinRow(row2, on2);
 
         if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.clip'), row2, chatId);
-
-//        paintPinRow(row2, isPinnedByKey(turnKey));
-//        if (showClipOnBody) bindClipPin(row2.querySelector('.clip'), art);
-//        if (row2) row2.dataset.preview = previewText || bodyLine || '';
-
 
         window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row2);
         window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
@@ -1006,7 +993,8 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         }
       });
     }
-
+    const rowsCount = body.querySelectorAll('.row').length;   // ← 空行は .row じゃないので除外される
+    NS._lastVisibleRows = rowsCount;
     NS.updateListFooterInfo();
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
@@ -1042,53 +1030,25 @@ console.debug('[renderList 末尾] done pinsCount=', Object.keys(_pinsCache||{})
     }
   }
 
-function updateListFooterInfo(){
-  try {
-    const t    = window.CGTN_I18N?.t || ((k)=>k);
-    const info = document.getElementById('cgpt-list-foot-info');
-    if (!info) return;
-
-    const total   = ST.all.length; // 全ターン
-    const pinned  = ST.all.filter(a =>
-      CGTN_LOGIC.isPinnedByKey(CGTN_LOGIC.getTurnKey(a))
-    ).length;
-
-    const body = document.getElementById('cgpt-list-body');
-    // ← ★ 実ターンだけをカウント（placeholder除外）
-    const shown = body ? body.querySelectorAll('.row[data-turn]').length : 0;
-
-//    info.textContent = `${shown}${t('listRows')}（${pinned}/${total}${t('listTurns')}）`;
-    info.textContent = `${shown}${t('listRows')} ${total}${t('listTurns')}`;
-  } catch(e){
-    console.warn('updateListFooterInfo failed', e);
-  }
-}
-
-window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
-  updateListFooterInfo,
-  getTurnKey,
-  isPinnedByKey
-});
-
-
-/*
   function updateListFooterInfo(){
     try {
-      const t    = window.CGTN_I18N?.t || ((k)=>k);
-      const info = document.getElementById('cgpt-list-foot-info'); // ← 既存のみ
-      if (!info) return;
+      const info = document.getElementById('cgpt-list-foot-info');
+      const body = document.getElementById('cgpt-list-body');
+      if (!info || !body) return;
 
-      const turns = ST.all.length;
-      info.textContent = `（${turns}${t('listTurns')}）`;
+      info.textContent = `${body.children.length}行（${ST.all.length}ターン中）`;
     } catch(e){
       console.warn('updateListFooterInfo failed', e);
     }
   }
 
+  // --- expose ---
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
-    updateListFooterInfo
+    updateListFooterInfo,                // ← ここはローカル名で参照できる
+    getTurnKey: (NS.getTurnKey || getTurnKey),
+    isPinnedByKey
   });
-*/
+
   // --- navigation ---
   function goTop(role){
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
