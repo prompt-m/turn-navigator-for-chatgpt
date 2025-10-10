@@ -75,21 +75,6 @@
     });
   }
 
-  function migrateObsoleteKeys(cfg){
-    // 使っていないキーは保存前に除去
-    if (cfg?.list) {
-      delete cfg.list.maxItems;   // 表示件数
-      delete cfg.viz?.headOffset; // ヘッダ補正
-    }
-    return cfg;
-  }
-
-  function saveAll(){
-    let cfg = uiToCfg();
-    cfg = migrateObsoleteKeys(cfg);
-    SH.saveSettings(cfg, showSavedToast);
-  }
-
   function showMsg(txt){
     const box = $('msg'); if (!box) return;
     box.textContent = txt;
@@ -105,25 +90,19 @@
     const aliveMap = (cfg.chatIndex && cfg.chatIndex.ids) || {};
     const nowOpen  = cfg.currentChatId || null;
 
-    const rows = Object.entries(pins).map(([cid, rec])=>{
+    const rows = Object.entries(pins).map(([cid, rec]) => {
       const title = String(rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
-      //const count = rec?.pins ? Object.keys(rec.pins).length : 0;
 
-      // rows を作っている所（pinsCount を計算している所）をこれに置換
-      const SH   = window.CGTN_SHARED;
-      const arr  = SH.getPinsArr(chatId);             // ← ★必ず正規化配列で取得
-      const pinsCount = arr.reduce((n, v) => n + (v ? 1 : 0), 0);
-      // 画面表示用の “ONの位置”（必要なら）
-      const turns = arr.map((v, i) => (v ? (i + 1) : null)).filter(Boolean).join(',');
+      // pins はオブジェクト想定：true の数だけを数える
+      const pinsCount = Object.values(rec?.pins || {}).filter(Boolean).length;
 
       const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
       const existsInSidebar = !!aliveMap[cid];
       const isNowOpen = (cid === nowOpen);
-//      const canDelete = !existsInSidebar && !isNowOpen;
-      const canDelete = true;
+      const canDelete = true; // 仕様：常に削除可（必要なら条件に戻す）
 
-      return { cid, title, count, date, canDelete, isNowOpen, existsInSidebar };
-    }).sort((a,b)=> b.count - a.count || (a.title>b.title?1:-1));
+      return { cid, title, count: pinsCount, date, canDelete, isNowOpen, existsInSidebar };
+    }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
 
     if (!rows.length){
       box.innerHTML = `
@@ -144,14 +123,16 @@
       </tr></thead>`,
       '<tbody>',
       ...rows.map(r => {
-        const why = r.isNowOpen ? T('options.nowOpen') : (r.existsInSidebar ? T('options.stillExists') : '');
+        const why = r.isNowOpen ? T('options.nowOpen')
+                  : (r.existsInSidebar ? T('options.stillExists') : '');
+        const dis = r.canDelete ? '' : `disabled title="${titleEscape(why)}"`;
         return `
           <tr data-cid="${r.cid}" data-count="${r.count}">
             <td class="title">${titleEscape(r.title)}</td>
             <td class="count" style="text-align:right">${r.count}</td>
             <td class="date">${r.date}</td>
             <td class="ops">
-              <button class="del" data-cid="${r.cid}" ${r.canDelete?'':`disabled title="${titleEscape(why)}"`}>${T('options.delBtn')}</button>
+              <button class="del" data-cid="${r.cid}" ${dis}>${T('options.delBtn')}</button>
             </td>
           </tr>`;
       }),
@@ -159,14 +140,7 @@
     ].join('');
     box.innerHTML = html;
 
-    // options.js（行生成時の削除ボタン）
-    btn.addEventListener('click', () => {
-      const ok = window.CGTN_SHARED.deletePinsForChat(chatId);
-      if (ok) renderTable(); // 再描画
-    });
-
-/*
-    // 削除ボタン
+    // 削除ボタンの配線
     box.querySelectorAll('button.del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const cid = btn.getAttribute('data-cid');
@@ -174,7 +148,6 @@
         await deletePinsFromOptions(cid);
       });
     });
-*/
 
   }
 
@@ -198,30 +171,34 @@
   document.getElementById('showViz')?.addEventListener('change', (ev)=>{
     const on = !!ev.target.checked;
     // 保存は通常フローでOK。即時反映の通知だけ投げる
-    chrome.tabs.query({ url: '*://chatgpt.com/*' }, tabs=>{
-      tabs.forEach(tab=>{
+      chrome.tabs.query({ url: ['*://chatgpt.com/*','*://chat.openai.com/*'] }, tabs=>{
+        tabs.forEach(tab=>{
         chrome.tabs.sendMessage(tab.id, { type:'cgtn:viz-toggle', on });
       });
     });
   });
 
   async function deletePinsFromOptions(chatId){
-    const yes = confirm('このチャットの付箋データを削除します。よろしいですか？');
+    const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
 
-    await SH.deletePinsForChat(chatId);
-
-    // 現在開いているタブ側を即時同期（同じchatならローカルキャッシュを捨てて再描画）
-    try {
-      chrome.tabs.query({ url: '*://chatgpt.com/*' }, tabs=>{
-        tabs.forEach(tab=>{
-          chrome.tabs.sendMessage(tab.id, { type:'cgtn:pins-deleted', chatId });
+    const ok = await SH.deletePinsForChat(chatId);
+    if (ok){
+      // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）
+      try {
+       const targets = [
+         '*://chatgpt.com/*',
+         '*://chat.openai.com/*'
+       ];
+       chrome.tabs.query({ url: targets }, tabs=>{
+          tabs.forEach(tab=>{
+            chrome.tabs.sendMessage(tab.id, { type:'cgtn:pins-deleted', chatId });
+          });
         });
-      });
-    } catch {}
-
-    renderPinsManager();
-    showSavedToast('削除しました');
+      } catch {}
+      await renderPinsManager();
+      showMsg(T('options.deleted') || 'Deleted');
+    }
   }
 
   // 初期化

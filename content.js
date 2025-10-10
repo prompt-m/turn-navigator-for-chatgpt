@@ -540,21 +540,25 @@
 
 // 基準線の表示ON/OFF 設定画面より受信
   // === options.html からの即時反映メッセージを受ける ===
-  try {
-    chrome.runtime.onMessage.addListener((msg) => {
+  try{
+    chrome.runtime.onMessage.addListener((msg)=>{
       if (!msg || !msg.type) return;
-      if (msg.type === 'cgtn:viz-toggle') {
-        window.CGTN_SHARED?.toggleViz?.(!!msg.on);
-      }
-      if (msg.type === 'cgtn:pins-deleted') {
-        // 開いているチャットの付箋キャッシュを再作成して再描画
-        const chatId = window.CGTN_SHARED?.getChatId?.();
-        if (!chatId || (msg.chatId && msg.chatId !== chatId)) return;
-        LG.hydratePinsCache?.(chatId);
+      if (msg.type === 'cgtn:pins-deleted'){
+        // 表示中のチャットなら一覧をリフレッシュ
+        const cid = SH.getChatId?.();
+        if (!cid || (msg.chatId && msg.chatId !== cid)) return;
+        LG.hydratePinsCache?.(cid);
         LG.renderList?.(true);
       }
+      if (msg.type === 'cgtn:viz-toggle'){
+        const on = !!msg.on;
+        SH.toggleViz?.(on);                       // 基準線の実表示を切替
+        const cb = document.querySelector('#cgpt-viz');
+        if (cb) cb.checked = on;                  // ナビパネルのチェックを同期
+        SH.saveSettingsPatch?.({ showViz: on });  // 状態も保存
+      }
     });
-  } catch {}
+  }catch{}
 
   // ========= 8) サイドバーから会話一覧を1回収集 =========
   const C_ID_RE = /\/c\/([0-9a-f-]{8,})/i;

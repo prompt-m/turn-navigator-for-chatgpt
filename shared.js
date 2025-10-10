@@ -120,7 +120,7 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
 */
-  // エントリ削除（options の「削除」ボタン用）
+/*  // エントリ削除（options の「削除」ボタン用）
   NS.deletePinsForChat = function deletePinsForChat(chatId){
     try {
       const cfg = this.getCFG?.() || {};
@@ -129,6 +129,26 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
       this.saveSettingsPatch({ pinsByChat: cfg.pinsByChat });
       return true;
     } catch(e){
+      console.warn('deletePinsForChat failed', e);
+      return false;
+    }
+  };
+
+*/
+
+  // チャット別の付箋データを削除
+  NS.deletePinsForChat = async function deletePinsForChat(chatId){
+  console.log("deletePinsForChat chatId:",chatId);
+    try{
+      const cur = NS.getCFG?.() || {};
+      const map = { ...(cur.pinsByChat || {}) };
+      if (!chatId || !map[chatId]) return false;
+
+      delete map[chatId];
+
+      await NS.saveSettingsPatch?.({ pinsByChat: map });
+      return true;
+    }catch(e){
       console.warn('deletePinsForChat failed', e);
       return false;
     }
