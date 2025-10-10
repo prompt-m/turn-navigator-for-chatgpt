@@ -13,8 +13,9 @@
   const DEF = (SH.DEFAULTS) || {
     centerBias: 0.40, headerPx: 0, eps: 20, lockMs: 700, showViz: false,
     panel:{ x:null, y:null },
-    list:{ enabled:false, pinOnly:false, maxItems:30, maxChars:40, fontSize:12, w:null, h:null, x:null, y:null }
+    list:{ enabled:false, pinOnly:false, maxItems:30, maxChars:60, fontSize:12, w:null, h:null, x:null, y:null }
   };
+//    list:{ enabled:false, pinOnly:false, maxItems:30, maxChars:40, fontSize:12, w:null, h:null, x:null, y:null }
 
   function sanitize(raw){
     const base = JSON.parse(JSON.stringify(DEF));
@@ -96,48 +97,6 @@
     setTimeout(()=> box.style.display='none', 1200);
   }
 
-  function renderPinsManager(){
-    const root = document.getElementById('pins-manager');
-    const cfg  = SH.getCFG() || {};
-    const by   = cfg.pinsByChat || {};
-    const meta = cfg.chatMeta || {};
-
-    const rows = Object.entries(by).map(([chatId, rec]) => {
-      const title = meta?.[chatId]?.title || '（無題チャット）';
-      const pins  = Array.isArray(rec?.pins) ? rec.pins : [];
-      const count = pins.reduce((a,b)=>a+(b?1:0),0);
-      const updated = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
-      return {chatId, title, count, updated};
-    });
-
-    root.innerHTML = `
-      <div class="pins-table">
-        <div class="hd">チャット</div>
-        <div class="hd">付箋数</div>
-        <div class="hd">更新</div>
-        <div class="hd">操作</div>
-        ${rows.map(r=>`
-          <div class="row" data-chat="${r.chatId}">
-            <div class="title">${SH.escapeHtml(r.title)}</div>
-            <div class="count">${r.count}</div>
-            <div class="updated">${r.updated}</div>
-            <div class="ops"><button class="del">削除</button></div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-
-    root.querySelectorAll('.row .del').forEach(btn=>{
-      btn.addEventListener('click', ev=>{
-        const row   = ev.target.closest('.row');
-        const chatId= row?.dataset?.chat;
-        if (!chatId) return;
-        deletePinsFromOptions(chatId);
-      });
-    });
-  }
-
-/*
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
@@ -148,11 +107,21 @@
 
     const rows = Object.entries(pins).map(([cid, rec])=>{
       const title = String(rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
-      const count = rec?.pins ? Object.keys(rec.pins).length : 0;
+      //const count = rec?.pins ? Object.keys(rec.pins).length : 0;
+
+      // rows を作っている所（pinsCount を計算している所）をこれに置換
+      const SH   = window.CGTN_SHARED;
+      const arr  = SH.getPinsArr(chatId);             // ← ★必ず正規化配列で取得
+      const pinsCount = arr.reduce((n, v) => n + (v ? 1 : 0), 0);
+      // 画面表示用の “ONの位置”（必要なら）
+      const turns = arr.map((v, i) => (v ? (i + 1) : null)).filter(Boolean).join(',');
+
       const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
       const existsInSidebar = !!aliveMap[cid];
       const isNowOpen = (cid === nowOpen);
-      const canDelete = !existsInSidebar && !isNowOpen;
+//      const canDelete = !existsInSidebar && !isNowOpen;
+      const canDelete = true;
+
       return { cid, title, count, date, canDelete, isNowOpen, existsInSidebar };
     }).sort((a,b)=> b.count - a.count || (a.title>b.title?1:-1));
 
@@ -190,18 +159,26 @@
     ].join('');
     box.innerHTML = html;
 
+    // options.js（行生成時の削除ボタン）
+    btn.addEventListener('click', () => {
+      const ok = window.CGTN_SHARED.deletePinsForChat(chatId);
+      if (ok) renderTable(); // 再描画
+    });
+
+/*
     // 削除ボタン
     box.querySelectorAll('button.del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
-        const cid = btn.getAttribute('data-cid'); if (!cid) return;
-        if (!confirm(T('options.delConfirm'))) return;
-        try { SH.deletePinsForChat?.(cid); } catch(e){}
-        await new Promise(r=>setTimeout(r, 80));
-        await renderPinsManager();
+        const cid = btn.getAttribute('data-cid');
+        if (!cid) return;
+        await deletePinsFromOptions(cid);
       });
     });
-  }
 */
+
+  }
+
+
   function titleEscape(s){
     return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -217,7 +194,8 @@
     renderPinsManager();
   });
 
-  document.getElementById('opt-viz-show')?.addEventListener('change', (ev)=>{
+//  document.getElementById('opt-viz-show')?.addEventListener('change', (ev)=>{
+  document.getElementById('showViz')?.addEventListener('change', (ev)=>{
     const on = !!ev.target.checked;
     // 保存は通常フローでOK。即時反映の通知だけ投げる
     chrome.tabs.query({ url: '*://chatgpt.com/*' }, tabs=>{
@@ -249,6 +227,11 @@
   // 初期化
   document.addEventListener('DOMContentLoaded', async () => {
     try{
+
+      // まず視覚ちらつき防止：showViz を一旦OFFにしてからロード
+      const vizBox = document.getElementById('showViz');
+      if (vizBox) vizBox.checked = false;
+
       // 見出し＆ヒント
       const sec = $('pins-manager') || document;
       const h3 = sec.querySelector('h3'); if (h3) h3.textContent = T('options.pinsTitle');
@@ -300,6 +283,35 @@
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') renderPinsManager();
       });
+
+      // オートセーブ + 即時反映
+      // 追加：変更検知→デバウンス保存（200ms）
+      const AUTO_SAVE_MS = 200;
+      let saveTimer = null;
+      function autoSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          const next = uiToCfg();
+          try { SH.saveSettings?.(next, () => showMsg(window.CGTN_I18N?.t?.('options.saved'))); }
+          catch(e){ console.warn('autoSave failed', e); }
+        }, AUTO_SAVE_MS);
+      }
+      // 監視する入力群（number/checkbox）
+      document.querySelectorAll('#cgtn-options input').forEach(el => {
+        el.addEventListener('input', autoSave);
+        el.addEventListener('change', autoSave);
+      });
+      // Extension version 表示
+      try {
+         const m = chrome.runtime.getManifest();
+//         const ver = `${m.name} v${m.version}`;
+         const ver = `${m.name} v${m.version} ${m.version_name ? '('+m.version_name+')' : ''}`.trim();
+
+         const info = document.getElementById('buildInfo');
+         if (info) info.textContent = ver;
+       } catch (e) {
+         console.warn('buildInfo failed', e);
+       }
 
     }catch(e){
       console.error('options init failed', e);

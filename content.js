@@ -539,15 +539,22 @@
   }
 
 // 基準線の表示ON/OFF 設定画面より受信
-  chrome.runtime.onMessage.addListener((msg)=>{
-    if (msg?.type === 'cgtn:viz-toggle') {
-      try{
-        const cfg = SH.getCFG() || {};
-        SH.renderViz?.(cfg, !!msg.on);
-      }catch(e){ console.warn('viz-toggle failed', e); }
-    }
-  });
-
+  // === options.html からの即時反映メッセージを受ける ===
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || !msg.type) return;
+      if (msg.type === 'cgtn:viz-toggle') {
+        window.CGTN_SHARED?.toggleViz?.(!!msg.on);
+      }
+      if (msg.type === 'cgtn:pins-deleted') {
+        // 開いているチャットの付箋キャッシュを再作成して再描画
+        const chatId = window.CGTN_SHARED?.getChatId?.();
+        if (!chatId || (msg.chatId && msg.chatId !== chatId)) return;
+        LG.hydratePinsCache?.(chatId);
+        LG.renderList?.(true);
+      }
+    });
+  } catch {}
 
   // ========= 8) サイドバーから会話一覧を1回収集 =========
   const C_ID_RE = /\/c\/([0-9a-f-]{8,})/i;

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ChatGPT Turn Navigator 設定</title>
   <style>
+
     :root { --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8; }
     @media (prefers-color-scheme: dark){
       :root { --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
@@ -14,15 +15,30 @@
     .desc{ color:var(--muted); margin:0 0 18px; }
     .card{ border:1px solid var(--bd); border-radius:14px; padding:16px; background:var(--pill); }
     .group{ margin:18px 0 0; }
-    .row{ display:grid; grid-template-columns:280px 1fr; gap:14px; align-items:center; padding:10px 0; border-top:1px dashed var(--bd); }
+/*
+    .row {
+      padding: 6px 0;
+      gap: 10px;
+    }
+*/
+    .row{ display:grid; grid-template-columns:280px 1fr; gap:14px; align-items:center; padding:12px 0; border-top:1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent); }
     .row:first-child{ border-top:none; padding-top:0; }
     label b{ font-weight:700; }
     input[type="number"]{ width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); }
     input[type="checkbox"]{ cursor:pointer; }
     .hint{ color:var(--muted); font-size:14px; }
     .actions{ display:flex; gap:10px; margin-top:18px; align-items:center; }
-    button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }
-    @media (prefers-color-scheme: dark){ button{ background:#3a3a40; } }
+/*    button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }*/
+    button{
+      all:unset; display:inline-grid; place-items:center; padding:4px 18px;
+      border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7;
+      box-shadow: 0 6px 24px rgba(0,0,0,.18);          /* ← ナビに寄せた影 */
+    }
+    button:hover { opacity: 1; background: #fff; }
+
+    @media (prefers-color-scheme: dark){
+      button{ background:#3a3a40; box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+    }
 
     /* 付箋テーブル */
     .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }

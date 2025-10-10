@@ -61,6 +61,22 @@
 
   // 上書き保存
   NS.setPinsForChat = function(pinsObj, chatId = NS.getChatId()){
+    const pinsCount = Object.values(pinsObj || {}).filter(Boolean).length;
+    if (pinsCount === 0) return;  // ← 空なら保存しない
+
+    const cfg = NS.getCFG?.() || {};
+    const map = cfg.pinsByChat || {};
+    const title = NS.getChatTitle?.() || map[chatId]?.title || '';
+    map[chatId] = {
+      pins: { ...(pinsObj||{}) },
+      title,
+      updatedAt: Date.now()
+    };
+    NS.saveSettingsPatch?.({ pinsByChat: map });
+  };
+
+/*
+  NS.setPinsForChat = function(pinsObj, chatId = NS.getChatId()){
     const cfg = NS.getCFG?.() || {};
     const map = _ensurePinsByChat(cfg);
     const title = NS.getChatTitle?.() || map[chatId]?.title || '';
@@ -71,7 +87,7 @@
     };
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
-
+*/
   // 件数
   NS.countPinsForChat = function(chatId = NS.getChatId()){
     const cur = NS.getPinsForChat(chatId);
@@ -92,7 +108,7 @@ console.debug('[getPinsForChat] chat=%s count=%d',
     };
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
-
+/*
   // エントリ削除（options の「削除」ボタン用）
   NS.deletePinsForChat = function(chatId){
 console.log("deletePinsForChat chatId:",chatId);
@@ -103,6 +119,21 @@ console.log("deletePinsForChat cfg:",cfg," map",map);
     delete map[chatId];
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
+*/
+  // エントリ削除（options の「削除」ボタン用）
+  NS.deletePinsForChat = function deletePinsForChat(chatId){
+    try {
+      const cfg = this.getCFG?.() || {};
+      if (!cfg.pinsByChat || !cfg.pinsByChat[chatId]) return false;
+      delete cfg.pinsByChat[chatId];
+      this.saveSettingsPatch({ pinsByChat: cfg.pinsByChat });
+      return true;
+    } catch(e){
+      console.warn('deletePinsForChat failed', e);
+      return false;
+    }
+  };
+
 
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
@@ -209,6 +240,7 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
     }
   }
 
+/*
 // 取得（常に配列を返す）
 NS.getPinsArr = function getPinsArr(chatId = NS.getChatId?.()) {
   const cfg  = NS.getCFG?.() || {};
@@ -240,11 +272,42 @@ NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.(
   NS.savePinsArr(arr, chatId);
   return !!next;
 };
+*/
 
-// 件数
-NS.countPinsForChat = function countPinsForChat(chatId = NS.getChatId?.()) {
-  return NS.getPinsArr(chatId).reduce((a, b) => a + (b ? 1 : 0), 0);
-};
+  // すでにあればこのままでOK。なければ追加
+  NS.getPinsArr = function getPinsArr(chatId = NS.getChatId?.()) {
+    const cfg  = NS.getCFG() || {};
+    const rec  = (cfg.pinsByChat || {})[chatId] || {};
+    const raw  = Array.isArray(rec.pins) ? rec.pins : [];
+    // 0/1 の稠密配列に正規化（"1"やtrue等は 1 に揃える）
+    return raw.map(v => (v ? 1 : 0));
+  };
+
+  NS.savePinsArr = function savePinsArr(arr, chatId = NS.getChatId?.()) {
+    const cfg = NS.getCFG() || {};
+    const pinsByChat = { ...(cfg.pinsByChat || {}) };
+    pinsByChat[chatId] = { pins: arr.map(v => (v ? 1 : 0)) };
+    NS.saveSettingsPatch({ pinsByChat });
+  };
+
+  // トグル（1始まり）←この実装でOK
+  NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.()) {
+    if (!Number.isFinite(index1) || index1 < 1) return false;
+    const arr = NS.getPinsArr(chatId).slice();
+    if (arr.length < index1) { const old = arr.length; arr.length = index1; arr.fill(0, old, index1); }
+    const next = arr[index1 - 1] ? 0 : 1;
+    arr[index1 - 1] = next;
+    NS.savePinsArr(arr, chatId);
+    return !!next;
+  };
+
+  // 件数ヘルパ（配列方式に合わせて修正）
+  NS.countPinsForChat = function(chatId = NS.getChatId()){
+    try{
+      const arr = NS.getCFG?.()?.pinsByChat?.[chatId]?.pins || [];
+      return arr.reduce((a,b)=> a + (b ? 1 : 0), 0);
+    }catch{ return 0; }
+  };
 
 /*
   // --- 付箋ON/OFFをトグル保存（配列方式） ---
@@ -325,6 +388,32 @@ NS.countPinsForChat = function countPinsForChat(chatId = NS.getChatId?.()) {
     return { line, band };
   }
 
+  function redrawBaseline(){
+    const { y } = computeAnchor(CFG);
+    const { line, band } = ensureVizElements();
+    line.style.top = `${y}px`;
+    const eps = CFG.eps ?? DEFAULTS.eps;
+    band.style.top = `${y - eps}px`;
+    band.style.height = `${eps * 2}px`;
+  }
+/*
+  // どこかの描画関数と連携している前提
+  function renderViz(cfg, on){
+    // id固定の線/帯を用意して display を切り替える
+    const line = document.getElementById('cgpt-bias-line');
+    const band = document.getElementById('cgpt-bias-band');
+    if (line) line.style.display = on ? 'block' : 'none';
+    if (band) band.style.display = on ? 'block' : 'none';
+  }
+
+  let _visible = false;
+  function toggleViz(on){
+    _visible = (typeof on === 'boolean') ? on : !_visible;
+    renderViz(CFG, _visible);
+    NS.saveSettingsPatch?.({ showViz: _visible });
+  }
+*/
+
   function renderViz(cfg, visible = undefined){
     const { y, eps } = computeAnchor(cfg || CFG);
     const { line, band } = ensureVizElements();
@@ -338,20 +427,13 @@ NS.countPinsForChat = function countPinsForChat(chatId = NS.getChatId?.()) {
     }
   }
 
-  function redrawBaseline(){
-    const { y } = computeAnchor(CFG);
-    const { line, band } = ensureVizElements();
-    line.style.top = `${y}px`;
-    const eps = CFG.eps ?? DEFAULTS.eps;
-    band.style.top = `${y - eps}px`;
-    band.style.height = `${eps * 2}px`;
-  }
-
   let _visible = false;
+
   function toggleViz(on){
     _visible = (typeof on === 'boolean') ? on : !_visible;
     renderViz(CFG, _visible);
   }
+
 
   try {
     chrome?.storage?.onChanged?.addListener?.((changes, area) => {
@@ -372,4 +454,5 @@ NS.countPinsForChat = function countPinsForChat(chatId = NS.getChatId?.()) {
   NS.renderViz = renderViz;
   NS.redrawBaseline = redrawBaseline;
   NS.toggleViz = toggleViz;
+  NS.renderViz  = renderViz;
 })();
