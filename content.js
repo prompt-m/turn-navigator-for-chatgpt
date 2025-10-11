@@ -20,6 +20,7 @@
       try {
         LG.rebuild?.();                  // 1) ST.all を作る
         LG.hydratePinsCache?.(chatId);   // 2) pins -> _pinsCache（引数で固定）
+        if (SH.getCFG?.()?.list?.enabled) LG.renderList?.(true);
         await Promise.resolve(LG.renderList?.()); // 3) 描画（末尾でフッター更新）
       } finally {
         _switchingChatId = null;

@@ -988,7 +988,8 @@ function bindClipPinByIndex(clipEl, rowEl, chatId){
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
     //チャット名を取得しておく
-    window.CGTN_SHARED?.touchChatMeta?.();
+    //window.CGTN_SHARED?.touchChatMeta?.();
+    // 一覧ONではメタを作らない（ピン操作時にだけ作成/更新する）
 
     const panel = ensureListBox();
     panel.style.display = on ? 'flex' : 'none';
@@ -1012,7 +1013,7 @@ function bindClipPinByIndex(clipEl, rowEl, chatId){
     } else {
     }
   }
-
+/*
   function updateListFooterInfo(){
     try {
       const info = document.getElementById('cgpt-list-foot-info');
@@ -1024,6 +1025,34 @@ function bindClipPinByIndex(clipEl, rowEl, chatId){
       console.warn('updateListFooterInfo failed', e);
     }
   }
+*/
+function updateListFooterInfo() {
+  const total = ST.all.length;
+  const cfg = SH.getCFG?.() || {};
+  const listCfg = cfg.list || {};
+  const pinOnly = !!listCfg.pinOnly;   // ← これを追加！
+
+  const info = document.getElementById('cgpt-list-foot-info');
+  if (!info) return;
+
+  const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
+  const T   = (k)=> window.CGTN_I18N?.t?.(k) || k;
+
+  if (pinOnly) {
+    // 付箋ターン数で数える
+    const chatId = SH.getChatId?.();
+    const pins = SH.getPinsForChat?.(chatId);
+    const pinnedCount = Array.isArray(pins)
+      ? pins.filter(Boolean).length
+      : Object.values(pins || {}).filter(Boolean).length;
+
+    info.textContent = fmt(T('list.footer.pinOnly'), { count: pinnedCount, total });
+  } else {
+    info.textContent = fmt(T('list.footer.all'), { total });
+  }
+}
+
+
 
   // --- expose ---
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {

@@ -179,6 +179,7 @@
   });
 
   async function deletePinsFromOptions(chatId){
+console.log("deletePinsFromOptions chatId:",chatId);
     const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
 

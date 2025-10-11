@@ -30,7 +30,7 @@
     .actions{ display:flex; gap:10px; margin-top:18px; align-items:center; }
 /*    button{ all:unset; display:inline-grid; place-items:center; padding:10px 18px; border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7; }*/
     button{
-      all:unset; display:inline-grid; place-items:center; padding:10px 14px;
+      all:unset; display:inline-grid; place-items:center; padding:4px 18px;
       border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7;
       box-shadow: 0 6px 24px rgba(0,0,0,.18);          /* ← ナビに寄せた影 */
     }

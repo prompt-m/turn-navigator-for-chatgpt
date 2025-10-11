@@ -60,6 +60,7 @@
   };
 
   // 上書き保存
+
   NS.setPinsForChat = function(pinsObj, chatId = NS.getChatId()){
     const pinsCount = Object.values(pinsObj || {}).filter(Boolean).length;
     if (pinsCount === 0) return;  // ← 空なら保存しない
@@ -67,6 +68,18 @@
     const cfg = NS.getCFG?.() || {};
     const map = cfg.pinsByChat || {};
     const title = NS.getChatTitle?.() || map[chatId]?.title || '';
+/*
++  const pinsCount = Object.values(pinsObj || {}).filter(Boolean).length;
++  if (pinsCount === 0) return;  // 空なら保存しない
++
++  const cfg = NS.getCFG?.() || {};
++  const map = cfg.pinsByChat || {};
++  // 実チャット画面からのみタイトルを取得（optionsでは既存タイトルを保持）
++  const isChatPage = /chatgpt\.com|chat\.openai\.com/.test(location.hostname);
++  const title = isChatPage
++    ? (NS.getChatTitle?.() || map[chatId]?.title || '')
++    : (map[chatId]?.title || '');
+*/
     map[chatId] = {
       pins: { ...(pinsObj||{}) },
       title,
@@ -75,19 +88,6 @@
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
 
-/*
-  NS.setPinsForChat = function(pinsObj, chatId = NS.getChatId()){
-    const cfg = NS.getCFG?.() || {};
-    const map = _ensurePinsByChat(cfg);
-    const title = NS.getChatTitle?.() || map[chatId]?.title || '';
-    map[chatId] = {
-      pins: { ...(pinsObj||{}) },
-      title,
-      updatedAt: Date.now()
-    };
-    NS.saveSettingsPatch?.({ pinsByChat: map });
-  };
-*/
   // 件数
   NS.countPinsForChat = function(chatId = NS.getChatId()){
     const cur = NS.getPinsForChat(chatId);
@@ -108,52 +108,65 @@ console.debug('[getPinsForChat] chat=%s count=%d',
     };
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
-/*
-  // エントリ削除（options の「削除」ボタン用）
-  NS.deletePinsForChat = function(chatId){
-console.log("deletePinsForChat chatId:",chatId);
-    const cfg = NS.getCFG?.() || {};
-    const map = _ensurePinsByChat(cfg);
-    if (!map[chatId]) return;
-console.log("deletePinsForChat cfg:",cfg," map",map);
-    delete map[chatId];
-    NS.saveSettingsPatch?.({ pinsByChat: map });
-  };
-*/
-/*  // エントリ削除（options の「削除」ボタン用）
+
+  // チャット別の付箋データを削除（ストレージ直叩き／競合に強い）
   NS.deletePinsForChat = function deletePinsForChat(chatId){
-    try {
-      const cfg = this.getCFG?.() || {};
-      if (!cfg.pinsByChat || !cfg.pinsByChat[chatId]) return false;
-      delete cfg.pinsByChat[chatId];
-      this.saveSettingsPatch({ pinsByChat: cfg.pinsByChat });
-      return true;
-    } catch(e){
-      console.warn('deletePinsForChat failed', e);
-      return false;
-    }
+    return new Promise((resolve) => {
+      try {
+        if (!chatId) return resolve(false);
+        chrome.storage.sync.get('cgNavSettings', (store)=>{
+          const st   = store?.cgNavSettings || {};
+          const map  = { ...(st.pinsByChat || {}) };
+          if (!map[chatId]) return resolve(false);   // そもそも無い
+
+          delete map[chatId];
+          const next = { ...st, pinsByChat: map };
+
+          chrome.storage.sync.set({ cgNavSettings: next }, ()=>{
+            // メモリキャッシュも即同期（DEFAULTS を基に安全に再構成）
+            const cfg = structuredClone(DEFAULTS);
+            (function deepMerge(dst, src){
+              for (const k in src){
+                if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) dst[k] = deepMerge(dst[k]||{}, src[k]);
+                else if (src[k] !== undefined) dst[k] = src[k];
+              }
+              return dst;
+            })(cfg, next);
+            CFG = cfg;
+            resolve(true);
+          });
+        });
+      } catch(e){
+        console.warn('deletePinsForChat failed', e);
+        resolve(false);
+      }
+    });
   };
 
-*/
-
-  // チャット別の付箋データを削除
-  NS.deletePinsForChat = async function deletePinsForChat(chatId){
-  console.log("deletePinsForChat chatId:",chatId);
-    try{
+/*
+  NS.deletePinsForChat = async function deletePinsForChat(chatId) {
+    try {
       const cur = NS.getCFG?.() || {};
       const map = { ...(cur.pinsByChat || {}) };
       if (!chatId || !map[chatId]) return false;
 
       delete map[chatId];
 
-      await NS.saveSettingsPatch?.({ pinsByChat: map });
-      return true;
-    }catch(e){
+      // 保存完了を確実に待つ（true/false を受け取る）
+      const ok = await (NS.saveSettingsPatch
+        ? NS.saveSettingsPatch({ pinsByChat: map })
+        : Promise.resolve(false));
+
+      // メモリキャッシュも同期（念押し）
+      CFG = { ...CFG, pinsByChat: map };
+
+      return !!ok;
+    } catch (e) {
       console.warn('deletePinsForChat failed', e);
       return false;
     }
   };
-
+*/
 
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
@@ -260,41 +273,6 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
     }
   }
 
-/*
-// 取得（常に配列を返す）
-NS.getPinsArr = function getPinsArr(chatId = NS.getChatId?.()) {
-  const cfg  = NS.getCFG?.() || {};
-  const rec  = cfg.pinsByChat?.[chatId] || { pins: [] };
-  return Array.isArray(rec.pins) ? rec.pins : [];
-};
-
-// 保存（配列を丸ごと置く）
-NS.savePinsArr = function savePinsArr(arr, chatId = NS.getChatId?.()) {
-  const cfg = NS.getCFG?.() || {};
-  cfg.pinsByChat = cfg.pinsByChat || {};
-  const prev = cfg.pinsByChat[chatId] || {};
-  cfg.pinsByChat[chatId] = {
-    ...prev,
-    pins: arr.slice(),
-    title: prev.title || NS.getChatTitle?.() || '',
-    updatedAt: Date.now()
-  };
-  NS.saveSettingsPatch?.({ pinsByChat: cfg.pinsByChat });
-};
-
-// トグル（index1は1始まり）
-NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.()) {
-  if (!Number.isFinite(index1) || index1 < 1) return false;
-  const arr = NS.getPinsArr(chatId).slice();
-  if (arr.length < index1) { const old = arr.length; arr.length = index1; arr.fill(0, old, index1); }
-  const next = arr[index1 - 1] ? 0 : 1;
-  arr[index1 - 1] = next;
-  NS.savePinsArr(arr, chatId);
-  return !!next;
-};
-*/
-
-  // すでにあればこのままでOK。なければ追加
   NS.getPinsArr = function getPinsArr(chatId = NS.getChatId?.()) {
     const cfg  = NS.getCFG() || {};
     const rec  = (cfg.pinsByChat || {})[chatId] || {};
@@ -329,53 +307,27 @@ NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.(
     }catch{ return 0; }
   };
 
-/*
-  // --- 付箋ON/OFFをトグル保存（配列方式） ---
-  NS.togglePinForChat = function togglePinForChat(turnKey, chatId) {
-    try {
-      const cfg = NS.getCFG() || {};
-      const chat = cfg.pinsByChat?.[chatId] || { pins: [] };
-      const arr = Array.isArray(chat.pins) ? chat.pins : [];
-
-      // turnKey は "turn:12" のような形式を想定
-      const idx = Number(String(turnKey).replace('turn:', '')) - 1;
-      if (isNaN(idx)) return false;
-
-      // 必要に応じて配列拡張
-      if (arr.length <= idx) {
-        const old = arr.length;
-        arr.length = idx + 1;
-        arr.fill(0, old, idx + 1);
+  NS.saveSettingsPatch = function saveSettingsPatch(patch, cb){
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.sync.get('cgNavSettings', (store)=>{
+          const next = structuredClone(DEFAULTS);
+          if (store && store.cgNavSettings) deepMerge(next, store.cgNavSettings);
+          if (!next.list) next.list = structuredClone(DEFAULTS.list);
+          deepMerge(next, patch);
+          CFG = next; // メモリ側も即更新
+          chrome.storage.sync.set({ cgNavSettings: next }, ()=>{
+            try{ cb && cb(); }catch{}
+            resolve(true);
+          });
+        });
+      } catch(e) {
+        // 非同期APIが落ちても最低限は反映
+        deepMerge(CFG, patch);
+        try{ cb && cb(); }catch{}
+        resolve(false);
       }
-
-      // トグル
-      const next = arr[idx] ? 0 : 1;
-      arr[idx] = next;
-
-      (cfg.pinsByChat || (cfg.pinsByChat = {}))[chatId] = { pins: arr };
-      NS.saveSettingsPatch({ pinsByChat: cfg.pinsByChat });
-      return !!next;
-    } catch (e) {
-      console.warn('togglePinForChat failed', e);
-      return false;
-    }
-  }
-*/
-
-  function saveSettingsPatch(patch){
-    try{
-      chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings })=>{
-//console.log("saveSettingsPatch patch:",patch);
-        const next = structuredClone(DEFAULTS);
-        if (cgNavSettings) deepMerge(next, cgNavSettings);
-        if (!next.list) next.list = structuredClone(DEFAULTS.list);
-        deepMerge(next, patch);
-        CFG = next;
-        chrome?.storage?.sync?.set?.({ cgNavSettings: next });
-      });
-    }catch{
-      deepMerge(CFG, patch);
-    }
+    });
   }
 
   function computeAnchor(cfg){
@@ -416,23 +368,6 @@ NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.(
     band.style.top = `${y - eps}px`;
     band.style.height = `${eps * 2}px`;
   }
-/*
-  // どこかの描画関数と連携している前提
-  function renderViz(cfg, on){
-    // id固定の線/帯を用意して display を切り替える
-    const line = document.getElementById('cgpt-bias-line');
-    const band = document.getElementById('cgpt-bias-band');
-    if (line) line.style.display = on ? 'block' : 'none';
-    if (band) band.style.display = on ? 'block' : 'none';
-  }
-
-  let _visible = false;
-  function toggleViz(on){
-    _visible = (typeof on === 'boolean') ? on : !_visible;
-    renderViz(CFG, _visible);
-    NS.saveSettingsPatch?.({ showViz: _visible });
-  }
-*/
 
   function renderViz(cfg, visible = undefined){
     const { y, eps } = computeAnchor(cfg || CFG);
@@ -469,7 +404,7 @@ NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.(
   NS.DEFAULTS = DEFAULTS;
   NS.getCFG = () => CFG;
   NS.loadSettings = loadSettings;
-  NS.saveSettingsPatch = saveSettingsPatch;
+//  NS.saveSettingsPatch = saveSettingsPatch;
   NS.computeAnchor = computeAnchor;
   NS.renderViz = renderViz;
   NS.redrawBaseline = redrawBaseline;
