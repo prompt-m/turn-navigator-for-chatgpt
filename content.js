@@ -620,11 +620,11 @@
   function initialize(){
     SH.loadSettings(() => {
       UI.installUI();
-      SH?.touchChatMeta?.();   // あればメタ更新（try不要な場合のみ）
+//      ↓こいつが悪さしてた
+//      SH?.touchChatMeta?.();   // あればメタ更新（try不要な場合のみ）
 
       ensureFocusPark();
       installFocusStealGuard();
-
       UI.applyLang();
       UI.clampPanelWithinViewport();
 
@@ -647,6 +647,9 @@
       // ★★★ 起動時1回：サイドバー会話一覧を保存（あなたの運用ポリシー） ★★★
       setTimeout(refreshChatIndexOnce, 400);
       watchChatIdChange();
+
+      // ★ここで一発クリーンアップ！
+      SH.cleanupZeroPinRecords();
     });
 
     // viewport 変化でナビ位置クランプ

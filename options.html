@@ -13,7 +13,14 @@
     body{ margin:24px; font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--fg); background:var(--bg); }
     h1{ font-size:28px; margin:0 0 6px; }
     .desc{ color:var(--muted); margin:0 0 18px; }
-    .card{ border:1px solid var(--bd); border-radius:14px; padding:16px; background:var(--pill); }
+    .card{
+      border:1px solid var(--bd);
+      border-radius:14px;
+      padding:16px;
+      background:var(--pill);
+      position: relative;
+      padding-top: 48px;
+    }
     .group{ margin:18px 0 0; }
     .row{ display:grid; grid-template-columns:280px 1fr; gap:14px; align-items:center; padding:12px 0; border-top:1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent); }
     .row:first-child{ border-top:none; padding-top:0; }
@@ -51,20 +58,36 @@
     @media (max-width: 720px){
       .pins-table{ grid-template-columns: 1fr 5rem 9rem 5rem; }
     }
+    /* 右上に貼り付け。枠の内側に少し余白 */
+    .lang-switch{
+      position: absolute;
+      top: 10px;                       /* 枠の上端からの距離 */
+      right: 12px;                     /* 枠の右端からの距離 */
+      display: flex;
+      gap: 8px;
+      z-index: 1;                      /* テーブルより前面に */
+    }
   </style>
 
 </head>
 <body>
   <h1>ChatGPT Turn Navigator 設定</h1>
     <div style="display:flex;justify-content:space-between;align-items:center;">
+<!--
       <div>
         <button id="lang-ja">日本語</button>
         <button id="lang-en">English</button>
       </div>
+-->
     </div>
   <p class="desc">よく使うのは「付箋データ管理」と「一覧パネルの表示設定」です。その他の数値や基準線は詳細設定にまとめました。</p>
 
   <form id="cgtn-options" class="card" autocomplete="off">
+  <!-- 追加：カード右上に貼り付ける -->
+  <div class="lang-switch">
+    <button id="lang-ja">日本語</button>
+    <button id="lang-en">English</button>
+  </div>
     <div class="group">
 
       <!-- ===== メイン1：付箋データ管理 ===== -->

@@ -28,6 +28,18 @@
     pins: {}// ← 付箋（key: true）
   });
 
+  NS.dumpPinsIndex = function(){
+    const cfg = NS.getCFG?.() || {};
+    const map = cfg.pinsByChat || {};
+    const out = Object.entries(map).map(([id, rec]) => ({
+      id, title: rec?.title, pinCount: Array.isArray(rec?.pins) ? rec.pins.filter(Boolean).length
+               : Object.values(rec?.pins||{}).filter(Boolean).length,
+      updatedAt: rec?.updatedAt
+    }));
+    console.table(out);
+    return out;
+  };
+
   // === pinsByChat 保存レイヤ ===
   // chatId の抽出（/c/<id> を最優先、なければパス全体をフォールバック）
   NS.getChatId = function(){
@@ -39,12 +51,26 @@
     } catch { return 'unknown'; }
   };
 
-  // 表示名（options 用に記録）
   NS.getChatTitle = function(){
     try {
-      // ChatGPT系は document.title の先頭で十分
-      return (document.title || '').trim().slice(0,120);
-    } catch { return ''; }
+      const docTitle = (document.title || '').trim();
+      const fromDoc  = docTitle.includes(' - ') ? docTitle.split(' - ')[0].trim() : docTitle;
+      const main = document.querySelector('main') || document.body;
+      const h = main.querySelector('h1, h2, [data-testid="title"], [data-testid*="conversation"]');
+      const fromMain = (h?.textContent || '').trim();
+
+      const cand = (fromMain || fromDoc || '').slice(0,120);
+
+      // ★計測ログ
+      console.debug('[getChatTitle]',
+        { cand, fromMain, fromDoc, path: location.pathname, time: new Date().toISOString() },
+        new Error('trace').stack?.split('\n').slice(1,4).join('\n')); // 上位3フレーム
+
+      return cand; // ← 何も弾かない。純粋に候補を返す
+    } catch(e) {
+      console.warn('[getChatTitle] error', e);
+      return '';
+    }
   };
 
   function _ensurePinsByChat(cfg){
@@ -68,18 +94,7 @@
     const cfg = NS.getCFG?.() || {};
     const map = cfg.pinsByChat || {};
     const title = NS.getChatTitle?.() || map[chatId]?.title || '';
-/*
-+  const pinsCount = Object.values(pinsObj || {}).filter(Boolean).length;
-+  if (pinsCount === 0) return;  // 空なら保存しない
-+
-+  const cfg = NS.getCFG?.() || {};
-+  const map = cfg.pinsByChat || {};
-+  // 実チャット画面からのみタイトルを取得（optionsでは既存タイトルを保持）
-+  const isChatPage = /chatgpt\.com|chat\.openai\.com/.test(location.hostname);
-+  const title = isChatPage
-+    ? (NS.getChatTitle?.() || map[chatId]?.title || '')
-+    : (map[chatId]?.title || '');
-*/
+
     map[chatId] = {
       pins: { ...(pinsObj||{}) },
       title,
@@ -99,13 +114,32 @@ console.debug('[getPinsForChat] chat=%s count=%d',
   // メタだけ更新（タイトル刷新等）
   NS.touchChatMeta = function(chatId = NS.getChatId(), title = NS.getChatTitle()){
     const cfg = NS.getCFG?.() || {};
-    const map = _ensurePinsByChat(cfg);
-    const rec = map[chatId] || {};
-    map[chatId] = {
-      pins: rec.pins || {},
-      title: title || rec.title || '',
-      updatedAt: Date.now()
-    };
+    const map = cfg.pinsByChat || {};
+    const rec = map[chatId];
+    if (!rec) {
+      console.debug('[touchChatMeta] skipped: no record', { chatId, title });
+      return;
+    }
+
+    const oldTitle = rec.title || '';
+    const picked   = oldTitle || title || '(No Title)';
+
+    // ★計測ログ：上書き検知
+    if (picked !== oldTitle) {
+      console.debug('[touchChatMeta] title change intent', {
+        chatId, oldTitle, titleCandidate: title, result: picked, path: location.pathname,
+        time: new Date().toISOString()
+      }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
+    } else {
+      console.debug('[touchChatMeta] keep title', { chatId, oldTitle });
+    }
+
+    map[chatId] = { pins: rec.pins || {}, title: picked, updatedAt: Date.now() };
+
+// 保存前の直前に入れる一行（両方共通）
+if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
+
+
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
 
@@ -239,7 +273,7 @@ console.debug('[getPinsForChat] chat=%s count=%d',
         CFG = next;
         _loaded = true; _resolves.splice(0).forEach(r=>r());
         cb?.();
-console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{})));
+//console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{})));
       });
     }catch{
       CFG = structuredClone(DEFAULTS);
@@ -247,6 +281,17 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
       cb?.();
     }
   }
+
+  NS.cleanupZeroPinRecords = function () {
+    const cfg = NS.getCFG() || {};
+    const map = { ...(cfg.pinsByChat || {}) };
+    let changed = false;
+    for (const [cid, rec] of Object.entries(map)) {
+      const pins = Array.isArray(rec?.pins) ? rec.pins : Object.values(rec?.pins || {});
+      if (!pins.some(Boolean)) { delete map[cid]; changed = true; }
+    }
+    if (changed) NS.saveSettingsPatch({ pinsByChat: map });
+  };
 
   NS.getPinsArr = function getPinsArr(chatId = NS.getChatId?.()) {
     const cfg  = NS.getCFG() || {};
@@ -258,15 +303,48 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
 
   NS.savePinsArr = function savePinsArr(arr, chatId = NS.getChatId?.()) {
     const cfg = NS.getCFG() || {};
-    const pinsByChat = { ...(cfg.pinsByChat || {}) };
-    const title = NS.getChatTitle?.() || pinsByChat[chatId]?.title || '';
-    pinsByChat[chatId] = {
-      pins: arr.map(v => (v ? 1 : 0)),
-      title,
-      updatedAt: Date.now()
-    };
-    NS.saveSettingsPatch({ pinsByChat });
+    const map = { ...(cfg.pinsByChat || {}) };
+    if (!chatId) { console.debug('[savePinsArr] skip: no chatId'); return; }
+
+    const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
+    const hasAny  = safeArr.some(Boolean);
+
+    // 0件なら削除（幽霊防止）※挙動は維持
+    if (!hasAny) {
+      if (map[chatId]) {
+        console.debug('[savePinsArr] delete record because zero pins', { chatId });
+        delete map[chatId];
+        NS.saveSettingsPatch({ pinsByChat: map });
+      } else {
+        console.debug('[savePinsArr] zero pins but record not exist', { chatId });
+      }
+      return;
+    }
+
+    const oldTitle = map[chatId]?.title || '';
+    const newTitle = NS.getChatTitle?.() || '';
+    const title    = oldTitle || newTitle || '(No Title)';
+
+    // ★計測ログ：ここが肝
+    console.debug('[savePinsArr] about to save', {
+      chatId,
+      pinsCount: safeArr.filter(Boolean).length,
+      oldTitle,
+      newTitle,
+      pickedTitle: title,
+      path: location.pathname,
+      time: new Date().toISOString()
+    }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
+
+    map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
+
+// 保存前の直前に入れる一行（両方共通）
+if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
+
+
+    NS.saveSettingsPatch({ pinsByChat: map });
   };
+
 
   // トグル（1始まり）←この実装でOK
   NS.togglePinByIndex = function togglePinByIndex(index1, chatId = NS.getChatId?.()) {
@@ -317,30 +395,6 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
     });
   };
 
-/*
-  NS.saveSettingsPatch = function saveSettingsPatch(patch, cb){
-    return new Promise((resolve) => {
-      try {
-        chrome.storage.sync.get('cgNavSettings', (store)=>{
-          const next = structuredClone(DEFAULTS);
-          if (store && store.cgNavSettings) deepMerge(next, store.cgNavSettings);
-          if (!next.list) next.list = structuredClone(DEFAULTS.list);
-          deepMerge(next, patch);
-          CFG = next; // メモリ側も即更新
-          chrome.storage.sync.set({ cgNavSettings: next }, ()=>{
-            try{ cb && cb(); }catch{}
-            resolve(true);
-          });
-        });
-      } catch(e) {
-        // 非同期APIが落ちても最低限は反映
-        deepMerge(CFG, patch);
-        try{ cb && cb(); }catch{}
-        resolve(false);
-      }
-    });
-  }
-*/
   function computeAnchor(cfg){
     const s = { ...DEFAULTS, ...(cfg||{}) };
     const vh = window.innerHeight || document.documentElement.clientHeight || 0;
