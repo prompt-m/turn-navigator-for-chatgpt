@@ -35,15 +35,20 @@
 
       // --- 「付箋のみ」ボタン（上部トグル） ---
       if (el.closest('#cgpt-pin-filter')) {
-        const btn = el.closest('#cgpt-pin-filter');
-        const cur = !!(SH.getCFG()?.list?.pinOnly);
+        const btn  = el.closest('#cgpt-pin-filter');
+        const cur  = !!(SH.getCFG()?.list?.pinOnly);
         const next = !cur;
 
-        SH.saveSettingsPatch({ list: { ...(SH.getCFG()?.list||{}), pinOnly: next }});
-        btn.setAttribute('aria-pressed', String(next));
+        // 1) cfg 更新（メモリ先更新なので、この時点で CFG は新値）
+        SH.saveSettingsPatch({ list: { ...(SH.getCFG()?.list||{}), pinOnly: next } }, () => {
+          // 2) 描画（新CFGを読む）
+          window.CGTN_LOGIC?.renderList?.(true);
+          // 3) フッター（新CFGを読む）
+          window.CGTN_LOGIC?.updateListFooterInfo?.();
+        });
 
-        // 画面反映
-        window.CGTN_LOGIC?.renderList?.(true, { pinOnlyOverride: next });
+        // UI状態（ARIA）は即時反映でOK
+        btn.setAttribute('aria-pressed', String(next));
         return;
       }
 

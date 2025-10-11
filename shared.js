@@ -143,31 +143,6 @@ console.debug('[getPinsForChat] chat=%s count=%d',
     });
   };
 
-/*
-  NS.deletePinsForChat = async function deletePinsForChat(chatId) {
-    try {
-      const cur = NS.getCFG?.() || {};
-      const map = { ...(cur.pinsByChat || {}) };
-      if (!chatId || !map[chatId]) return false;
-
-      delete map[chatId];
-
-      // 保存完了を確実に待つ（true/false を受け取る）
-      const ok = await (NS.saveSettingsPatch
-        ? NS.saveSettingsPatch({ pinsByChat: map })
-        : Promise.resolve(false));
-
-      // メモリキャッシュも同期（念押し）
-      CFG = { ...CFG, pinsByChat: map };
-
-      return !!ok;
-    } catch (e) {
-      console.warn('deletePinsForChat failed', e);
-      return false;
-    }
-  };
-*/
-
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   NS.setLangResolver = (fn) => { langResolver = fn; };
@@ -284,7 +259,12 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
   NS.savePinsArr = function savePinsArr(arr, chatId = NS.getChatId?.()) {
     const cfg = NS.getCFG() || {};
     const pinsByChat = { ...(cfg.pinsByChat || {}) };
-    pinsByChat[chatId] = { pins: arr.map(v => (v ? 1 : 0)) };
+    const title = NS.getChatTitle?.() || pinsByChat[chatId]?.title || '';
+    pinsByChat[chatId] = {
+      pins: arr.map(v => (v ? 1 : 0)),
+      title,
+      updatedAt: Date.now()
+    };
     NS.saveSettingsPatch({ pinsByChat });
   };
 
@@ -310,6 +290,37 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
   NS.saveSettingsPatch = function saveSettingsPatch(patch, cb){
     return new Promise((resolve) => {
       try {
+        // 1) まずメモリCFGをベースに安全マージ
+        const base = NS.getCFG?.() || structuredClone(DEFAULTS);
+        const next = structuredClone(base);
+        deepMerge(next, patch);
+
+        // 2) メモリを先に更新（ここがキモ）
+        CFG = next; // または NS.setCFG?.(next);
+
+        // 3) 非同期でストレージへ反映
+        chrome.storage.sync.set({ cgNavSettings: next }, () => {
+          try { cb && cb(next); } catch {}
+          resolve(true);
+        });
+      } catch(e) {
+        // storage API が失敗しても、最低限メモリ反映だけは行う
+        try {
+          const base = NS.getCFG?.() || structuredClone(DEFAULTS);
+          const fallback = structuredClone(base);
+          deepMerge(fallback, patch);
+          CFG = fallback; // または NS.setCFG?.(fallback);
+          try { cb && cb(fallback); } catch {}
+        } catch {}
+        resolve(false);
+      }
+    });
+  };
+
+/*
+  NS.saveSettingsPatch = function saveSettingsPatch(patch, cb){
+    return new Promise((resolve) => {
+      try {
         chrome.storage.sync.get('cgNavSettings', (store)=>{
           const next = structuredClone(DEFAULTS);
           if (store && store.cgNavSettings) deepMerge(next, store.cgNavSettings);
@@ -329,7 +340,7 @@ console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{
       }
     });
   }
-
+*/
   function computeAnchor(cfg){
     const s = { ...DEFAULTS, ...(cfg||{}) };
     const vh = window.innerHeight || document.documentElement.clientHeight || 0;

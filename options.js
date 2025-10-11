@@ -170,12 +170,29 @@
 //  document.getElementById('opt-viz-show')?.addEventListener('change', (ev)=>{
   document.getElementById('showViz')?.addEventListener('change', (ev)=>{
     const on = !!ev.target.checked;
+
+    // 1) 設定画面自身へ即時反映
+    try {
+      const cfgNow = (SH.getCFG && SH.getCFG()) || DEF;
+      SH.renderViz?.(cfgNow, on);
+    } catch {}
+    // 2) 設定も保存（他と整合）
+    SH.saveSettingsPatch?.({ showViz: on });
+    // 3) ChatGPT タブにも反映を通知
+    chrome.tabs.query({ url: ['*://chatgpt.com/*','*://chat.openai.com/*'] }, tabs=>{
+      tabs.forEach(tab=>{
+        chrome.tabs.sendMessage(tab.id, { type:'cgtn:viz-toggle', on });
+      });
+    });
+
+/*
     // 保存は通常フローでOK。即時反映の通知だけ投げる
       chrome.tabs.query({ url: ['*://chatgpt.com/*','*://chat.openai.com/*'] }, tabs=>{
         tabs.forEach(tab=>{
         chrome.tabs.sendMessage(tab.id, { type:'cgtn:viz-toggle', on });
       });
     });
+*/
   });
 
   async function deletePinsFromOptions(chatId){

@@ -548,8 +548,13 @@
         // 表示中のチャットなら一覧をリフレッシュ
         const cid = SH.getChatId?.();
         if (!cid || (msg.chatId && msg.chatId !== cid)) return;
+        //LG.hydratePinsCache?.(cid);
+        //LG.renderList?.(true);
         LG.hydratePinsCache?.(cid);
-        LG.renderList?.(true);
+        const wasOpen = !!window.CGTN_SHARED?.getCFG?.()?.list?.enabled;
+        // wasOpen === true のときだけ描画（閉じていれば何もしない）
+        if (wasOpen) window.CGTN_LOGIC?.renderList?.(false);
+
       }
       if (msg.type === 'cgtn:viz-toggle'){
         const on = !!msg.on;
