@@ -369,7 +369,7 @@
 }
 
 /* ナビボタンに軽い立体感をつける */
-#cgpt-nav .cgpt-nav-group > button{
+#cgpt-nav .cgpt-nav-group > button:not(.cgtn-open-settings){
   background: #fff;
   border: 1px solid rgba(0,0,0,.06);
   border-radius: 14px;
@@ -413,10 +413,33 @@
 #cgpt-list-foot { display:flex; align-items:center; gap:6px; }
 #cgpt-list-foot-info { margin-left:auto; }
 
-#cgtn-open-settings{
-  height:28px; padding:0 10px; font-size:24px; border-radius:0px;
+#cgtn-open-settings.cgtn-open-settings {
+  all: unset;
+  font: inherit;                 /* 既存のフォント系を継承 */
+  font-size: 16px;
+  color: var(--fg);
+  background: #fff;
+  border: none;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  line-height: 1;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
 }
-
+#cgtn-open-settings.cgtn-open-settings {
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+#cgtn-open-settings.cgtn-open-settings:hover {
+  background: color-mix(in srgb, #fff 92%, var(--bd) 8%);
+  transform: translateY(-1px);  /* クリック感をほんの少し */
+}
+#cgtn-open-settings.cgtn-open-settings:active {
+  transform: translateY(0);
+}
   `;
   injectCss(BASE_CSS);
 
