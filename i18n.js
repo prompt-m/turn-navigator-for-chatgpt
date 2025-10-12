@@ -46,6 +46,7 @@
       'options.reset': '規定に戻しました',
       'options.nowOpen': '表示中のチャットは削除できません。',
       'options.stillExists': 'チャットがサイドバーに存在します（更新で反映）。',
+      'options.listTitle':  '一覧パネルの表示設定',
       'options.listMaxItems': '最大表示件数（目安: 20–80）',
       'options.listMaxChars': '1行の最大文字数（目安: 30–80）',
       'options.listFontSize': 'フォントサイズ（px）',
@@ -56,6 +57,8 @@
       'options.epsHint':      '小さい=敏感 / 大きい=安定（目安 5–50）',
       'options.headerPx':     'ヘッダー補正 (px)',
       'options.lockMs':       'スクロールロック (ms)',
+      'options.saveBtn':      '保存',
+      'options.resetBtn':     '規定に戻す',
       'opts.title': 'ChatGPT Turn Navigator 設定',
       'opts.tips': 'よく使うのは「付箋データ管理」と「一覧パネルの表示設定」です。その他の数値や基準線は詳細設定にまとめました。',
       'opts.lang.ja': '日本語',
@@ -66,18 +69,7 @@
       'opts.pins.col.updated': '更新',
       'opts.pins.col.action': '操作',
       'opts.pins.btn.delete': '削除',
-      'opts.pins.note': '各チャットの付箋を一覧。不要になったチャットは削除できます。',
-      'opts.title': 'ChatGPT Turn Navigator Settings',
-      'opts.tips': 'You’ll mostly use “Pin Data Manager” and “List Panel Display Settings.” Other numbers and the baseline live under Advanced.',
-      'opts.lang.ja': '日本語',
-      'opts.lang.en': 'English',
-      'opts.pins.section': 'Pin Data Manager',
-      'opts.pins.col.chat': 'Chat',
-      'opts.pins.col.count': 'Pins',
-      'opts.pins.col.updated': 'Updated',
-      'opts.pins.col.action': 'Action',
-      'opts.pins.btn.delete': 'Delete',
-      'opts.pins.note': 'View pins per chat. Remove rows you no longer need.',
+      'opts.pins.note': '各チャットの付箋を一覧。不要になった付箋データは削除できます。',
       // ===== ツールチップ =====
       'nav.top': '先頭へ',
       'nav.bottom': '末尾へ',
@@ -86,6 +78,7 @@
       'nav.lang': 'English / 日本語',
       'nav.viz': '基準線の表示/非表示',
       'nav.list': '一覧の表示/非表示',
+      'nav.openSettings': '設定を開く',
       'nav.drag': 'ドラッグで移動',
       'row.previewBtn': 'クリックでプレビューを表示／もう一度クリックで閉じます',
       'row.pin': 'このターンを付箋 ON/OFF',
@@ -120,7 +113,7 @@
       'attachments': "Attachments",
       // ===== Options (settings screen) =====
       'options.pinsTitle': 'Pinned Data',
-      'options.pinsHint': 'List of pins (pinsByChat) per chat. You can delete data for a specific chat.',
+      'options.pinsHint': 'Displays pinned data per chat. You can delete unneeded pin data.',
       'options.thChat': 'Chat',
       'options.thCount': 'Pins',
       'options.thUpdated': 'Updated',
@@ -134,6 +127,7 @@
       'options.reset': 'Reset to defaults',
       'options.nowOpen': 'Now open chat cannot be deleted.',
       'options.stillExists': 'Chat still exists in the sidebar. Reload to update.',
+      'options.listTitle':  'List Panel Display Settings.',
       'options.listMaxItems': 'Max items (guide: 20–80)',
       'options.listMaxChars': 'Max chars per line (30–80)',
       'options.listFontSize': 'Font size (px)',
@@ -144,6 +138,19 @@
       'options.epsHint':      'Small=sensitive / Large=stable (5–50)',
       'options.headerPx':     'Header offset (px)',
       'options.lockMs':       'Scroll lock (ms)',
+      'options.saveBtn':      'Save',
+      'options.resetBtn':     'Reset',
+      'opts.title': 'ChatGPT Turn Navigator Settings',
+      'opts.tips': 'You’ll mostly use “Pin Data Manager” and “List Panel Display Settings.” Other numbers and the baseline live under Advanced.',
+      'opts.lang.ja': '日本語',
+      'opts.lang.en': 'English',
+      'opts.pins.section': 'Pin Data Manager',
+      'opts.pins.col.chat': 'Chat',
+      'opts.pins.col.count': 'Pins',
+      'opts.pins.col.updated': 'Updated',
+      'opts.pins.col.action': 'Action',
+      'opts.pins.btn.delete': 'Delete',
+      'opts.pins.note': 'Displays pinned data per chat. You can delete unneeded pin data.',
       // ===== Tooltips =====
       'nav.top': 'Go to top',
       'nav.bottom': 'Go to bottom',
@@ -152,6 +159,7 @@
       'nav.lang': 'English / 日本語',
       'nav.viz': 'Show/Hide guide line',
       'nav.list': 'Show/Hide list',
+      'nav.openSettings': 'Open Settings',
       'nav.drag': 'Drag to move',
       'row.previewBtn': 'Click to show preview / Click again to close',
       'row.pin': 'Toggle pin for this turn',
@@ -160,6 +168,15 @@
   };
 
   NS._forceLang = null;
+
+  // 言語を強制切替する関数（全モジュール共通で使用）
+  NS.setLang = function (lang) {
+    NS._forceLang = (lang === 'en' ? 'en' : 'ja');
+    document.documentElement.lang = NS._forceLang;
+    // 共有モジュールにも伝播
+    window.CGTN_SHARED?.updateTooltips?.();   // ツールチップ再翻訳
+    window.CGTN_SHARED?._langHooks?.forEach?.(fn => { try{fn();}catch{} });
+  };
 
   const getLang = () => {
     if (NS._forceLang) return NS._forceLang; // ← 即反映
@@ -175,4 +192,5 @@
 
   NS.getLang = getLang;
   NS.t = t;
+
 })();

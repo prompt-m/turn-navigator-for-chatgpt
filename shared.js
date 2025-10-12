@@ -106,8 +106,7 @@
   // 件数
   NS.countPinsForChat = function(chatId = NS.getChatId()){
     const cur = NS.getPinsForChat(chatId);
-console.debug('[getPinsForChat] chat=%s count=%d',
-  chatId, Object.keys((CFG.pinsByChat?.[chatId]?.pins)||{}).length);
+//console.debug('[getPinsForChat] chat=%s count=%d',chatId, Object.keys((CFG.pinsByChat?.[chatId]?.pins)||{}).length);
     return Object.keys(cur).length;
   };
 
@@ -180,6 +179,7 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   NS.setLangResolver = (fn) => { langResolver = fn; };
+  NS.setLang = (lang) => window.CGTN_I18N?.setLang?.(lang);
 
   function curLang(){
     try {
@@ -326,6 +326,7 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
     const title    = oldTitle || newTitle || '(No Title)';
 
     // ★計測ログ：ここが肝
+/*
     console.debug('[savePinsArr] about to save', {
       chatId,
       pinsCount: safeArr.filter(Boolean).length,
@@ -335,6 +336,7 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
       path: location.pathname,
       time: new Date().toISOString()
     }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
+*/
 
     map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
 

@@ -371,22 +371,22 @@
     clip.setAttribute('aria-pressed', String(!!pinned));
   }
 
-function bindClipPinByIndex(clipEl, rowEl, chatId){
-  clipEl.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const idx1 = Number(rowEl?.dataset?.idx);
-    if (!Number.isFinite(idx1) || idx1 < 1) return;
+  function bindClipPinByIndex(clipEl, rowEl, chatId){
+    clipEl.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const idx1 = Number(rowEl?.dataset?.idx);
+      if (!Number.isFinite(idx1) || idx1 < 1) return;
 
-    const next = SH.togglePinByIndex?.(idx1, chatId);
-    paintPinRow(rowEl, !!next);
-    NS.updateListFooterInfo?.();
+      const next = SH.togglePinByIndex?.(idx1, chatId);
+      paintPinRow(rowEl, !!next);
+      NS.updateListFooterInfo?.();
 
-    // pinOnly 表示中は再描画したい場合 ↓を有効化
-    // const cfg = SH.getCFG() || {};
-    // if (cfg.list?.pinOnly) NS.renderList?.(true);
-  }, { passive:false });
-}
+      // pinOnly 表示中は再描画したい場合 ↓を有効化
+      // const cfg = SH.getCFG() || {};
+      // if (cfg.list?.pinOnly) NS.renderList?.(true);
+    }, { passive:false });
+  }
 
   // 相方行のUI更新（ここ変えたよ：強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){

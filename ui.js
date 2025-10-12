@@ -413,6 +413,10 @@
 #cgpt-list-foot { display:flex; align-items:center; gap:6px; }
 #cgpt-list-foot-info { margin-left:auto; }
 
+#cgtn-open-settings{
+  height:28px; padding:0 10px; font-size:24px; border-radius:0px;
+}
+
   `;
   injectCss(BASE_CSS);
 
@@ -445,6 +449,7 @@
     box.innerHTML = `
       <div id="cgpt-drag" title=""></div>
 
+      <!-- === ユーザー === -->
       <div class="cgpt-nav-group" data-role="user">
         <div class="cgpt-nav-label" data-i18n="user"></div>
         <button data-act="top" data-i18n="top"></button>
@@ -453,6 +458,7 @@
         <button data-act="bottom" data-i18n="bottom"></button>
       </div>
 
+      <!-- === アシスタント === -->
       <div class="cgpt-nav-group" data-role="assistant">
         <div class="cgpt-nav-label" data-i18n="assistant"></div>
         <button data-act="top" data-i18n="top"></button>
@@ -461,25 +467,36 @@
         <button data-act="bottom" data-i18n="bottom"></button>
       </div>
 
+      <!-- === 全体ナビ + 設定 === -->
       <div class="cgpt-nav-group" data-role="all">
         <div class="cgpt-nav-label" data-i18n="all"></div>
+
         <div class="cgpt-grid2">
           <button data-act="top">▲</button>
           <button data-act="bottom">▼</button>
         </div>
+
+        <!-- 言語切替 -->
         <button class="cgpt-lang-btn"></button>
 
-        <label class="cgpt-viz-toggle">
+        <!-- 基準線トグル（非表示） -->
+        <label class="cgpt-viz-toggle" style="display:none !important;">
           <input id="cgpt-viz" type="checkbox" style="accent-color:#888;">
           <span data-i18n="line"></span>
         </label>
 
+        <!-- 一覧表示 -->
         <label class="cgpt-list-toggle">
           <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
+
+        <!-- 設定ボタン -->
+        <button id="cgtn-open-settings" class="cgtn-open-settings" title="設定を開く">⚙</button>
       </div>
     `;
+
+
     document.body.appendChild(box);
 
     // 言語リゾルバ（tooltipsの言語切替に使用）
@@ -558,7 +575,8 @@
       '#cgpt-drag'               : 'nav.drag',
       '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
       '#cgpt-viz'                : 'nav.viz',
-      '#cgpt-list-toggle'        : 'nav.list'
+      '#cgpt-list-toggle'        : 'nav.list',
+      '#cgtn-open-settings'      : 'nav.openSettings'
     }, document);
 
 /*ｺｺｶﾗ*/

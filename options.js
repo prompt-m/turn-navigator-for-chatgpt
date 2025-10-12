@@ -75,6 +75,40 @@
     });
   }
 
+function applyI18N(){
+  const T = (k)=> window.CGTN_I18N?.t?.(k) || k;
+  const set = (id, key)=>{ const n=document.getElementById(id); if(n) n.textContent=T(key); };
+
+  set('opt-title',       'opts.title');
+  set('opt-desc',        'opts.tips');
+
+  set('lang-ja',         'opts.lang.ja');
+  set('lang-en',         'opts.lang.en');
+
+  set('pins-title',      'options.pinsTitle');
+  set('pins-hint',       'options.pinsHint');
+
+  set('sum-list',        'options.listTitle');
+  set('lbl-listMaxChars','options.listMaxChars');
+  set('lbl-listFontSize','options.listFontSize');
+
+  set('sum-advanced',    'options.detailTitle');
+  set('lbl-showViz',     'nav.viz');
+  const hv=document.getElementById('hint-showViz'); if(hv) hv.textContent = T('nav.viz');
+
+  set('lbl-centerBias',  'options.centerBias');
+  const hcb=document.getElementById('hint-centerBias'); if(hcb) hcb.textContent = T('options.centerBiasHint');
+
+  set('lbl-eps',         'options.eps');
+  const he=document.getElementById('hint-eps'); if(he) he.textContent = T('options.epsHint');
+
+  set('lbl-lockMs',      'options.lockMs');
+
+  const sv=document.getElementById('saveBtn');  if(sv) sv.textContent = T('options.saveBtn');
+  const rs=document.getElementById('resetBtn'); if(rs) rs.textContent = T('options.resetBtn');
+}
+
+
   function showMsg(txt){
     const box = $('msg'); if (!box) return;
     box.textContent = txt;
@@ -158,11 +192,13 @@
 
   document.getElementById('lang-ja')?.addEventListener('click', ()=>{
     SH.setLang?.('ja'); // i18n.js にある setter を想定（無ければ自前で保持）
-    applyToUI();        // 再レンダ
+    applyI18N();
+    applyToUI();
     renderPinsManager();
   });
   document.getElementById('lang-en')?.addEventListener('click', ()=>{
     SH.setLang?.('en');
+    applyI18N();
     applyToUI();
     renderPinsManager();
   });
@@ -184,19 +220,9 @@
         chrome.tabs.sendMessage(tab.id, { type:'cgtn:viz-toggle', on });
       });
     });
-
-/*
-    // 保存は通常フローでOK。即時反映の通知だけ投げる
-      chrome.tabs.query({ url: ['*://chatgpt.com/*','*://chat.openai.com/*'] }, tabs=>{
-        tabs.forEach(tab=>{
-        chrome.tabs.sendMessage(tab.id, { type:'cgtn:viz-toggle', on });
-      });
-    });
-*/
   });
 
   async function deletePinsFromOptions(chatId){
-console.log("deletePinsFromOptions chatId:",chatId);
     const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
 
@@ -228,14 +254,15 @@ console.log("deletePinsFromOptions chatId:",chatId);
       if (vizBox) vizBox.checked = false;
 
       // 見出し＆ヒント
-      const sec = $('pins-manager') || document;
-      const h3 = sec.querySelector('h3'); if (h3) h3.textContent = T('options.pinsTitle');
-      const hint = sec.querySelector('.hint'); if (hint) hint.textContent = T('options.pinsHint');
+      //const sec = $('pins-manager') || document;
+      //const h3 = sec.querySelector('h3'); if (h3) h3.textContent = T('options.pinsTitle');
+      //const hint = sec.querySelector('.hint'); if (hint) hint.textContent = T('options.pinsHint');
 
       // 設定ロード→UI反映
       await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
       const cfg = (SH.getCFG && SH.getCFG()) || DEF;
       applyToUI(cfg);
+      applyI18N();
       try { SH.renderViz?.(cfg, !!cfg.showViz); } catch {}
 
       // 付箋テーブル

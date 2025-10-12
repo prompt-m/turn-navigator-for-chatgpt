@@ -82,6 +82,13 @@
         return;
       }
 
+      // --- 設定を開く ---
+      if (el.closest('#cgtn-open-settings')) {
+console.log("#cgtn-open-settings click");
+        chrome.runtime.openOptionsPage?.();
+        return;
+      }
+
       // --- ナビゲーション（Top/Bottom/Prev/Next） ---
       const btn = el.closest('button[data-act]');
       if (btn) {
