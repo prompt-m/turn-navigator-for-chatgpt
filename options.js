@@ -202,8 +202,16 @@ function applyI18N(){
     applyToUI();
     renderPinsManager();
   });
-
-//  document.getElementById('opt-viz-show')?.addEventListener('change', (ev)=>{
+/*
+  // 保存（フォーム送信）
+  document.getElementById('cgtn-options')?.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const cfg = uiToCfg();
+    SH.saveSettingsPatch?.(cfg, ()=>{
+      showMsg(window.CGTN_I18N?.t?.('options.saved')); // ← ここだけ
+    });
+  });
+*/
   document.getElementById('showViz')?.addEventListener('change', (ev)=>{
     const on = !!ev.target.checked;
 

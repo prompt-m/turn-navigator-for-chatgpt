@@ -7,6 +7,7 @@
   <style>
 
     :root { --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8; }
+    :root{ --pins-h: 360px; }                 /* 好みで 300–480px */
     @media (prefers-color-scheme: dark){
       :root { --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
     }
@@ -22,7 +23,15 @@
       padding-top: 48px;
     }
     .group{ margin:18px 0 0; }
-    .row{ display:grid; grid-template-columns:280px 1fr; gap:14px; align-items:center; padding:12px 0; border-top:1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent); }
+    .row{
+      display: grid;
+      grid-template-columns: minmax(180px, 30%) 1fr;  /* ← 可変幅に */
+      grid-template-columns: minmax(180px, 30%) 1fr;  /* ← 左30%/右70% */
+      gap: 14px;
+      align-items: center;
+      padding: 12px 0;
+      border-top: 1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent);
+    }
     .row:first-child{ border-top:none; padding-top:0; }
     label b{ font-weight:700; }
     input[type="number"]{ width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); }
@@ -38,6 +47,27 @@
 
     @media (prefers-color-scheme: dark){
       button{ background:#3a3a40; box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+    }
+    .pins-island{
+      grid-column: 1 / -1;
+      background: var(--bg);
+      border: 1px solid var(--bd);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .pins-wrap{
+      max-height: var(--pins-h);
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-gutter: stable;               /* 横ズレ防止 */
+    }
+    .pins-wrap thead th{
+      position: sticky; top: 0;
+      background: var(--pill);
+      z-index: 1;
+    }
+    @media (max-width: 720px){
+      :root{ --pins-h: min(50vh, 360px); }
     }
 
     /* 付箋テーブル */
@@ -67,6 +97,18 @@
       gap: 8px;
       z-index: 1;                      /* テーブルより前面に */
     }
+    /* クション行（保存・リセット）を常に見えるように */
+    .actions{
+      position: sticky; bottom: 0;
+      background: var(--pill);
+      padding: 12px 0;
+      border-top: 1px solid var(--bd);
+      display: flex; gap: 10px; align-items: center;
+    }
+    .group{ margin: 18px 0 0; }
+    details{ background: transparent; }
+    details[open] summary{ margin-bottom: 8px; }
+
   </style>
 
 </head>
@@ -87,18 +129,16 @@
 
 
   <div class="group">
-    <details class="row" open="false" style="grid-column:1 / -1;">
-      <p class="hint" id="pins-hint" style="margin-top:6px;"></p>
+    <!-- ===== メイン1：付箋データ管理 ===== -->
+    <details class="row" id="pins-section" open="false" style="grid-column:1 / -1;">
       <summary style="cursor:pointer;"><b id="pins-title"></b></summary>
-        <!-- ===== メイン1：付箋データ管理 ===== -->
-        <div class="row" style="border-top:none;">
-          <!--section id="pins-manager" style="grid-column:1 / -1;"-->
-
-            <!--<h3 style="margin:0 0 8px;">付箋データ管理</h3>-->
-            <!--h3 id="pins-title" style="margin:0 0 8px;"></h3-->
+      <p class="hint" id="pins-hint" style="margin-top:6px;"></p>
+      <div class="row" style="border-top:none;">
+        <div class="pins-island">
+          <div class="pins-wrap">
             <div id="pins-table"></div>
-          <!--/section-->
-        </div>
+          </div>
+      </div>
     </details>
 
     <div class="actions">
