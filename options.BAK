@@ -151,30 +151,66 @@
     }
     .section-actions .msg-inline.show{ opacity: 1; }
 
+    #msg-pins {
+      opacity: 0;
+      transition: opacity .25s ease;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    #msg-pins.show {
+      display: block;
+      opacity: 1;
+    }
+    #cgtn-floater{
+      position: fixed;
+      inset: 0;                   /* 画面全体を覆うが pointer-events: none で邪魔しない */
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .cgtn-toast{
+      position: absolute;
+      max-width: 52ch;
+      background: #111;          /* ダーク/ライト両対応の無難色にしたいなら var(--fg)/--bg で調整 */
+      color: #fff;
+      font-size: 14px;
+      line-height: 1.4;
+      padding: 8px 12px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+      opacity: 0;
+      transform: translate(-50%,-50%) scale(.98);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .cgtn-toast.show{
+      opacity: 1;
+      transform: translate(-50%,-50%) scale(1);
+    }
+    @media (prefers-color-scheme: dark){
+      .cgtn-toast{ background:#222; color:#e7e7ea; }
+    }
+
+
   </style>
 
 </head>
 <body>
-  <!--
-  <h1>ChatGPT Turn Navigator 設定</h1>
-  <p class="desc">よく使うのは「付箋データ管理」と「一覧パネルの表示設定」です。その他の数値や基準線は詳細設定にまとめました。  </p>
-  -->
-  <h1 id="opt-title"></h1>
-  <p class="desc" id="opt-desc"></p>
+  <h1 id="opt-title" data-i18n="opts.title"></h1>
+  <p class="desc" id="opt-desc" data-i18n="opts.tips"></p>
 
   <form id="cgtn-options" class="card" autocomplete="off">
 
   <div class="lang-switch">
-    <button id="lang-ja" type="button"></button>
-    <button id="lang-en" type="button"></button>
+    <button id="lang-ja" data-i18n="opts.lang.ja" type="button"></button>
+    <button id="lang-en" data-i18n="opts.lang.en" type="button"></button>
   </div>
 
 
   <div class="group">
     <!-- ===== メイン1：付箋データ管理 ===== -->
     <details class="row" id="pins-section" open="false" style="grid-column:1 / -1;">
-      <summary style="cursor:pointer;"><b id="pins-title"></b></summary>
-      <p class="hint" id="pins-hint" style="margin-top:6px;"></p>
+      <summary style="cursor:pointer;"><b id="pins-title" data-i18n="options.pinsTitle"></b></summary>
+      <p class="hint" id="pins-hint" data-i18n="options.pinsHint" style="margin-top:6px;"></p>
+      <p class="desc hint" id="msg-pins"></p>
       <div class="row" style="border-top:none;">
         <div class="pins-island">
           <div class="pins-wrap">
@@ -183,30 +219,20 @@
       </div>
     </details>
 
-    <!--div class="actions"-->
-      <!-- 保存 -->
-      <!--button id="saveBtn"  type="submit"></button>
-      <!-- 既定に戻す -->
-      <!--button id="resetBtn" type="button"></button>
-      <!-- 保存しました -->
-      <!--p class="desc hint" id="msg" style="display:none;"></p>
-    </div-->
-
-
     <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
     <details class="row" open="false" style="grid-column:1 / -1;">
       <!--一覧パネル-->
-      <summary style="cursor:pointer;"><b id="sum-list"></b></summary>
+      <summary style="cursor:pointer;"><b id="sum-list" data-i18n="options.listTitle"></b></summary>
       <div class="section" style="padding-top:10px;display:grid;gap:10px;">
         <div class="row" style="border-top:none;padding:0;">
           <!--1行の最大文字数-->
-          <label for="listMaxChars"><b id="lbl-listMaxChars"></b></label>
+          <label for="listMaxChars"><b id="lbl-listMaxChars" data-i18n="options.listMaxChars"></b></label>
           <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
         </div>
         <div class="row" style="border-top:none;padding:0;">
           <!--フォントサイズ(px)-->
           <label for="listFontSize"><b id="lbl-listFontSize"></b></label>
-          <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
+          <input id="listFontSize" name="listFontSize" data-i18n="options.listFontSize" type="number" min="8" max="24" step="1" />
         </div>
         <!-- このセクション専用のボタン帯 -->
         <div class="section-actions">
@@ -220,41 +246,41 @@
     <!-- ===== 詳細設定（折りたたみ） ===== -->
     <details class="row" open="false" style="grid-column:1 / -1;">
       <!--詳細設定（基準線とスクロール挙動）-->
-      <summary style="cursor:pointer;"><b id="sum-advanced"></b></summary>
+      <summary style="cursor:pointer;"><b id="sum-advanced" data-i18n="options.detailTitle"></b></summary>
         <div class="section" style="padding-top:10px;display:grid;gap:10px;">
           <!-- 基準線：ON/OFF -->
           <div class="row">
             <!--基準線の表示-->
-            <label for="showViz"><b id="lbl-showViz"></b></label>
+            <label for="showViz"><b id="lbl-showViz" data-i18n="nav.viz"></b></label>
             <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
               <input id="showViz" name="showViz" type="checkbox" />
-              <span id="hint-showViz" class="hint"></span>
+              <span id="hint-showViz" class="hint" data-i18n="nav.viz"></span>
             </label>
           </div>
 
           <!-- Center Bias -->
           <div class="row">
-            <label for="centerBias"><b id="lbl-centerBias"></b></label>
+            <label for="centerBias"><b id="lbl-centerBias" data-i18n="options.centerBias"></b></label>
             <div>
               <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
-              <div class="hint" id="hint-centerBias"></div>
+              <div class="hint" id="hint-centerBias" data-i18n="options.centerBiasHint"></div>
             </div>
           </div>
 
           <div class="row">
             <!--ゆらぎ幅 (EPS Hysteresis)-->
-            <label for="eps"><b id="lbl-eps"></b></label>
+            <label for="eps"><b id="lbl-eps" data-i18n="options.eps"></b></label>
             <div>
               <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
               <!--「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。目安 5–50。-->
-              <div class="hint" id="hint-eps"></div>
+              <div class="hint" id="hint-eps" data-i18n="options.epsHint"></div>
             </div>
           </div>
 
           <!-- その他の挙動 -->
           <div class="row">
             <!--スクロールロック (ms)-->
-            <label for="lockMs"><b id="lbl-lockMs"></b></label>
+            <label for="lockMs"><b id="lbl-lockMs" data-i18n="options.lockMs"></b></label>
             <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
           </div>
 
@@ -273,5 +299,6 @@
   <script src="options.js"></script>
 
   <footer><p class="desc hint" id="buildInfo" style="margin-top:12px;"></p></footer>
+  <div id="cgtn-floater" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

@@ -151,14 +151,48 @@
     }
     .section-actions .msg-inline.show{ opacity: 1; }
 
+    #msg-pins {
+      opacity: 0;
+      transition: opacity .25s ease;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    #msg-pins.show {
+      display: block;
+      opacity: 1;
+    }
+    #cgtn-floater{
+      position: fixed;
+      inset: 0;                   /* 画面全体を覆うが pointer-events: none で邪魔しない */
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .cgtn-toast{
+      position: absolute;
+      max-width: 52ch;
+      background: #111;          /* ダーク/ライト両対応の無難色にしたいなら var(--fg)/--bg で調整 */
+      color: #fff;
+      font-size: 14px;
+      line-height: 1.4;
+      padding: 8px 12px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+      opacity: 0;
+      transform: translate(-50%,-50%) scale(.98);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .cgtn-toast.show{
+      opacity: 1;
+      transform: translate(-50%,-50%) scale(1);
+    }
+    @media (prefers-color-scheme: dark){
+      .cgtn-toast{ background:#222; color:#e7e7ea; }
+    }
+
   </style>
 
 </head>
 <body>
-  <!--
-  <h1>ChatGPT Turn Navigator 設定</h1>
-  <p class="desc">よく使うのは「付箋データ管理」と「一覧パネルの表示設定」です。その他の数値や基準線は詳細設定にまとめました。  </p>
-  -->
   <h1 id="opt-title" data-i18n="opts.title"></h1>
   <p class="desc" id="opt-desc" data-i18n="opts.tips"></p>
 
@@ -175,6 +209,7 @@
     <details class="row" id="pins-section" open="false" style="grid-column:1 / -1;">
       <summary style="cursor:pointer;"><b id="pins-title" data-i18n="options.pinsTitle"></b></summary>
       <p class="hint" id="pins-hint" data-i18n="options.pinsHint" style="margin-top:6px;"></p>
+      <p class="desc hint" id="msg-pins"></p>
       <div class="row" style="border-top:none;">
         <div class="pins-island">
           <div class="pins-wrap">
@@ -182,16 +217,6 @@
           </div>
       </div>
     </details>
-
-    <!--div class="actions"-->
-      <!-- 保存 -->
-      <!--button id="saveBtn"  type="submit"></button>
-      <!-- 既定に戻す -->
-      <!--button id="resetBtn" type="button"></button>
-      <!-- 保存しました -->
-      <!--p class="desc hint" id="msg" style="display:none;"></p>
-    </div-->
-
 
     <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
     <details class="row" open="false" style="grid-column:1 / -1;">
@@ -273,5 +298,6 @@
   <script src="options.js"></script>
 
   <footer><p class="desc hint" id="buildInfo" style="margin-top:12px;"></p></footer>
+  <div id="cgtn-floater" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

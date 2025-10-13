@@ -124,7 +124,50 @@ function applyI18N(){
 }
 */
 
+  // --- pointer tracker（マウス/タッチの最後の位置を保持） ---
+  let _lastPt = { x: window.innerWidth/2, y: window.innerHeight/2 };
+  window.addEventListener('mousemove', e => _lastPt = { x:e.clientX, y:e.clientY }, { passive:true });
+  window.addEventListener('touchstart', e => {
+    const t = e.touches?.[0]; if (t) _lastPt = { x:t.clientX, y:t.clientY };
+  },{ passive:true });
+
+  // --- near-pointer toast ---
+  function toastNearPointer(msg, { ms=1400, dx=18, dy=-22 } = {}){
+    const host = document.getElementById('cgtn-floater');
+    if (!host) return;
+
+    // 画面端でははみ出さない程度にクランプ
+    const x = Math.max(12, Math.min(window.innerWidth-12,  _lastPt.x + dx));
+    const y = Math.max(12, Math.min(window.innerHeight-12, _lastPt.y + dy));
+
+    const el = document.createElement('div');
+    el.className = 'cgtn-toast';
+    el.textContent = msg;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    host.appendChild(el);
+
+    // フェードイン → 一定時間後フェードアウト＆削除
+    requestAnimationFrame(()=> el.classList.add('show'));
+    const t1 = setTimeout(()=> el.classList.remove('show'), ms);
+    const t2 = setTimeout(()=> { el.remove(); }, ms + 220);
+    // 参照持っておくなら el._timers = [t1,t2];
+  }
+
+  function flashMsgPins(key='options.deleted'){
+console.log("flashMsgPins ");
+    const T = window.CGTN_I18N?.t || (s=>s);
+    const el = document.getElementById('msg-pins');
+    if (!el) return;
+    el.textContent = T(key);
+    el.classList.add('show');
+    clearTimeout(el._to);
+    el._to = setTimeout(()=> el.classList.remove('show'), 1600);
+  }
+
+
   function flashMsgInline(id, key='options.saved'){
+console.log("flashMsgInline id:",id);
     const T = window.CGTN_I18N?.t || (s=>s);
     const el = document.getElementById(id);
     if (!el) return;
@@ -133,14 +176,14 @@ function applyI18N(){
     clearTimeout(el._to);
     el._to = setTimeout(()=> el.classList.remove('show'), 1600);
   }
-
+/*
   function showMsg(txt){
     const box = $('msg'); if (!box) return;
     box.textContent = txt;
     box.style.display='block';
     setTimeout(()=> box.style.display='none', 1200);
   }
-
+*/
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
@@ -191,7 +234,7 @@ function applyI18N(){
             <td class="count" style="text-align:right">${r.count}</td>
             <td class="date">${r.date}</td>
             <td class="ops">
-              <button class="del" data-cid="${r.cid}" ${dis}>${T('options.delBtn')}</button>
+              <button type="button" class="del" data-cid="${r.cid}" ${dis}>${T('options.delBtn')}</button>
             </td>
           </tr>`;
       }),
@@ -249,11 +292,14 @@ console.log("lang-en");
   });
 
   async function deletePinsFromOptions(chatId){
+console.log("deletePinsFromOptions");
     const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
 
     const ok = await SH.deletePinsForChat(chatId);
+
     if (ok){
+console.log("deletePinsFromOptions call chatId: ",chatId," OK?:",ok);
       // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）
       try {
        const targets = [
@@ -266,9 +312,15 @@ console.log("lang-en");
           });
         });
       } catch {}
+
       await renderPinsManager();
-      showMsg(T('options.deleted') || 'Deleted');
+console.log("deletePinsFromOptions flashMsgPins直前: ",chatId," OK?:",ok);
+      // 近くにポワン
+      toastNearPointer(T('options.deleted') || 'Deleted');
+//      flashMsgPins('options.deleted');
     }
+console.log("deletePinsFromOptions call chatId: ",chatId," not OK?:",ok);
+
   }
 
   // 初期化
@@ -294,18 +346,25 @@ console.log("lang-en");
       // 付箋テーブル
       await renderPinsManager();
 
-      // 入力で即保存
       const form = $('cgtn-options');
-      form?.addEventListener('input', ()=>{
+      // 入力で即保存
+      form?.addEventListener('input', (ev)=>{
 console.log("入力で即保存");
-        try{
+        try {
           const c2 = uiToCfg();
           SH.saveSettingsPatch?.(c2);
           try { SH.renderViz?.(c2, undefined); } catch {}
-          showMsg(T('options.saved'));
-        }catch(e){ console.warn('input handler failed', e); }
-      });
 
+          // 入力元に応じて表示箇所を切り替え
+          const id = ev.target.id || '';
+          if (id.startsWith('list')) {
+            flashMsgInline('msg-list','options.saved');
+          } else if (['showViz','centerBias','eps','lockMs'].includes(id)) {
+            flashMsgInline('msg-adv','options.saved');
+          }
+        } catch(e){ console.warn('input handler failed', e); }
+      });
+/*
       // submit（明示保存）
       form?.addEventListener('submit', (e)=>{
 console.log("明示保存");
@@ -318,7 +377,8 @@ console.log("明示保存");
           showMsg(T('options.saved'));
         }catch(e){ console.warn('submit failed', e); }
       });
-
+*/
+/*
       // 既定に戻す
       $('resetBtn')?.addEventListener('click', async ()=>{
 console.log("既定に戻す");
@@ -329,7 +389,7 @@ console.log("既定に戻す");
         showMsg(T('options.reset'));
         await renderPinsManager();
       });
-
+*/
       // タブ復帰で再描画
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') renderPinsManager();
@@ -340,6 +400,8 @@ console.log("既定に戻す");
       const AUTO_SAVE_MS = 200;
       let saveTimer = null;
       function autoSave() {
+console.log("autoSave");
+
         clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
           const next = uiToCfg();
