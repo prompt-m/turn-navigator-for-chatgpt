@@ -25,7 +25,9 @@
   SH.setLangResolver?.(SH.getLang);
 
   //付箋上にあるときのマウスポインタ＾
-  const pinCurURL = chrome.runtime.getURL('assets/fpointer_32.cur');
+  const pinCurURL = chrome.runtime.getURL('assets/fpointer.cur');
+  //プレビュー上にあるときのマウスポインタ＾
+  const prvCurURL = chrome.runtime.getURL('assets/ppointer.png');
 
   function injectCss(css){
     const s = document.createElement('style');

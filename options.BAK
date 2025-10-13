@@ -6,8 +6,10 @@
   <title>ChatGPT Turn Navigator 設定</title>
   <style>
 
-    :root { --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8; }
-    :root{ --pins-h: 360px; }                 /* 好みで 300–480px */
+    :root{ --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8; }
+    :root{ --pins-h: 360px; }          /* 300–480px */
+    :root{ --label-col: 220px;}        /* 200–260px */
+
     @media (prefers-color-scheme: dark){
       :root { --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
     }
@@ -23,21 +25,34 @@
       padding-top: 48px;
     }
     .group{ margin:18px 0 0; }
+    /* セクション全幅行（“1列化”して回り込み防止） */
+    .row.full{
+      grid-template-columns: 1fr;     /* ← ここが肝 */
+      grid-column: 1 / -1;            /* 親グリッドを全面使用 */
+      padding-top: 12px;
+    }
+
+    /* full内のrowにもグリッドを適用する */
+    .row.full .row {
+      display: grid;
+      grid-template-columns: var(--label-col) 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
     .row{
       display: grid;
-      grid-template-columns: minmax(180px, 30%) 1fr;  /* ← 可変幅に */
-      grid-template-columns: minmax(180px, 30%) 1fr;  /* ← 左30%/右70% */
+      grid-template-columns: var(--label-col) 1fr;  /* 左固定/右フレキシブル */
       gap: 14px;
       align-items: center;
       padding: 12px 0;
       border-top: 1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent);
     }
-    .row:first-child{ border-top:none; padding-top:0; }
+
     label b{ font-weight:700; }
     input[type="number"]{ width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); }
     input[type="checkbox"]{ cursor:pointer; }
     .hint{ color:var(--muted); font-size:14px; }
-    .actions{ display:flex; gap:10px; margin-top:18px; align-items:center; }
     button{
       all:unset; display:inline-grid; place-items:center; padding:4px 18px;
       border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7;
@@ -86,6 +101,7 @@
     .pins-table .row{ display:contents; } /* 各行＝4セル */
     .pins-table .ops button{ width:100%; }
     @media (max-width: 720px){
+      .row{ grid-template-columns: 1fr; }
       .pins-table{ grid-template-columns: 1fr 5rem 9rem 5rem; }
     }
     /* 右上に貼り付け。枠の内側に少し余白 */
@@ -95,7 +111,7 @@
       right: 12px;                     /* 枠の右端からの距離 */
       display: flex;
       gap: 8px;
-      z-index: 1;                      /* テーブルより前面に */
+      z-index: 2;                      /* テーブルより前面に */
     }
     /* クション行（保存・リセット）を常に見えるように */
     .actions{
@@ -105,6 +121,7 @@
       border-top: 1px solid var(--bd);
       display: flex; gap: 10px; align-items: center;
     }
+
     .group{ margin: 18px 0 0; }
     details{ background: transparent; }
     details[open] summary{ margin-bottom: 8px; }
@@ -150,7 +167,7 @@
       opacity: 0; transition: opacity .15s ease;
     }
     .section-actions .msg-inline.show{ opacity: 1; }
-
+/*
     #msg-pins {
       opacity: 0;
       transition: opacity .25s ease;
@@ -161,6 +178,7 @@
       display: block;
       opacity: 1;
     }
+*/
     #cgtn-floater{
       position: fixed;
       inset: 0;                   /* 画面全体を覆うが pointer-events: none で邪魔しない */
@@ -188,6 +206,20 @@
     @media (prefers-color-scheme: dark){
       .cgtn-toast{ background:#222; color:#e7e7ea; }
     }
+    .section-label{
+      font-weight:600; font-size:15px;
+      margin:18px 0 8px; color:var(--fg);
+    }
+    .section .row{ border-top:none; padding:0; }
+    .section .row + .row{ border-top:1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent); }
+    .section-actions{ grid-column: 1 / -1; }
+
+    .section > .row {
+      display: grid;
+      grid-template-columns: var(--label-col) 1fr;
+      gap: 14px;
+      align-items: center;
+    }
 
 
   </style>
@@ -207,22 +239,23 @@
 
   <div class="group">
     <!-- ===== メイン1：付箋データ管理 ===== -->
-    <details class="row" id="pins-section" open="false" style="grid-column:1 / -1;">
-      <summary style="cursor:pointer;"><b id="pins-title" data-i18n="options.pinsTitle"></b></summary>
-      <p class="hint" id="pins-hint" data-i18n="options.pinsHint" style="margin-top:6px;"></p>
-      <p class="desc hint" id="msg-pins"></p>
-      <div class="row" style="border-top:none;">
-        <div class="pins-island">
-          <div class="pins-wrap">
-            <div id="pins-table"></div>
-          </div>
+    <p class="section-label" data-i18n="options.pinsTitle"></p>
+    <p class="hint" id="pins-hint" data-i18n="options.pinsHint" style="margin-top:6px;"></p>
+
+    <!-- フル幅の1行として配置。入れ子の .row は使わない -->
+    <div class="row full" id="pins-section">
+      <div class="pins-island">
+        <div class="pins-wrap">
+          <div id="pins-table"></div>
+        </div>
       </div>
-    </details>
+    </div>
 
     <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
-    <details class="row" open="false" style="grid-column:1 / -1;">
+    <p class="section-label" data-i18n="options.listTitle"></p>
+    <div class="row full">
       <!--一覧パネル-->
-      <summary style="cursor:pointer;"><b id="sum-list" data-i18n="options.listTitle"></b></summary>
+      <!--summary style="cursor:pointer;"><b id="sum-list" data-i18n="options.listTitle"></b></summary-->
       <div class="section" style="padding-top:10px;display:grid;gap:10px;">
         <div class="row" style="border-top:none;padding:0;">
           <!--1行の最大文字数-->
@@ -241,12 +274,13 @@
           <span class="msg-inline" id="msg-list" aria-live="polite"></span>
         </div>
       </div>
-    </details>
+    </div>
 
     <!-- ===== 詳細設定（折りたたみ） ===== -->
-    <details class="row" open="false" style="grid-column:1 / -1;">
+    <p class="section-label" data-i18n="options.detailTitle"></p>
+    <div class="row full">
       <!--詳細設定（基準線とスクロール挙動）-->
-      <summary style="cursor:pointer;"><b id="sum-advanced" data-i18n="options.detailTitle"></b></summary>
+      <!--summary style="cursor:pointer;"><b id="sum-advanced" data-i18n="options.detailTitle"></b></summary-->
         <div class="section" style="padding-top:10px;display:grid;gap:10px;">
           <!-- 基準線：ON/OFF -->
           <div class="row">
@@ -291,7 +325,7 @@
             <span class="msg-inline" id="msg-adv" aria-live="polite"></span>
           </div>
         </div>
-    </details>
+    </div>
     </div>
   </form>
   <script src="i18n.js"></script>
