@@ -109,6 +109,48 @@
     details{ background: transparent; }
     details[open] summary{ margin-bottom: 8px; }
 
+    /* セクション(=details.row)のまとめ用ラッパ */
+    .section { display:grid; gap:10px; }
+    .section .row{ border-top:none; padding:0; }
+    
+    /* details要素のsummaryを“見出しバー”っぽく、上下の無駄を詰める */
+    details.row > summary{
+      list-style:none; cursor:pointer;
+      margin: 0 -8px 6px; padding: 6px 8px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--pill) 86%, var(--bd) 14%);
+      font-weight: 600;
+    }
+
+    /* セクション末尾のボタン帯（スクロールに流されにくい軽いスティッキー） */
+    .section-actions{
+      position: sticky; bottom: -4px;
+      display:flex; gap:8px; align-items:center;
+      padding: 8px 0 0;
+      background: linear-gradient(to top, var(--pill) 70%, transparent);
+    }
+
+    .section-actions button {
+      all: revert;                    /* ← 「全リセット解除」これで一気に元のボタン仕様を戻す */
+      font: inherit;
+      padding: 6px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--bd);
+      background: var(--pill);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+    .section-actions button:hover {
+      background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%);
+    }
+
+    .section-actions{ display:flex; gap:8px; align-items:center; }
+    .section-actions .msg-inline{
+      margin-left: 6px; font-size: 14px; color: var(--muted);
+      opacity: 0; transition: opacity .15s ease;
+    }
+    .section-actions .msg-inline.show{ opacity: 1; }
+
   </style>
 
 </head>
@@ -123,8 +165,8 @@
   <form id="cgtn-options" class="card" autocomplete="off">
 
   <div class="lang-switch">
-    <button id="lang-ja"></button>
-    <button id="lang-en"></button>
+    <button id="lang-ja" type="button"></button>
+    <button id="lang-en" type="button"></button>
   </div>
 
 
@@ -141,56 +183,57 @@
       </div>
     </details>
 
-    <div class="actions">
+    <!--div class="actions"-->
       <!-- 保存 -->
-      <button id="saveBtn"  type="submit"></button>
+      <!--button id="saveBtn"  type="submit"></button>
       <!-- 既定に戻す -->
-      <button id="resetBtn" type="button"></button>
+      <!--button id="resetBtn" type="button"></button>
       <!-- 保存しました -->
-      <p class="desc hint" id="msg" style="display:none;"></p>
-    </div>
+      <!--p class="desc hint" id="msg" style="display:none;"></p>
+    </div-->
 
 
     <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
     <details class="row" open="false" style="grid-column:1 / -1;">
       <!--一覧パネル-->
       <summary style="cursor:pointer;"><b id="sum-list"></b></summary>
-        <div style="padding-top:10px;display:grid;gap:10px;">
-          <div class="row" style="border-top:none;padding:0;">
-            <!--1行の最大文字数-->
-            <label for="listMaxChars"><b id="lbl-listMaxChars"></b></label>
-            <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
-          </div>
-          <div class="row" style="border-top:none;padding:0;">
-            <!--フォントサイズ(px)-->
-            <label for="listFontSize"><b id="lbl-listFontSize"></b></label>
-            <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
-          </div>
+      <div class="section" style="padding-top:10px;display:grid;gap:10px;">
+        <div class="row" style="border-top:none;padding:0;">
+          <!--1行の最大文字数-->
+          <label for="listMaxChars"><b id="lbl-listMaxChars"></b></label>
+          <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
         </div>
+        <div class="row" style="border-top:none;padding:0;">
+          <!--フォントサイズ(px)-->
+          <label for="listFontSize"><b id="lbl-listFontSize"></b></label>
+          <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
+        </div>
+        <!-- このセクション専用のボタン帯 -->
+        <div class="section-actions">
+          <button id="saveList"  type="button" data-i18n="options.saveBtn"></button>
+          <button id="resetList" type="button" data-i18n="options.resetBtn"></button>
+          <span class="msg-inline" id="msg-list" aria-live="polite"></span>
+        </div>
+      </div>
     </details>
+
     <!-- ===== 詳細設定（折りたたみ） ===== -->
     <details class="row" open="false" style="grid-column:1 / -1;">
       <!--詳細設定（基準線とスクロール挙動）-->
       <summary style="cursor:pointer;"><b id="sum-advanced"></b></summary>
-        <div style="padding-top:10px;display:grid;gap:10px;">
-
+        <div class="section" style="padding-top:10px;display:grid;gap:10px;">
           <!-- 基準線：ON/OFF -->
-          <div class="row" style="border-top:none;padding:0;">
+          <div class="row">
             <!--基準線の表示-->
             <label for="showViz"><b id="lbl-showViz"></b></label>
-            <div>
-              <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
-                <input id="showViz" name="showViz" type="checkbox" />
-                <span id="hint-showViz" class="hint"></span>
-              </label>
-              <div class="hint" id="hint-showVizNote">
-                <!--任意の補足を追加するならここ-->
-              </div>
-            </div>
+            <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
+              <input id="showViz" name="showViz" type="checkbox" />
+              <span id="hint-showViz" class="hint"></span>
+            </label>
           </div>
 
           <!-- Center Bias -->
-          <div class="row" style="border-top:none;padding:0;">
+          <div class="row">
             <label for="centerBias"><b id="lbl-centerBias"></b></label>
             <div>
               <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
@@ -198,7 +241,7 @@
             </div>
           </div>
 
-          <div class="row" style="border-top:none;padding:0;">
+          <div class="row">
             <!--ゆらぎ幅 (EPS Hysteresis)-->
             <label for="eps"><b id="lbl-eps"></b></label>
             <div>
@@ -209,26 +252,21 @@
           </div>
 
           <!-- その他の挙動 -->
-          <div class="row" style="border-top:none;padding:0;">
+          <div class="row">
             <!--スクロールロック (ms)-->
             <label for="lockMs"><b id="lbl-lockMs"></b></label>
             <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
           </div>
 
+          <!-- このセクション専用のボタン帯 -->
+          <div class="section-actions">
+            <button id="saveAdv"  type="button" data-i18n="options.saveBtn"></button>
+            <button id="resetAdv" type="button" data-i18n="options.resetBtn"></button>
+            <span class="msg-inline" id="msg-adv" aria-live="polite"></span>
+          </div>
         </div>
     </details>
-
     </div>
-<!--
-    <div class="actions">
-      <!-- 保存 -->
-      <button id="saveBtn"  type="submit"></button>
-      <!-- 既定に戻す -->
-      <button id="resetBtn" type="button"></button>
-      <!-- 保存しました -->
-      <p class="desc hint" id="msg" style="display:none;"></p>
-    </div>
--->
   </form>
   <script src="i18n.js"></script>
   <script src="shared.js"></script>

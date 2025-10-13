@@ -75,6 +75,19 @@
     });
   }
 
+  function applyI18N(){
+    const T = window.CGTN_I18N?.t || (s=>s);
+    document.querySelectorAll('[data-i18n]').forEach(el=>{
+      const key = el.dataset.i18n;
+      const target = el.dataset.i18nTarget || 'text';   // 'text' | 'placeholder' | 'title' | 'aria-label'
+      const v = T(key);
+      if (target === 'placeholder')      el.placeholder = v;
+      else if (target === 'title')       el.title = v;
+      else if (target === 'aria-label')  el.setAttribute('aria-label', v);
+      else                               el.textContent = v;
+    });
+  }
+/*
 function applyI18N(){
   const T = (k)=> window.CGTN_I18N?.t?.(k) || k;
   const set = (id, key)=>{ const n=document.getElementById(id); if(n) n.textContent=T(key); };
@@ -104,10 +117,22 @@ function applyI18N(){
 
   set('lbl-lockMs',      'options.lockMs');
 
-  const sv=document.getElementById('saveBtn');  if(sv) sv.textContent = T('options.saveBtn');
-  const rs=document.getElementById('resetBtn'); if(rs) rs.textContent = T('options.resetBtn');
+  const sl=document.getElementById('saveList');  if(sl) sl.textContent = T('options.saveBtn');
+  const rl=document.getElementById('resetList'); if(rl) rl.textContent = T('options.resetBtn');
+  const sa=document.getElementById('saveAdv');  if(sa) sa.textContent = T('options.saveBtn');
+  const ra=document.getElementById('resetAdv'); if(ra) ra.textContent = T('options.resetBtn');
 }
+*/
 
+  function flashMsgInline(id, key='options.saved'){
+    const T = window.CGTN_I18N?.t || (s=>s);
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = T(key);
+    el.classList.add('show');
+    clearTimeout(el._to);
+    el._to = setTimeout(()=> el.classList.remove('show'), 1600);
+  }
 
   function showMsg(txt){
     const box = $('msg'); if (!box) return;
@@ -191,27 +216,20 @@ function applyI18N(){
   }
 
   document.getElementById('lang-ja')?.addEventListener('click', ()=>{
+console.log("lang-ja");
     SH.setLang?.('ja'); // i18n.js にある setter を想定（無ければ自前で保持）
     applyI18N();
     applyToUI();
     renderPinsManager();
   });
   document.getElementById('lang-en')?.addEventListener('click', ()=>{
+console.log("lang-en");
     SH.setLang?.('en');
     applyI18N();
     applyToUI();
     renderPinsManager();
   });
-/*
-  // 保存（フォーム送信）
-  document.getElementById('cgtn-options')?.addEventListener('submit', (e)=>{
-    e.preventDefault();
-    const cfg = uiToCfg();
-    SH.saveSettingsPatch?.(cfg, ()=>{
-      showMsg(window.CGTN_I18N?.t?.('options.saved')); // ← ここだけ
-    });
-  });
-*/
+
   document.getElementById('showViz')?.addEventListener('change', (ev)=>{
     const on = !!ev.target.checked;
 
@@ -221,7 +239,7 @@ function applyI18N(){
       SH.renderViz?.(cfgNow, on);
     } catch {}
     // 2) 設定も保存（他と整合）
-    SH.saveSettingsPatch?.({ showViz: on });
+//    SH.saveSettingsPatch?.({ showViz: on });
     // 3) ChatGPT タブにも反映を通知
     chrome.tabs.query({ url: ['*://chatgpt.com/*','*://chat.openai.com/*'] }, tabs=>{
       tabs.forEach(tab=>{
@@ -279,6 +297,7 @@ function applyI18N(){
       // 入力で即保存
       const form = $('cgtn-options');
       form?.addEventListener('input', ()=>{
+console.log("入力で即保存");
         try{
           const c2 = uiToCfg();
           SH.saveSettingsPatch?.(c2);
@@ -289,6 +308,7 @@ function applyI18N(){
 
       // submit（明示保存）
       form?.addEventListener('submit', (e)=>{
+console.log("明示保存");
         e.preventDefault();
         try{
           const c3 = uiToCfg();
@@ -301,6 +321,7 @@ function applyI18N(){
 
       // 既定に戻す
       $('resetBtn')?.addEventListener('click', async ()=>{
+console.log("既定に戻す");
         const def = sanitize(DEF);
         applyToUI(def);
         SH.saveSettingsPatch?.(def);
@@ -331,6 +352,45 @@ function applyI18N(){
         el.addEventListener('input', autoSave);
         el.addEventListener('change', autoSave);
       });
+
+      // 一覧セクションの保存
+      document.getElementById('saveList')?.addEventListener('click', ()=>{
+        const cur = SH.getCFG() || {};
+        const patch = {
+          list:{
+            ...(cur.list||{}),
+            maxChars: +document.getElementById('listMaxChars').value,
+            fontSize: +document.getElementById('listFontSize').value
+          }
+        };
+        SH.saveSettingsPatch?.(patch, ()=> flashMsgInline('msg-list','options.saved'));
+      });
+
+      // 詳細セクションの保存
+      document.getElementById('saveAdv')?.addEventListener('click', ()=>{
+        const patch = {
+          showViz: !!document.getElementById('showViz').checked,
+          centerBias: +document.getElementById('centerBias').value,
+          eps: +document.getElementById('eps').value,
+          lockMs: +document.getElementById('lockMs').value
+        };
+        SH.saveSettingsPatch?.(patch, ()=>{
+          try{ SH.renderViz?.(patch, patch.showViz); }catch{}
+          flashMsgInline('msg-adv','options.saved');
+        });
+      });
+
+      // リセット時も同様に
+      document.getElementById('resetList')?.addEventListener('click', ()=>{
+        // 値戻し→保存…
+        flashMsgInline('msg-list','options.reset');
+      });
+      document.getElementById('resetAdv')?.addEventListener('click', ()=>{
+        // 値戻し→保存…
+        flashMsgInline('msg-adv','options.reset');
+      });
+
+
       // Extension version 表示
       try {
          const m = chrome.runtime.getManifest();
