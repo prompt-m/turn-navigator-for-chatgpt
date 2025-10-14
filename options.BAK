@@ -5,334 +5,222 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ChatGPT Turn Navigator 設定</title>
   <style>
-
-    :root{ --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8; }
-    :root{ --pins-h: 360px; }          /* 300–480px */
-    :root{ --label-col: 220px;}        /* 200–260px */
-
-    @media (prefers-color-scheme: dark){
-      :root { --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
+    :root{
+      --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8;
+      --label-col: 300px;      /* ラベル固定幅（200–300で調整） */
+      --pins-h: 360px;         /* 付箋島の最大高さ */
+      --radius: 12px;
     }
-    body{ margin:24px; font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--fg); background:var(--bg); }
+    @media (prefers-color-scheme: dark){
+      :root{ --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
+    }
+
+    /* base */
+    body{
+      margin:24px;
+      font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      color:var(--fg);
+      background:var(--bg);
+      line-height: 1.0;
+    }
     h1{ font-size:28px; margin:0 0 6px; }
-    .desc{ color:var(--muted); margin:0 0 18px; }
+    .desc{ color:var(--muted); margin:0 0 1px; }
+
+    /* card */
     .card{
+      position:relative;
       border:1px solid var(--bd);
-      border-radius:14px;
-      padding:16px;
+      border-radius:var(--radius);
       background:var(--pill);
-      position: relative;
-      padding-top: 48px;
-    }
-    .group{ margin:18px 0 0; }
-    /* セクション全幅行（“1列化”して回り込み防止） */
-    .row.full{
-      grid-template-columns: 1fr;     /* ← ここが肝 */
-      grid-column: 1 / -1;            /* 親グリッドを全面使用 */
-      padding-top: 12px;
+      padding:24px;
+      padding-top:56px; /* 言語トグル分 */
     }
 
-    /* full内のrowにもグリッドを適用する */
-    .row.full .row {
-      display: grid;
-      grid-template-columns: var(--label-col) 1fr;
-      gap: 14px;
-      align-items: center;
-    }
-
-    .row{
-      display: grid;
-      grid-template-columns: var(--label-col) 1fr;  /* 左固定/右フレキシブル */
-      gap: 14px;
-      align-items: center;
-      padding: 12px 0;
-      border-top: 1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent);
-    }
-
-    label b{ font-weight:700; }
-    input[type="number"]{ width:180px; padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); }
-    input[type="checkbox"]{ cursor:pointer; }
-    .hint{ color:var(--muted); font-size:14px; }
-    button{
-      all:unset; display:inline-grid; place-items:center; padding:4px 18px;
-      border-radius:10px; border:1px solid var(--bd); cursor:pointer; background:#f2f2f7;
-      box-shadow: 0 6px 24px rgba(0,0,0,.18);          /* ← ナビに寄せた影 */
-    }
-    button:hover { opacity: 1; background: #fff; }
-
-    @media (prefers-color-scheme: dark){
-      button{ background:#3a3a40; box-shadow: 0 6px 24px rgba(0,0,0,.28); }
-    }
-    .pins-island{
-      grid-column: 1 / -1;
-      background: var(--bg);
-      border: 1px solid var(--bd);
-      border-radius: 12px;
-      padding: 10px 12px;
-    }
-    .pins-wrap{
-      max-height: var(--pins-h);
-      overflow-y: auto;
-      overflow-x: hidden;
-      scrollbar-gutter: stable;               /* 横ズレ防止 */
-    }
-    .pins-wrap thead th{
-      position: sticky; top: 0;
-      background: var(--pill);
-      z-index: 1;
-    }
-    @media (max-width: 720px){
-      :root{ --pins-h: min(50vh, 360px); }
-    }
-
-    /* 付箋テーブル */
-    .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
-    .cgtn-pins-table th, .cgtn-pins-table td{ border-bottom:1px solid rgba(0,0,0,.08); padding:6px 8px; }
-    .cgtn-pins-table .ops button{ padding:4px 8px; cursor:pointer; }
-    .cgtn-pins-table tr:hover{ background:rgba(0,0,0,.03); }
-    .cgtn-pins-table tr[data-count="0"]{ opacity:.6; }
-    .pins-table{
-      display:grid;
-      grid-template-columns: 1fr 7rem 12rem 6rem; /* チャット / 付箋数 / 更新 / 操作 */
-      gap:10px 16px;
-      align-items:center;
-    }
-    .pins-table .hd{ font-weight:600; opacity:.8; }
-    .pins-table .row{ display:contents; } /* 各行＝4セル */
-    .pins-table .ops button{ width:100%; }
-    @media (max-width: 720px){
-      .row{ grid-template-columns: 1fr; }
-      .pins-table{ grid-template-columns: 1fr 5rem 9rem 5rem; }
-    }
-    /* 右上に貼り付け。枠の内側に少し余白 */
+    /* lang switch */
     .lang-switch{
-      position: absolute;
-      top: 10px;                       /* 枠の上端からの距離 */
-      right: 12px;                     /* 枠の右端からの距離 */
-      display: flex;
-      gap: 8px;
-      z-index: 2;                      /* テーブルより前面に */
+      position:absolute; top:12px; right:14px; z-index:2;
+      display:flex; gap:8px;
     }
-    /* クション行（保存・リセット）を常に見えるように */
-    .actions{
-      position: sticky; bottom: 0;
-      background: var(--pill);
-      padding: 12px 0;
-      border-top: 1px solid var(--bd);
-      display: flex; gap: 10px; align-items: center;
+    .pill-btn{
+      all:unset; cursor:pointer; display:inline-grid; place-items:center;
+      padding:6px 14px; border:1px solid var(--bd); border-radius:10px; background:#f2f2f7;
+      box-shadow:0 6px 24px rgba(0,0,0,.18);
     }
-
-    .group{ margin: 18px 0 0; }
-    details{ background: transparent; }
-    details[open] summary{ margin-bottom: 8px; }
-
-    /* セクション(=details.row)のまとめ用ラッパ */
-    .section { display:grid; gap:10px; }
-    .section .row{ border-top:none; padding:0; }
-    
-    /* details要素のsummaryを“見出しバー”っぽく、上下の無駄を詰める */
-    details.row > summary{
-      list-style:none; cursor:pointer;
-      margin: 0 -8px 6px; padding: 6px 8px;
-      border-radius: 8px;
-      background: color-mix(in srgb, var(--pill) 86%, var(--bd) 14%);
-      font-weight: 600;
-    }
-
-    /* セクション末尾のボタン帯（スクロールに流されにくい軽いスティッキー） */
-    .section-actions{
-      position: sticky; bottom: -4px;
-      display:flex; gap:8px; align-items:center;
-      padding: 8px 0 0;
-      background: linear-gradient(to top, var(--pill) 70%, transparent);
-    }
-
-    .section-actions button {
-      all: revert;                    /* ← 「全リセット解除」これで一気に元のボタン仕様を戻す */
-      font: inherit;
-      padding: 6px 18px;
-      border-radius: 10px;
-      border: 1px solid var(--bd);
-      background: var(--pill);
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,.12);
-    }
-    .section-actions button:hover {
-      background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%);
-    }
-
-    .section-actions{ display:flex; gap:8px; align-items:center; }
-    .section-actions .msg-inline{
-      margin-left: 6px; font-size: 14px; color: var(--muted);
-      opacity: 0; transition: opacity .15s ease;
-    }
-    .section-actions .msg-inline.show{ opacity: 1; }
-/*
-    #msg-pins {
-      opacity: 0;
-      transition: opacity .25s ease;
-      color: var(--muted);
-      margin-top: 6px;
-    }
-    #msg-pins.show {
-      display: block;
-      opacity: 1;
-    }
-*/
-    #cgtn-floater{
-      position: fixed;
-      inset: 0;                   /* 画面全体を覆うが pointer-events: none で邪魔しない */
-      pointer-events: none;
-      z-index: 9999;
-    }
-    .cgtn-toast{
-      position: absolute;
-      max-width: 52ch;
-      background: #111;          /* ダーク/ライト両対応の無難色にしたいなら var(--fg)/--bg で調整 */
-      color: #fff;
-      font-size: 14px;
-      line-height: 1.4;
-      padding: 8px 12px;
-      border-radius: 12px;
-      box-shadow: 0 8px 30px rgba(0,0,0,.25);
-      opacity: 0;
-      transform: translate(-50%,-50%) scale(.98);
-      transition: opacity .18s ease, transform .18s ease;
-    }
-    .cgtn-toast.show{
-      opacity: 1;
-      transform: translate(-50%,-50%) scale(1);
-    }
+    .pill-btn:hover{ background:#fff; }
     @media (prefers-color-scheme: dark){
-      .cgtn-toast{ background:#222; color:#e7e7ea; }
-    }
-    .section-label{
-      font-weight:600; font-size:15px;
-      margin:18px 0 8px; color:var(--fg);
-    }
-    .section .row{ border-top:none; padding:0; }
-    .section .row + .row{ border-top:1.5px dashed color-mix(in srgb, var(--bd) 60%, transparent); }
-    .section-actions{ grid-column: 1 / -1; }
-
-    .section > .row {
-      display: grid;
-      grid-template-columns: var(--label-col) 1fr;
-      gap: 14px;
-      align-items: center;
+      .pill-btn{ background:#3a3a40; box-shadow:0 6px 24px rgba(0,0,0,.28); }
     }
 
+    /* section block：左バー＋インデント */
+    .section-block{
+      display:grid; grid-template-columns: 12px 1fr; gap:10px; margin-bottom:20px;
+    }
+    .section-block::before{
+      content:""; display:block; width:4px; margin-top:6px; border-radius:3px;
+      background:color-mix(in srgb, var(--fg) 30%, transparent);
+    }
+    .section-inner{ display:flex; flex-direction:column; gap:5px; }/*gap:12px*/
+    .section-title{ font-size:18px; font-weight:700; margin-top:10px; margin-bottom:4px; }
+    .hint{ color:var(--muted); font-size:14px; margin-bottom:1px}
 
+    /* 設定行：ラベル左固定／入力右フレキシブル */
+    .settings{
+      font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      display:grid; grid-template-columns: var(--label-col) 1fr;
+      gap:14px; align-items:center;
+      background:var(--bg); border:1px solid var(--bd); border-radius:10px;
+      padding:4px 10px;/*14px 16px*/
+    }
+    .settings + .settings{ margin-top:10px; }
+    label{ font-weight:600; }
+
+    input[type="number"], input[type="text"]{
+      width:220px; max-width:100%;
+      padding:8px 10px; border-radius:10px; border:1px solid var(--bd);
+      background:var(--bg); color:var(--fg);
+    }
+    input[type="checkbox"]{ cursor:pointer; }
+
+    /* 保存帯（軽いスティッキー） */
+    .section-actions{
+      position:sticky; bottom:-4px;
+      display:flex; gap:8px; align-items:center;
+      padding-top:8px;
+      background:linear-gradient(to top, var(--pill) 70%, transparent);
+    }
+    .btn{
+      all:revert; font:inherit; cursor:pointer;
+      padding:6px 18px; border-radius:10px; border:1px solid var(--bd); background:var(--pill);
+      box-shadow:0 2px 8px rgba(0,0,0,.12);
+    }
+    .btn:hover{ background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%); }
+    .msg-inline{
+      margin-left:6px; font-size:14px; color:var(--muted);
+      opacity:0; transition:opacity .15s ease;
+    }
+    .msg-inline.show{ opacity:1; }
+
+    /* 付箋アイランド */
+    .island{
+      background:var(--bg); border:1px solid var(--bd); border-radius:10px; padding:12px;
+    }
+    .pins-wrap{ max-height:var(--pins-h); overflow:auto; scrollbar-gutter:stable; }
+    .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
+    .cgtn-pins-table th, .cgtn-pins-table td{ padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.08); }
+    .cgtn-pins-table thead th{ position:sticky; top:0; background:var(--pill); z-index:1; }
+
+    /* responsive */
+    @media (max-width:720px){
+      :root{ --label-col: 160px; --pins-h:min(50vh,360px); }
+      .settings{ grid-template-columns: 1fr; }
+    }
+
+    /* 補助 */
+    footer .desc{ margin-top:12px; }
+    #cgtn-floater{ position:fixed; inset:0; pointer-events:none; z-index:9999; }
   </style>
-
 </head>
 <body>
   <h1 id="opt-title" data-i18n="opts.title"></h1>
   <p class="desc" id="opt-desc" data-i18n="opts.tips"></p>
 
   <form id="cgtn-options" class="card" autocomplete="off">
+    <!-- 言語トグル（既存 i18n.js と互換ID） -->
+    <div class="lang-switch">
+      <button id="lang-ja" class="pill-btn" type="button" data-i18n="opts.lang.ja"></button>
+      <button id="lang-en" class="pill-btn" type="button" data-i18n="opts.lang.en"></button>
+    </div>
 
-  <div class="lang-switch">
-    <button id="lang-ja" data-i18n="opts.lang.ja" type="button"></button>
-    <button id="lang-en" data-i18n="opts.lang.en" type="button"></button>
-  </div>
-
-
-  <div class="group">
-    <!-- ===== メイン1：付箋データ管理 ===== -->
-    <p class="section-label" data-i18n="options.pinsTitle"></p>
-    <p class="hint" id="pins-hint" data-i18n="options.pinsHint" style="margin-top:6px;"></p>
-
-    <!-- フル幅の1行として配置。入れ子の .row は使わない -->
-    <div class="row full" id="pins-section">
-      <div class="pins-island">
-        <div class="pins-wrap">
-          <div id="pins-table"></div>
+    <!-- ===== 付箋データ管理 ===== -->
+    <div class="section-block">
+      <div class="section-inner">
+        <div class="section-title" data-i18n="options.pinsTitle"></div>
+        <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
+        <div class="island">
+          <div class="pins-wrap">
+            <!-- テーブルは options.js が #pins-table に描画 -->
+            <div id="pins-table"></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ===== メイン2：一覧パネルの表示設定 ===== -->
-    <p class="section-label" data-i18n="options.listTitle"></p>
-    <div class="row full">
-      <!--一覧パネル-->
-      <!--summary style="cursor:pointer;"><b id="sum-list" data-i18n="options.listTitle"></b></summary-->
-      <div class="section" style="padding-top:10px;display:grid;gap:10px;">
-        <div class="row" style="border-top:none;padding:0;">
-          <!--1行の最大文字数-->
+    <!-- ===== 一覧パネルの表示設定（保存帯つき） ===== -->
+    <div class="section-block">
+      <div class="section-inner">
+        <div class="section-title" data-i18n="options.listTitle"></div>
+
+        <div class="settings">
           <label for="listMaxChars"><b id="lbl-listMaxChars" data-i18n="options.listMaxChars"></b></label>
           <input id="listMaxChars" name="listMaxChars" type="number" min="10" max="200" step="1" />
         </div>
-        <div class="row" style="border-top:none;padding:0;">
-          <!--フォントサイズ(px)-->
-          <label for="listFontSize"><b id="lbl-listFontSize"></b></label>
-          <input id="listFontSize" name="listFontSize" data-i18n="options.listFontSize" type="number" min="8" max="24" step="1" />
+
+        <div class="settings">
+          <label for="listFontSize"><b id="lbl-listFontSize" data-i18n="options.listFontSize"></b></label>
+          <input id="listFontSize" name="listFontSize" type="number" min="8" max="24" step="1" />
         </div>
-        <!-- このセクション専用のボタン帯 -->
+
         <div class="section-actions">
-          <button id="saveList"  type="button" data-i18n="options.saveBtn"></button>
-          <button id="resetList" type="button" data-i18n="options.resetBtn"></button>
-          <span class="msg-inline" id="msg-list" aria-live="polite"></span>
+          <button id="saveList"  class="btn" type="button" data-i18n="options.saveBtn"></button>
+          <button id="resetList" class="btn" type="button" data-i18n="options.resetBtn"></button>
+          <span  id="msg-list"  class="msg-inline" aria-live="polite"></span>
         </div>
       </div>
     </div>
 
-    <!-- ===== 詳細設定（折りたたみ） ===== -->
-    <p class="section-label" data-i18n="options.detailTitle"></p>
-    <div class="row full">
-      <!--詳細設定（基準線とスクロール挙動）-->
-      <!--summary style="cursor:pointer;"><b id="sum-advanced" data-i18n="options.detailTitle"></b></summary-->
-        <div class="section" style="padding-top:10px;display:grid;gap:10px;">
-          <!-- 基準線：ON/OFF -->
-          <div class="row">
-            <!--基準線の表示-->
-            <label for="showViz"><b id="lbl-showViz" data-i18n="nav.viz"></b></label>
+    <!-- ===== 詳細設定（保存帯つき） ===== -->
+    <div class="section-block">
+      <div class="section-inner">
+        <div class="section-title" data-i18n="options.detailTitle"></div>
+
+        <div class="settings">
+          <label for="showViz"><b id="lbl-showViz" data-i18n="nav.viz"></b></label>
+          <div>
             <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer;">
               <input id="showViz" name="showViz" type="checkbox" />
-              <span id="hint-showViz" class="hint" data-i18n="nav.viz"></span>
+              <span class="hint" id="hint-showViz" data-i18n="nav.viz"></span>
             </label>
           </div>
+        </div>
 
-          <!-- Center Bias -->
-          <div class="row">
-            <label for="centerBias"><b id="lbl-centerBias" data-i18n="options.centerBias"></b></label>
-            <div>
-              <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
-              <div class="hint" id="hint-centerBias" data-i18n="options.centerBiasHint"></div>
-            </div>
-          </div>
-
-          <div class="row">
-            <!--ゆらぎ幅 (EPS Hysteresis)-->
-            <label for="eps"><b id="lbl-eps" data-i18n="options.eps"></b></label>
-            <div>
-              <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
-              <!--「同じ記事とみなす」幅。小さい=敏感 / 大きい=安定。目安 5–50。-->
-              <div class="hint" id="hint-eps" data-i18n="options.epsHint"></div>
-            </div>
-          </div>
-
-          <!-- その他の挙動 -->
-          <div class="row">
-            <!--スクロールロック (ms)-->
-            <label for="lockMs"><b id="lbl-lockMs" data-i18n="options.lockMs"></b></label>
-            <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
-          </div>
-
-          <!-- このセクション専用のボタン帯 -->
-          <div class="section-actions">
-            <button id="saveAdv"  type="button" data-i18n="options.saveBtn"></button>
-            <button id="resetAdv" type="button" data-i18n="options.resetBtn"></button>
-            <span class="msg-inline" id="msg-adv" aria-live="polite"></span>
+        <div class="settings">
+          <label for="centerBias"><b id="lbl-centerBias" data-i18n="options.centerBias"></b></label>
+          <div>
+            <input id="centerBias" name="centerBias" type="number" step="0.01" min="0" max="1" />
+            <div class="hint" id="hint-centerBias" data-i18n="options.centerBiasHint"></div>
           </div>
         </div>
-    </div>
+
+        <div class="settings">
+          <label for="eps"><b id="lbl-eps" data-i18n="options.eps"></b></label>
+          <div>
+            <input id="eps" name="eps" type="number" step="1" min="0" max="120" />
+            <div class="hint" id="hint-eps" data-i18n="options.epsHint"></div>
+          </div>
+        </div>
+
+        <div class="settings">
+          <label for="lockMs"><b id="lbl-lockMs" data-i18n="options.lockMs"></b></label>
+          <input id="lockMs" name="lockMs" type="number" step="10" min="0" max="3000" />
+        </div>
+
+        <div class="section-actions">
+          <button id="saveAdv"  class="btn" type="button" data-i18n="options.saveBtn"></button>
+          <button id="resetAdv" class="btn" type="button" data-i18n="options.resetBtn"></button>
+          <span  id="msg-adv"  class="msg-inline" aria-live="polite"></span>
+        </div>
+      </div>
     </div>
   </form>
+
+  <footer><p class="desc hint" id="buildInfo" style="margin-top:12px;"></p></footer>
+  <div id="cgtn-floater" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- 既存ロジックを読み込み -->
   <script src="i18n.js"></script>
   <script src="shared.js"></script>
   <script src="options.js"></script>
 
-  <footer><p class="desc hint" id="buildInfo" style="margin-top:12px;"></p></footer>
-  <div id="cgtn-floater" aria-live="polite" aria-atomic="true"></div>
+
 </body>
 </html>

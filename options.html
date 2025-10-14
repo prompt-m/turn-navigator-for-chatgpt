@@ -7,18 +7,24 @@
   <style>
     :root{
       --fg:#111; --muted:#666; --bd:#ddd; --bg:#fff; --pill:#f5f6f8;
-      --label-col: 220px;      /* ラベル固定幅（200–260で調整） */
+      --label-col: 300px;      /* ラベル固定幅（200–300で調整） */
       --pins-h: 360px;         /* 付箋島の最大高さ */
-      --radius: 14px;
+      --radius: 12px;
     }
     @media (prefers-color-scheme: dark){
       :root{ --fg:#e7e7ea; --muted:#aaa; --bd:#3a3a3f; --bg:#1f1f22; --pill:#2a2a2d; }
     }
 
     /* base */
-    body{ margin:24px; font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--fg); background:var(--bg); }
+    body{
+      margin:24px;
+      font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      color:var(--fg);
+      background:var(--bg);
+      line-height: 1.0;
+    }
     h1{ font-size:28px; margin:0 0 6px; }
-    .desc{ color:var(--muted); margin:0 0 18px; }
+    .desc{ color:var(--muted); margin:0 0 1px; }
 
     /* card */
     .card{
@@ -37,7 +43,7 @@
     }
     .pill-btn{
       all:unset; cursor:pointer; display:inline-grid; place-items:center;
-      padding:6px 14px; border:1px solid var(--bd); border-radius:10px; background:#f2f2f7;
+      padding:8px 14px; border:1px solid var(--bd); border-radius:5px	px; background:#f2f2f7;
       box-shadow:0 6px 24px rgba(0,0,0,.18);
     }
     .pill-btn:hover{ background:#fff; }
@@ -47,22 +53,23 @@
 
     /* section block：左バー＋インデント */
     .section-block{
-      display:grid; grid-template-columns: 12px 1fr; gap:10px; margin-bottom:28px;
+      display:grid; grid-template-columns: 12px 1fr; gap:10px; margin-bottom:20px;
     }
     .section-block::before{
       content:""; display:block; width:4px; margin-top:6px; border-radius:3px;
       background:color-mix(in srgb, var(--fg) 30%, transparent);
     }
-    .section-inner{ display:flex; flex-direction:column; gap:12px; }
-    .section-title{ font-size:18px; font-weight:700; margin-bottom:4px; }
-    .hint{ color:var(--muted); font-size:14px; }
+    .section-inner{ display:flex; flex-direction:column; gap:5px; }/*gap:12px*/
+    .section-title{ font-size:18px; font-weight:700; margin-top:10px; margin-bottom:4px; }
+    .hint{ color:var(--muted); font-size:14px; margin-bottom:1px}
 
     /* 設定行：ラベル左固定／入力右フレキシブル */
     .settings{
+      font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
       display:grid; grid-template-columns: var(--label-col) 1fr;
       gap:14px; align-items:center;
       background:var(--bg); border:1px solid var(--bd); border-radius:10px;
-      padding:14px 16px;
+      padding:4px 10px;/*14px 16px*/
     }
     .settings + .settings{ margin-top:10px; }
     label{ font-weight:600; }
@@ -83,7 +90,7 @@
     }
     .btn{
       all:revert; font:inherit; cursor:pointer;
-      padding:6px 18px; border-radius:10px; border:1px solid var(--bd); background:var(--pill);
+      padding:8px 14px; border-radius:5px; border:1px solid var(--bd); background:var(--pill);
       box-shadow:0 2px 8px rgba(0,0,0,.12);
     }
     .btn:hover{ background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%); }
@@ -214,19 +221,6 @@
   <script src="shared.js"></script>
   <script src="options.js"></script>
 
-  <!-- 置き換え確認用の簡易フラッシュ（本番では options.js が制御） -->
-  <script>
-    (function(){
-      const flash = (id, txt)=>{
-        const el = document.getElementById(id);
-        if(!el) return; el.textContent = txt; el.classList.add('show');
-        clearTimeout(el._t); el._t = setTimeout(()=> el.classList.remove('show'), 1500);
-      };
-      document.getElementById('saveList') ?.addEventListener('click', ()=> flash('msg-list', (window.CGTN_I18N?.t('options.saved')||'保存しました')));
-      document.getElementById('resetList')?.addEventListener('click', ()=> flash('msg-list', (window.CGTN_I18N?.t('options.reset')||'規定に戻しました')));
-      document.getElementById('saveAdv')  ?.addEventListener('click', ()=> flash('msg-adv',  (window.CGTN_I18N?.t('options.saved')||'保存しました')));
-      document.getElementById('resetAdv')?.addEventListener('click', ()=> flash('msg-adv',  (window.CGTN_I18N?.t('options.reset')||'規定に戻しました')));
-    })();
-  </script>
+
 </body>
 </html>

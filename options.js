@@ -11,11 +11,9 @@
 
   // 既定値（shared側の DEFAULTS があれば尊重）
   const DEF = (SH.DEFAULTS) || {
-    centerBias: 0.40, headerPx: 0, eps: 20, lockMs: 700, showViz: false,
-    panel:{ x:null, y:null },
-    list:{ enabled:false, pinOnly:false, maxItems:30, maxChars:60, fontSize:12, w:null, h:null, x:null, y:null }
+    centerBias: 0.40, eps: 20, lockMs: 700, showViz: false,
+    list:{ maxChars: 60, fontSize: 12, /* 他は不要 */ }
   };
-//    list:{ enabled:false, pinOnly:false, maxItems:30, maxChars:40, fontSize:12, w:null, h:null, x:null, y:null }
 
   function sanitize(raw){
     const base = JSON.parse(JSON.stringify(DEF));
@@ -87,42 +85,6 @@
       else                               el.textContent = v;
     });
   }
-/*
-function applyI18N(){
-  const T = (k)=> window.CGTN_I18N?.t?.(k) || k;
-  const set = (id, key)=>{ const n=document.getElementById(id); if(n) n.textContent=T(key); };
-
-  set('opt-title',       'opts.title');
-  set('opt-desc',        'opts.tips');
-
-  set('lang-ja',         'opts.lang.ja');
-  set('lang-en',         'opts.lang.en');
-
-  set('pins-title',      'options.pinsTitle');
-  set('pins-hint',       'options.pinsHint');
-
-  set('sum-list',        'options.listTitle');
-  set('lbl-listMaxChars','options.listMaxChars');
-  set('lbl-listFontSize','options.listFontSize');
-
-  set('sum-advanced',    'options.detailTitle');
-  set('lbl-showViz',     'nav.viz');
-  const hv=document.getElementById('hint-showViz'); if(hv) hv.textContent = T('nav.viz');
-
-  set('lbl-centerBias',  'options.centerBias');
-  const hcb=document.getElementById('hint-centerBias'); if(hcb) hcb.textContent = T('options.centerBiasHint');
-
-  set('lbl-eps',         'options.eps');
-  const he=document.getElementById('hint-eps'); if(he) he.textContent = T('options.epsHint');
-
-  set('lbl-lockMs',      'options.lockMs');
-
-  const sl=document.getElementById('saveList');  if(sl) sl.textContent = T('options.saveBtn');
-  const rl=document.getElementById('resetList'); if(rl) rl.textContent = T('options.resetBtn');
-  const sa=document.getElementById('saveAdv');  if(sa) sa.textContent = T('options.saveBtn');
-  const ra=document.getElementById('resetAdv'); if(ra) ra.textContent = T('options.resetBtn');
-}
-*/
 
   // --- pointer tracker（マウス/タッチの最後の位置を保持） ---
   let _lastPt = { x: window.innerWidth/2, y: window.innerHeight/2 };
@@ -167,7 +129,6 @@ console.log("flashMsgPins ");
 
 
   function flashMsgInline(id, key='options.saved'){
-console.log("flashMsgInline id:",id);
     const T = window.CGTN_I18N?.t || (s=>s);
     const el = document.getElementById(id);
     if (!el) return;
@@ -176,14 +137,7 @@ console.log("flashMsgInline id:",id);
     clearTimeout(el._to);
     el._to = setTimeout(()=> el.classList.remove('show'), 1600);
   }
-/*
-  function showMsg(txt){
-    const box = $('msg'); if (!box) return;
-    box.textContent = txt;
-    box.style.display='block';
-    setTimeout(()=> box.style.display='none', 1200);
-  }
-*/
+
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
@@ -331,11 +285,6 @@ console.log("deletePinsFromOptions call chatId: ",chatId," not OK?:",ok);
       const vizBox = document.getElementById('showViz');
       if (vizBox) vizBox.checked = false;
 
-      // 見出し＆ヒント
-      //const sec = $('pins-manager') || document;
-      //const h3 = sec.querySelector('h3'); if (h3) h3.textContent = T('options.pinsTitle');
-      //const hint = sec.querySelector('.hint'); if (hint) hint.textContent = T('options.pinsHint');
-
       // 設定ロード→UI反映
       await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
       const cfg = (SH.getCFG && SH.getCFG()) || DEF;
@@ -364,55 +313,9 @@ console.log("入力で即保存");
           }
         } catch(e){ console.warn('input handler failed', e); }
       });
-/*
-      // submit（明示保存）
-      form?.addEventListener('submit', (e)=>{
-console.log("明示保存");
-        e.preventDefault();
-        try{
-          const c3 = uiToCfg();
-          applyToUI(c3);
-          SH.saveSettingsPatch?.(c3);
-          SH.renderViz?.(c3, !!c3.showViz);
-          showMsg(T('options.saved'));
-        }catch(e){ console.warn('submit failed', e); }
-      });
-*/
-/*
-      // 既定に戻す
-      $('resetBtn')?.addEventListener('click', async ()=>{
-console.log("既定に戻す");
-        const def = sanitize(DEF);
-        applyToUI(def);
-        SH.saveSettingsPatch?.(def);
-        SH.renderViz?.(def, false);
-        showMsg(T('options.reset'));
-        await renderPinsManager();
-      });
-*/
       // タブ復帰で再描画
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') renderPinsManager();
-      });
-
-      // オートセーブ + 即時反映
-      // 追加：変更検知→デバウンス保存（200ms）
-      const AUTO_SAVE_MS = 200;
-      let saveTimer = null;
-      function autoSave() {
-console.log("autoSave");
-
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(() => {
-          const next = uiToCfg();
-          try { SH.saveSettings?.(next, () => showMsg(window.CGTN_I18N?.t?.('options.saved'))); }
-          catch(e){ console.warn('autoSave failed', e); }
-        }, AUTO_SAVE_MS);
-      }
-      // 監視する入力群（number/checkbox）
-      document.querySelectorAll('#cgtn-options input').forEach(el => {
-        el.addEventListener('input', autoSave);
-        el.addEventListener('change', autoSave);
       });
 
       // 一覧セクションの保存
@@ -426,6 +329,23 @@ console.log("autoSave");
           }
         };
         SH.saveSettingsPatch?.(patch, ()=> flashMsgInline('msg-list','options.saved'));
+      });
+
+      // 一覧セクション：規定に戻す（値を戻して保存）
+      document.getElementById('resetList')?.addEventListener('click', ()=>{
+        const cur = SH.getCFG() || {};
+        const patch = {
+          list:{
+            ...(cur.list||{}),
+            maxChars: DEF.list.maxChars,
+            fontSize: DEF.list.fontSize,
+          }
+        };
+        // UIも戻す
+        document.getElementById('listMaxChars').value = patch.list.maxChars;
+        document.getElementById('listFontSize').value = patch.list.fontSize;
+      
+        SH.saveSettingsPatch?.(patch, ()=> flashMsgInline('msg-list','options.reset'));
       });
 
       // 詳細セクションの保存
@@ -452,6 +372,25 @@ console.log("autoSave");
         flashMsgInline('msg-adv','options.reset');
       });
 
+      // 詳細セクション：規定に戻す（値を戻して保存）
+      document.getElementById('resetAdv')?.addEventListener('click', ()=>{
+        // UIを既定に
+        document.getElementById('showViz').checked = !!DEF.showViz;
+        document.getElementById('centerBias').value = DEF.centerBias;
+        document.getElementById('eps').value = DEF.eps;
+        document.getElementById('lockMs').value = DEF.lockMs;
+
+        const patch = {
+          showViz: !!DEF.showViz,
+          centerBias: DEF.centerBias,
+          eps: DEF.eps,
+          lockMs: DEF.lockMs,
+        };
+        SH.saveSettingsPatch?.(patch, ()=>{
+          try{ SH.renderViz?.(patch, patch.showViz); }catch{}
+          flashMsgInline('msg-adv','options.reset');
+        });
+      });
 
       // Extension version 表示
       try {
@@ -465,6 +404,27 @@ console.log("autoSave");
          console.warn('buildInfo failed', e);
        }
 
+       // 開発用の軽いフラッシュ（本番ロジックがあれば不要）
+       function devFlash(id, txt){
+         const el = document.getElementById(id);
+         if(!el) return;
+         el.textContent = txt;
+         el.classList.add('show');
+         clearTimeout(el._t);
+         el._t = setTimeout(()=> el.classList.remove('show'), 1500);
+       }
+
+       document.addEventListener('DOMContentLoaded', () => {
+         // 既存の save / reset ハンドラに組み込む or なければ仮で紐付け
+         const L = (k)=> (window.CGTN_I18N?.t(k) || '');
+         const msgSaved = L('options.saved') || '保存しました';
+         const msgReset = L('options.reset') || '規定に戻しました';
+       
+         document.getElementById('saveList') ?.addEventListener('click', ()=> devFlash('msg-list', msgSaved));
+         document.getElementById('resetList')?.addEventListener('click', ()=> devFlash('msg-list', msgReset));
+         document.getElementById('saveAdv')  ?.addEventListener('click', ()=> devFlash('msg-adv',  msgSaved));
+         document.getElementById('resetAdv')?.addEventListener('click', ()=> devFlash('msg-adv',  msgReset));
+       });
     }catch(e){
       console.error('options init failed', e);
     }

@@ -3,6 +3,7 @@
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
   const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
+
   const t = window.CGTN_I18N?.t || ((k)=>k);
   function _L(){ return (SH?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
 
@@ -18,7 +19,21 @@
     for (let i = 0; i < pinsArr.length; i++){
       if (pinsArr[i]) _pinsCache['turn:' + (i + 1)] = true;
     }
-//console.debug(`[hydratePinsCache] chat=${chatId} pins=${pinsArr.filter(v=>v).length}`);
+  }
+
+  // 必ず役割を決定する（なければ既定で assistant）
+  function getTurnRole(turnEl){
+    // 直下 or 配下から探す
+    const r = turnEl.querySelector('[data-message-author-role]');
+    let role = r?.getAttribute('data-message-author-role');
+    if (!role) {
+      // 稀に turnEl 直下にいないケースへの保険
+      const any = turnEl.querySelector('*[data-message-author-role]');
+      role = any?.getAttribute('data-message-author-role') || '';
+    }
+    // tool はアシスタント寄りに扱う（既存UIとの整合）
+    if (role === 'tool') role = 'assistant';
+    return (role === 'user' || role === 'assistant') ? role : 'assistant';
   }
 
   function isPinnedByKey(turnId){
@@ -70,10 +85,23 @@
     };
     const isAssistant = article.matches('[data-message-author-role="assistant"]')
                      || !!article.querySelector('[data-message-author-role="assistant"]');
+
     const isUser      = article.matches('[data-message-author-role="user"]')
                      || !!article.querySelector('[data-message-author-role="user"]');
+/*
     if (isAssistant){
-      return pick(article, ':scope > div') || pick(article, 'div.text-base') || pick(article, 'div.markdown') || article;
+      return pick(article, ':scope > div') ||
+             pick(article, 'div.text-base') ||
+             pick(article, 'div.markdown') ||
+             article;
+    }
+*/
+
+    if (isAssistant){
+      return pick(article, ':scope > div, :scope > article') ||
+             pick(article, 'div.text-base') ||
+             pick(article, 'div.markdown') ||
+             article;
     }
     if (isUser){
       const wrap = pick(article, 'div.flex.justify-end') || pick(article, 'div.items-end') || article;
@@ -430,6 +458,7 @@
     }
     return list.filter(a => a.getBoundingClientRect().height > 10 && getComputedStyle(a).display !== 'none');
   }
+
   function sortByY(list){
     const sc = getTrueScroller();
     try{
@@ -437,6 +466,7 @@
                  .sort((a,b)=> a.y - b.y).map(x=>x.el);
     }catch{ return list; }
   }
+
   function isRealTurn(article){
     const head = headNodeOf(article);
     if (!head) return false;
@@ -450,7 +480,6 @@
       '[data-testid*="download"],[data-testid*="attachment"],[data-testid*="file"],' +
       'a[download],a[href^="blob:"]'
     );
-
     const busy = head.getAttribute?.('aria-busy') === 'true';
     return (hasText || hasMedia) && !busy;
   }
@@ -859,7 +888,7 @@
       }
 
       // 本文行
-      if (bodyLine){
+      if (bodyLine){  
         const row2 = document.createElement('div');
         row2.className = 'row';
         row2.style.fontSize = fontPx;
