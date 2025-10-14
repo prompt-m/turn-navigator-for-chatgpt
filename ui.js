@@ -25,9 +25,9 @@
   SH.setLangResolver?.(SH.getLang);
 
   //付箋上にあるときのマウスポインタ＾
-  const pinCurURL = chrome.runtime.getURL('assets/cursor_preview.cur');
+  const pinCurURL = chrome.runtime.getURL('assets/cursor_pin.cur');
   //プレビュー上にあるときのマウスポインタ＾
-  const prvCurURL = chrome.runtime.getURL('assets/cursor_pin.cur');
+  const prvCurURL = chrome.runtime.getURL('assets/cursor_preview.cur');
 
   function injectCss(css){
     const s = document.createElement('style');
@@ -89,8 +89,26 @@
 #cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }  /* ← flex:1 を追加 */
 #cgpt-list-body .row{ display:flex; gap:8px; align-items:center;
   padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer }
-#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
+/* リスト行ホバー時に背景を強調（スクショ相当の濃さ） */
+
+#cgpt-list-body .row:hover{
+  background: #dfe9f8 !important;   /* 明るい青みの強調 */
+  transition: background .08s ease;
+}
+
+/*
 #cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
+*/
+
+/* 右端オペレーション領域 */
+#cgpt-list-body .row { display:flex; align-items:center; gap:8px; }
+#cgpt-list-body .row .txt { flex:1; min-width:0; }     /* 省略記号のために必要 */
+#cgpt-list-body .row .ops {
+  display:flex; gap:6px; margin-left:auto; align-items:center;
+}
+#cgpt-list-body .row .ops > * { line-height:1; }
+
+
 
 /* フッターは常に最下部に見える（パネルがflex縦なのでsticky不要） */
 #cgpt-list-foot{
@@ -109,12 +127,10 @@
 #cgpt-list-collapse{all:unset;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;cursor:pointer;}
 
 /* 1ターン1個の付箋：ダミー枠は幅だけ確保（table風の見た目） */
-#cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
+/*#cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }*/
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
-#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
-#cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
-
+/*#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }*/
 /* === マウス操作時のフォーカス枠を消す（キーボード操作の :focus-visible は維持） === */
 #cgpt-nav button:focus,
 #cgpt-nav label:focus,
@@ -136,24 +152,21 @@
   box-shadow: none !important;
 }
 
-/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
-.cgtn-cursor-pin{
-  cursor: url("${pinCurURL}"), pointer;
-}
-.cgtn-cursor-pin.off{
-  cursor: url("${pinCurURL}"), pointer;
-}
 
 /* 行の本文は従来どおり“指” */
 #cgpt-list-body .row { cursor: pointer; }
 
 /* === 付箋カーソルを最優先で適用（!important で上書き） === */
-#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {
-  cursor: url("${pinCurURL}"), pointer !important;
-}
-#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
-  cursor: url("${pinCurURL}"), pointer !important;
-}
+/*
+#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {cursor: url("${pinCurURL}"), pointer !important;}
+#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {cursor: url("${pinCurURL}"), pointer !important;}
+*/
+/* 右端アイコン用カーソル */
+
+#cgpt-list-body .row .cgtn-clip-pin       { cursor: url("${pinCurURL}"), pointer !important; }
+#cgpt-list-body .row .cgtn-preview-btn    { cursor: url("${prvCurURL}"), pointer !important; }
+.cgtn-cursor-pin{cursor: url("${pinCurURL}"), pointer;}
+.cgtn-cursor-pin.off{cursor: url("${pinCurURL}"), pointer;}
 
 /* === プレビュー吹き出し === */
 .cgtn-preview-popup {
@@ -170,17 +183,22 @@
   z-index: 2147483647;
   white-space: normal;
 }
-.cgtn-preview-btn {
+.cgtn-preview-btn,
+.cgtn-clip-pin {
   all: unset;
-  cursor: pointer;
   font-size: 14px;
-  padding: 0 4px;
+  padding: 3px 3px;
   color: #555;
 }
-.cgtn-preview-btn:hover {
-  color: #FFF;
-  background: rgba(21,21,21,21);
+.cgtn-preview-btn:hover,
+.cgtn-clip-pin:hover {
+  color: White;
+  background: DarkBlue;
+  filter:brightness(1.1);
 }
+/*
+#cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
+*/
 
 /* === プレビュー吹き出し（追加） === */
 .cgtn-popover {
@@ -442,6 +460,7 @@
 #cgtn-open-settings.cgtn-open-settings:active {
   transform: translateY(0);
 }
+
   `;
   injectCss(BASE_CSS);
 

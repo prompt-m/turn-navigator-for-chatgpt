@@ -3,6 +3,7 @@
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
   const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
+  const titleEscape = SH.titleEscape;
 
   const t = window.CGTN_I18N?.t || ((k)=>k);
   function _L(){ return (SH?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
@@ -144,7 +145,6 @@
   // ここ変えたよ：共通トランケータ
   function truncate(s, max){
     if (!max || !s) return s || '';
-//    return s.length > max ? s.slice(0, max) + '…' : s;
     return s.length > max ? s.slice(0, max) + '' : s;
   }
 
@@ -233,7 +233,6 @@
       picked = filePart || textPart;
     }
 
-//    if (maxChars && picked.length > maxChars) picked = picked.slice(0, maxChars) + '…';
     if (maxChars && picked.length > maxChars) picked = picked.slice(0, maxChars) + '';
     return picked || '（内容なし）';
   }
@@ -296,7 +295,6 @@
                       .replace(/\n{3,}/g, '\n\n')
                       .replace(/[ \t]{2,}/g, ' ');
 //console.log("プレビュー用テキストnorm:",norm);
-//      return norm.length > 2000 ? norm.slice(0, 2000) + '…' : norm;
       return norm.length > 2000 ? norm.slice(0, 2000) + '' : norm;
     } catch {
       return '';
@@ -386,6 +384,7 @@
     clip.classList.add('cgtn-clip-pin');
     clip.classList.add('cgtn-cursor-pin');
     clip.classList.toggle('off', !pinned);
+
     // ダミーは見せずに幅だけ確保
     if (clip.classList.contains('clip-dummy')){
       clip.setAttribute('aria-pressed', 'false');
@@ -393,6 +392,7 @@
       clip.style.pointerEvents = 'none';
       return;
     }
+
     clip.style.visibility = 'visible';
     clip.style.pointerEvents = 'auto';
     clip.textContent = '🔖\uFE0E';
@@ -797,6 +797,8 @@
 
     if (!enabled) return;
 
+    const T = (k)=> window.CGTN_I18N?.t?.(k) || k;
+
     const panel = ensureListBox();
     const body  = panel.querySelector('#cgpt-list-body');
     const foot  = panel.querySelector('#cgpt-list-foot');
@@ -804,7 +806,7 @@
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
-
+  
 
     //pinOnly のときのフィルタは 最新の PINS セットで判定
     // pinOnly 判定（オーバーライド優先）
@@ -828,7 +830,6 @@
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
-
     // === 行生成 ===
     for (const art of turns){
       // “元の全体順”の1始まり index を算出して、行に刻む
@@ -864,22 +865,34 @@
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
         // 本文行テンプレート
+        // row.innerHTML = ... の部分を差し替え
         row.innerHTML = `
-          <button class="cgtn-preview-btn">…</button>
-          <span class="txt"></span>
-          <span class="clip ${showClipOnAttach ? '' : 'clip-dummy'}"
-                style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
+          <div class="txt">${titleEscape(attachLine)}</div>
+          <div class="ops">
+            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
+            <button class="cgtn-clip-pin off" aria-pressed="false" title="${T('row.pin')}">🔖\uFE0E</button>
+          </div>
         `;
-        row.querySelector('.txt').textContent = attachLine;
+/*
+        row.innerHTML = `
+          <div class="txt">${titleEscape(attachLine)}</div>
+          <div class="ops">
+            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
+            <button class="cgtn-clip-pin ${isPinned ? 'on' : 'off'}" aria-pressed="${isPinned ? 'true':'false'}" title="${T('row.pin')}">🔖\uFE0E</button>
+          </div>
+        `;
+*/
+
+
+//        row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
-        //row.dataset.turn = turnKey;
         row.dataset.preview = previewText || attachLine || '';
 
         // 付箋の色設定(初期ピン色)：配列の index で決める
         const on = !!pinsArr[index1 - 1];
         paintPinRow(row, on);
 
-        if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.clip'), row, chatId);
+        if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.cgtn-clip-pin'), row, chatId);
 
         window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row);
         window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
@@ -901,22 +914,32 @@
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
         // 本文行テンプレート
+/*        
         row2.innerHTML = `
-          <button class="cgtn-preview-btn">…</button>
-          <span class="txt"></span>
-          <span class="clip ${showClipOnBody ? '' : 'clip-dummy'}"
-                style="width:1.6em;display:inline-flex;justify-content:center;align-items:center">🔖\uFE0E</span>
+          <div class="txt">${titleEscape(bodyLine)}</div>
+          <div class="ops">
+            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
+            <button class="cgtn-clip-pin \${isPinned ? 'on' : 'off'}" aria-pressed="\${isPinned ? 'true':'false'}" title="\${T('row.pin')}">🔖\uFE0E</button>
+          </div>
+        `;
+*/
+        row2.innerHTML = `
+          <div class="txt">${titleEscape(bodyLine)}</div>
+          <div class="ops">
+            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
+            <button class="cgtn-clip-pin off" aria-pressed="false" title="${T('row.pin')}">🔖\uFE0E</button>
+          </div>
         `;
 
-        row2.querySelector('.txt').textContent = bodyLine;
+
+
         row2.addEventListener('click', () => scrollToHead(art));
-//        row2.dataset.turn = turnKey;
         row2.dataset.preview = previewText || bodyLine || '';
 
         const on2 = !!pinsArr[index1 - 1];
         paintPinRow(row2, on2);
 
-        if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.clip'), row2, chatId);
+        if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
 
         window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row2);
         window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
@@ -1005,31 +1028,31 @@
     }
   }
 */
-function updateListFooterInfo() {
-  const total = ST.all.length;
-  const cfg = SH.getCFG?.() || {};
-  const listCfg = cfg.list || {};
-  const pinOnly = !!listCfg.pinOnly;   // ← これを追加！
+  function updateListFooterInfo() {
+    const total = ST.all.length;
+    const cfg = SH.getCFG?.() || {};
+    const listCfg = cfg.list || {};
+    const pinOnly = !!listCfg.pinOnly;   // ← これを追加！
 
-  const info = document.getElementById('cgpt-list-foot-info');
-  if (!info) return;
+    const info = document.getElementById('cgpt-list-foot-info');
+    if (!info) return;
 
-  const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
-  const T   = (k)=> window.CGTN_I18N?.t?.(k) || k;
+    const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
+    const T   = (k)=> window.CGTN_I18N?.t?.(k) || k;
 
-  if (pinOnly) {
-    // 付箋ターン数で数える
-    const chatId = SH.getChatId?.();
-    const pins = SH.getPinsForChat?.(chatId);
-    const pinnedCount = Array.isArray(pins)
-      ? pins.filter(Boolean).length
-      : Object.values(pins || {}).filter(Boolean).length;
+    if (pinOnly) {
+      // 付箋ターン数で数える
+      const chatId = SH.getChatId?.();
+      const pins = SH.getPinsForChat?.(chatId);
+      const pinnedCount = Array.isArray(pins)
+        ? pins.filter(Boolean).length
+        : Object.values(pins || {}).filter(Boolean).length;
 
-    info.textContent = fmt(T('list.footer.pinOnly'), { count: pinnedCount, total });
-  } else {
-    info.textContent = fmt(T('list.footer.all'), { total });
+      info.textContent = fmt(T('list.footer.pinOnly'), { count: pinnedCount, total });
+    } else {
+      info.textContent = fmt(T('list.footer.all'), { total });
+    }
   }
-}
 
 
 

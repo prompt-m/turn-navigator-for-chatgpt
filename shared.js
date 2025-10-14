@@ -456,6 +456,20 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
     renderViz(CFG, _visible);
   }
 
+  // --- HTMLエスケープ（タイトルやツールチップ用） ---
+  window.CGTN_SHARED = window.CGTN_SHARED || {};
+  (function(NS){
+    NS.titleEscape = function(s){
+      return String(s || '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      }[c]));
+    };
+  })(window.CGTN_SHARED);
+
 
   try {
     chrome?.storage?.onChanged?.addListener?.((changes, area) => {
