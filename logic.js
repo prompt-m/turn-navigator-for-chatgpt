@@ -86,23 +86,11 @@
     };
     const isAssistant = article.matches('[data-message-author-role="assistant"]')
                      || !!article.querySelector('[data-message-author-role="assistant"]');
-
     const isUser      = article.matches('[data-message-author-role="user"]')
                      || !!article.querySelector('[data-message-author-role="user"]');
-/*
     if (isAssistant){
-      return pick(article, ':scope > div') ||
-             pick(article, 'div.text-base') ||
-             pick(article, 'div.markdown') ||
-             article;
-    }
-*/
-
-    if (isAssistant){
-      return pick(article, ':scope > div, :scope > article') ||
-             pick(article, 'div.text-base') ||
-             pick(article, 'div.markdown') ||
-             article;
+      return pick(article, ':scope > div') || pick(article, 'div.text-base') || pick(article, 'div.markdown') || article;
+//      return pick(article, ':scope > div, :scope > article') || pick(article, 'div.text-base') || pick(article, 'div.markdown') || article;
     }
     if (isUser){
       const wrap = pick(article, 'div.flex.justify-end') || pick(article, 'div.items-end') || article;
@@ -865,26 +853,14 @@
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
 
         // 本文行テンプレート
-        // row.innerHTML = ... の部分を差し替え
         row.innerHTML = `
-          <div class="txt">${titleEscape(attachLine)}</div>
+          <div class="txt"></div>
           <div class="ops">
-            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
-            <button class="cgtn-clip-pin off" aria-pressed="false" title="${T('row.pin')}">🔖\uFE0E</button>
+            <button class="cgtn-clip-pin cgtn-iconbtn off" title="${T('row.pin')}" aria-label="${T('row.pin')}">🔖\uFE0E</button>
+            <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
           </div>
         `;
-/*
-        row.innerHTML = `
-          <div class="txt">${titleEscape(attachLine)}</div>
-          <div class="ops">
-            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
-            <button class="cgtn-clip-pin ${isPinned ? 'on' : 'off'}" aria-pressed="${isPinned ? 'true':'false'}" title="${T('row.pin')}">🔖\uFE0E</button>
-          </div>
-        `;
-*/
-
-
-//        row.querySelector('.txt').textContent = attachLine;
+        row.querySelector('.txt').textContent = attachLine;
         row.addEventListener('click', () => scrollToHead(art));
         row.dataset.preview = previewText || attachLine || '';
 
@@ -914,25 +890,15 @@
         if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
 
         // 本文行テンプレート
-/*        
         row2.innerHTML = `
-          <div class="txt">${titleEscape(bodyLine)}</div>
+          <div class="txt"></div>
           <div class="ops">
-            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
-            <button class="cgtn-clip-pin \${isPinned ? 'on' : 'off'}" aria-pressed="\${isPinned ? 'true':'false'}" title="\${T('row.pin')}">🔖\uFE0E</button>
-          </div>
-        `;
-*/
-        row2.innerHTML = `
-          <div class="txt">${titleEscape(bodyLine)}</div>
-          <div class="ops">
-            <button class="cgtn-preview-btn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
-            <button class="cgtn-clip-pin off" aria-pressed="false" title="${T('row.pin')}">🔖\uFE0E</button>
+            ${showClipOnBody ? `<button class="cgtn-clip-pin cgtn-iconbtn off" aria-pressed="false" title="${T('row.pin')}">🔖\uFE0E</button>` : ``}
+            <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
           </div>
         `;
 
-
-
+        row2.querySelector('.txt').textContent = bodyLine;
         row2.addEventListener('click', () => scrollToHead(art));
         row2.dataset.preview = previewText || bodyLine || '';
 
