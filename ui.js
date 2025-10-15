@@ -25,13 +25,8 @@
 const pinCurURL = chrome.runtime.getURL('assets/cursor_pin.cur');
 const prvCurURL = chrome.runtime.getURL('assets/cursor_preview.cur');
 
-const BASE_CSS = `
-/* ===================================================================
-   ChatGPT Turn Navigator - BASE_CSS (整理版)
-   方針: 1文字も削除せず、章立てのみ変更。問題箇所はコメントで明示。
-   章順: NAV → LIST(枠/ヘッダ/本文/フッタ) → 行/ピン/プレビュー → ドック → 共通/トグル
-=================================================================== */
-
+/* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
+const NAV_CSS = `
 /* =========================
    1) NAV (ナビパネル)
 ========================= */
@@ -105,7 +100,9 @@ const BASE_CSS = `
   transform: translateY(-1px);  /* クリック感をほんの少し */
 }
 #cgtn-open-settings.cgtn-open-settings:active { transform: translateY(0); }
+`;
 
+const LIST_CSS = `
 /* =========================
    2) LIST PANEL（外枠/配置）
 ========================= */
@@ -198,14 +195,12 @@ const BASE_CSS = `
 /* =========================
    4) LIST: 行/ピン/操作子
 ========================= */
-/* 1ターン1個の付箋：ダミー枠は幅だけ確保（table風の見た目） */
 #cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
 #cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
 #cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
 
-/* マウス操作時のフォーカス枠を消す（キーボード操作の :focus-visible は維持） */
 #cgpt-nav button:focus,
 #cgpt-nav label:focus,
 #cgpt-list-panel button:focus,
@@ -218,7 +213,6 @@ const BASE_CSS = `
   outline: 2px solid rgba(0,0,0,.25);
   outline-offset: 2px;
 }
-/* マウス操作時のフォーカス枠を確実に消す（キーボードの :focus-visible は残す） */
 #cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
 #cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible) {
   outline: none !important;
@@ -379,7 +373,9 @@ const BASE_CSS = `
   .cgtn-dock .cgtn-dock-close,
   .cgtn-dock .cgtn-dock-resize{ color:#cfd8e3; }
 }
+`;
 
+const MISC_CSS = `
 /* =========================
    7) リスト補助（情報/色/スクロールバー）
 ========================= */
@@ -414,13 +410,26 @@ const BASE_CSS = `
 #cgpt-list-body::-webkit-scrollbar-thumb:hover{ background: rgba(0,0,0,.45); }
 `;
 
-  function injectCss(css){
-    const s = document.createElement('style');
-    s.textContent = css;
-    document.head.appendChild(s);
-  }
+/* 注入ヘルパ */
+function injectCss(css){
+  const s = document.createElement('style');
+  s.textContent = css;
+  document.head.appendChild(s);
+}
+function injectCssMany(...chunks){
+  injectCss(chunks.join('\n'));
+}
 
-  injectCss(BASE_CSS);
+// 4) Preview: プレビューウィンドウ
+const PREVIEW_CSS = `
+/* ---------- Preview window ---------- */
+#cgpt-preview{ border-radius:var(--cgtn-radius); }
+#cgpt-preview .header .cgtn-iconbtn{ /* 共通ボタン */ }
+`;
+
+/* ここで一括注入（順序固定） */
+injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
+
 
 /*ｺｺｶﾗ*/
 // いちばん最後に差すフォーカス無効CSS（:focus-visible は保持）
