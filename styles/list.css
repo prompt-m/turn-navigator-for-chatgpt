@@ -1,0 +1,173 @@
+/* =========================
+   2) LIST PANEL（外枠/配置）
+========================= */
+#cgpt-list-panel{
+  position:fixed; right:120px; bottom:140px;
+  display:none; flex-direction:column;
+  z-index:2147483646; width:360px; max-width:min(92vw,420px);
+  max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12);
+  border-radius:16px; background:rgba(255,255,255,.98);
+  box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden;
+}
+
+/* =========================
+   3) LIST: ヘッダ/本文/フッタ
+========================= */
+/* ヘッダ（定義が複数回あるため順序を保持しつつ集約） */
+#cgpt-list-head{ display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px }
+/* DUPLICATE: 下に同じセレクタの再定義あり（position:sticky 含む） */
+
+#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px; cursor:pointer }
+#cgpt-list-body{ overflow:auto; padding:6px 8px }
+#cgpt-list-body .row{
+  display:flex; gap:8px; align-items:center;
+  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
+}
+#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
+#cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
+
+#cgpt-bias-line,#cgpt-bias-band{ pointer-events:none!important }
+.cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
+.cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
+.cgpt-nav-group button{ box-shadow:0 6px 24px; }
+
+#cgpt-list-grip{
+  height:12px; border-radius:10px;
+  background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
+  opacity:.6; cursor:grab; flex:1
+}
+#cgpt-list-grip.dragging .drag-handle { cursor: grabbing; }
+
+#cgpt-drag{
+  width:92px; height:12px; border-radius:10px;
+  background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
+  opacity:.55; cursor:grab; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)
+}
+#cgpt-drag.dragging .drag-handle { cursor: grabbing; }
+
+#cgpt-list-foot{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  padding:6px 8px; border-top:1px solid rgba(0,0,0,.08)
+}
+
+/* パネルは縦フレックスで head / body / foot を上下に配置（再定義） */
+#cgpt-list-head{
+  display:flex; align-items:center; gap:8px;
+  border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
+}
+#cgpt-list-collapse{
+  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; color:#000;
+  padding:6px 8px; cursor:pointer; display:inline-grid; place-items:center;
+}
+/* 本文は可変。ここだけスクロールさせる（再定義） */
+#cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }  /* ← flex:1 を追加 */
+#cgpt-list-body .row{
+  display:flex; gap:8px; align-items:center;
+  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
+}
+#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
+#cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
+#cgpt-list-foot{
+  display:flex; gap:8px; align-items:center; justify-content:flex-end;
+  flex-wrap:wrap; padding:6px 8px; border-top:1px solid rgba(0,0,0,.08);
+}
+/* フッター常時最下（sticky不要） */
+
+/* パネルを畳んだ見た目（ヘッダだけ残す） */
+#cgpt-list-panel.collapsed { max-height: 48px; }
+#cgpt-list-panel.collapsed #cgpt-list-body,
+#cgpt-list-panel.collapsed #cgpt-list-foot { display:none; }
+
+/* ヘッダ sticky 版（DUPLICATE: 上の #cgpt-list-head と重複） */
+#cgpt-list-head{
+  display:flex; align-items:center; gap:8px;
+  border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
+  position:sticky; top:0; background:rgba(255,255,255,.98)
+}
+#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; cursor:pointer; }
+#cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px; cursor:pointer; }
+
+/* =========================
+   4) LIST: 行/ピン/操作子
+========================= */
+#cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
+#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
+#cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
+
+#cgpt-nav button:focus,
+#cgpt-nav label:focus,
+#cgpt-list-panel button:focus,
+#cgpt-list-panel label:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+#cgpt-nav button:focus-visible,
+#cgpt-list-panel button:focus-visible {
+  outline: 2px solid rgba(0,0,0,.25);
+  outline-offset: 2px;
+}
+#cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
+#cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* ボタンヒットボックス（🔎/🔖 共通） */
+#cgpt-list-body .row .ops > button{
+  all: unset;
+  display: inline-flex; justify-content: center; align-items: center;
+  width: 20px; height: 20px; padding: 3px;
+  line-height: 1; font-size: 14px; border-radius: 4px;
+  color: #555; cursor: pointer;
+  transition: background .08s ease, color .08s ease, filter .08s ease;
+}
+
+/* ホバー色（あなたの指定通りに反映） */
+#cgpt-list-body .row .ops > .cgtn-preview-btn:hover,
+#cgpt-list-body .row .ops > .cgtn-clip-pin:hover{
+  color: White;
+  background: DarkBlue;
+  filter: brightness(1.1);
+}
+
+/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
+.cgtn-cursor-pin{ cursor: url("${pinCurURL}"), pointer; }
+.cgtn-cursor-pin.off{ cursor: url("${pinCurURL}"), pointer; }
+
+/* 行の本文は従来どおり“指” */
+#cgpt-list-body .row { cursor: pointer; }
+
+/* 付箋カーソルを最優先で適用（!important で上書き） */
+#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {
+  cursor: url("${pinCurURL}"), pointer !important;
+}
+#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
+  cursor: url("${pinCurURL}"), pointer !important;
+}
+
+/* カーソル（ランタイム変数から反映） */
+#cgpt-list-body .row .cgtn-clip-pin{
+  cursor: var(--pin-cur), pointer !important;
+}
+#cgpt-list-body .row .cgtn-preview-btn{
+  cursor: var(--prv-cur), pointer !important;
+}
+
+/* ピンON/OFF色 */
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color: var(--danger); }
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color: #979797; }
+
+
+/* リストを最新にする（ミニボタン） */
+#cgpt-list-refresh.cgtn-mini-btn{
+  all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px;
+}
+#cgpt-list-refresh.cgtn-mini-btn:hover{ background: rgba(0,0,0,.08); }
+
+/* リストパネル内の行（ライト読みやすさ重視） */
+#cgpt-list-panel .row{ background: #fafafa; color: #0b0d12; }
+/* 交互やホバーがあれば微差で */
+#cgpt-list-panel .row:hover{ background:#f2f5f8; }
+
+

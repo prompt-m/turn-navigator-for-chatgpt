@@ -20,407 +20,41 @@
   // ★ curLang() がこれを拾えるように resolver にも設定
   SH.setLangResolver?.(SH.getLang);
 
-
 // === Cursor assets ===
 const pinCurURL = chrome.runtime.getURL('assets/cursor_pin.cur');
 const prvCurURL = chrome.runtime.getURL('assets/cursor_preview.cur');
 
-const BASE_CSS = `
-/* ===================================================================
-   ChatGPT Turn Navigator - BASE_CSS (整理版)
-   方針: 1文字も削除せず、章立てのみ変更。問題箇所はコメントで明示。
-   章順: NAV → LIST(枠/ヘッダ/本文/フッタ) → 行/ピン/プレビュー → ドック → 共通/トグル
-=================================================================== */
 
-/* =========================
-   1) NAV (ナビパネル)
-========================= */
-#cgpt-nav{
-  position:fixed; right:12px; bottom:140px;
-  display:flex; flex-direction:column; gap:12px;
-  z-index:2147483647
-}
-.cgpt-nav-group{
-  width:92px; border-radius:14px; padding:10px;
-  border:1px solid rgba(0,0,0,.12);
-  background:rgba(255,255,255,.95);
-  box-shadow:0 6px 24px rgba(0,0,0,.18);
-  display:flex; flex-direction:column; gap:6px
-}
-.cgpt-nav-label{
-  text-align:center; font-weight:600; opacity:.9;
-  margin-bottom:2px; font-size:12px; color:#000
-}
-#cgpt-nav button{
-  all:unset; height:34px; border-radius:10px;
-  font:12px/1.1 system-ui,-apple-system,sans-serif;
-  display:grid; place-items:center; cursor:pointer;
-  background:#f2f2f7; color:#111; border:1px solid rgba(0,0,0,.08)
-}
-#cgpt-nav button:hover{ background:#fff }
-.cgpt-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px }
-#cgpt-nav .cgpt-lang-btn{ height:28px; margin-top:4px; color:#000 }
-#cgpt-nav input[type=checkbox] { cursor: pointer; }
-.cgpt-viz-toggle,.cgpt-list-toggle{
-  margin-top:6px; display:flex; gap:8px; align-items:center;
-  justify-content:flex-start; font-size:12px; cursor:pointer
-}
-.cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{ cursor:pointer; opacity:.9 }
+// CSS変数（ここだけはJSで注入）
+(function injectRuntimeVars(){
+  const s = document.createElement('style');
+  s.textContent = `
+    #cgpt-root{
+      --accent: #003a9b;
+      --danger: #e60033;
+      --pin-cur: url("${pinCurURL}");
+      --prv-cur: url("${prvCurURL}");
+    }
+  `;
+  document.head.appendChild(s);
+})();
 
-/* --- ナビ: ボタンに軽い立体感 --- */
-#cgpt-nav .cgpt-nav-group > button:not(.cgtn-open-settings){
-  background:#fff; border:1px solid rgba(0,0,0,.06);
-  border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,.12);
-}
-/* 押下中の沈み込み */
-#cgpt-nav .cgpt-nav-group > button:active{
-  box-shadow: 0 2px 8px rgba(0,0,0,.18) inset, 0 2px 8px rgba(0,0,0,.08);
-}
-/* ダーク時だけ少し強め */
-@media (prefers-color-scheme: dark){
-  #cgpt-nav .cgpt-nav-group > button{
-    background:#1d1f23; border-color:rgba(255,255,255,.06);
-    box-shadow:0 6px 18px rgba(0,0,0,.35); color:#e8eaed;
-  }
+async function injectCssFile(path){
+  const url = chrome.runtime.getURL(path);
+  const css = await fetch(url).then(r => r.text());
+  const s = document.createElement('style');
+  s.textContent = css;
+  document.head.appendChild(s);
 }
 
-/* --- 設定ボタン（ナビ内） --- */
-#cgtn-open-settings.cgtn-open-settings {
-  all: unset;
-  font: inherit;                 /* 既存のフォント系を継承 */
-  font-size: 16px;
-  color: var(--fg);
-  background: #fff;
-  border: none;
-  box-shadow: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 28px; line-height: 1; padding: 0 8px; border-radius: 6px;
-  cursor: pointer;
-}
-#cgtn-open-settings.cgtn-open-settings {
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-#cgtn-open-settings.cgtn-open-settings:hover {
-  background: color-mix(in srgb, #fff 92%, var(--bd) 8%);
-  transform: translateY(-1px);  /* クリック感をほんの少し */
-}
-#cgtn-open-settings.cgtn-open-settings:active { transform: translateY(0); }
+(async function injectAllCss(){
+  // 順序が大事：NAV → LIST → PREVIEW → MISC
+  await injectCssFile('styles/nav.css');
+  await injectCssFile('styles/list.css');
+  await injectCssFile('styles/preview.css');
+  await injectCssFile('styles/misc.css');
+})();
 
-/* =========================
-   2) LIST PANEL（外枠/配置）
-========================= */
-#cgpt-list-panel{
-  position:fixed; right:120px; bottom:140px;
-  display:none; flex-direction:column;
-  z-index:2147483646; width:360px; max-width:min(92vw,420px);
-  max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12);
-  border-radius:16px; background:rgba(255,255,255,.98);
-  box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden;
-}
-
-/* =========================
-   3) LIST: ヘッダ/本文/フッタ
-========================= */
-/* ヘッダ（定義が複数回あるため順序を保持しつつ集約） */
-#cgpt-list-head{ display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px }
-/* DUPLICATE: 下に同じセレクタの再定義あり（position:sticky 含む） */
-
-#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px; cursor:pointer }
-#cgpt-list-body{ overflow:auto; padding:6px 8px }
-#cgpt-list-body .row{
-  display:flex; gap:8px; align-items:center;
-  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
-}
-#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
-#cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
-
-#cgpt-bias-line,#cgpt-bias-band{ pointer-events:none!important }
-.cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
-.cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
-.cgpt-nav-group button{ box-shadow:0 6px 24px; }
-
-#cgpt-list-grip{
-  height:12px; border-radius:10px;
-  background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
-  opacity:.6; cursor:grab; flex:1
-}
-#cgpt-list-grip.dragging .drag-handle { cursor: grabbing; }
-
-#cgpt-drag{
-  width:92px; height:12px; border-radius:10px;
-  background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
-  opacity:.55; cursor:grab; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)
-}
-#cgpt-drag.dragging .drag-handle { cursor: grabbing; }
-
-#cgpt-list-foot{
-  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
-  padding:6px 8px; border-top:1px solid rgba(0,0,0,.08)
-}
-
-/* パネルは縦フレックスで head / body / foot を上下に配置（再定義） */
-#cgpt-list-head{
-  display:flex; align-items:center; gap:8px;
-  border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
-}
-#cgpt-list-collapse{
-  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; color:#000;
-  padding:6px 8px; cursor:pointer; display:inline-grid; place-items:center;
-}
-/* 本文は可変。ここだけスクロールさせる（再定義） */
-#cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }  /* ← flex:1 を追加 */
-#cgpt-list-body .row{
-  display:flex; gap:8px; align-items:center;
-  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
-}
-#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
-#cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
-#cgpt-list-foot{
-  display:flex; gap:8px; align-items:center; justify-content:flex-end;
-  flex-wrap:wrap; padding:6px 8px; border-top:1px solid rgba(0,0,0,.08);
-}
-/* フッター常時最下（sticky不要） */
-
-/* パネルを畳んだ見た目（ヘッダだけ残す） */
-#cgpt-list-panel.collapsed { max-height: 48px; }
-#cgpt-list-panel.collapsed #cgpt-list-body,
-#cgpt-list-panel.collapsed #cgpt-list-foot { display:none; }
-
-/* ヘッダ sticky 版（DUPLICATE: 上の #cgpt-list-head と重複） */
-#cgpt-list-head{
-  display:flex; align-items:center; gap:8px;
-  border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
-  position:sticky; top:0; background:rgba(255,255,255,.98)
-}
-#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; cursor:pointer; }
-#cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px; cursor:pointer; }
-
-/* =========================
-   4) LIST: 行/ピン/操作子
-========================= */
-/* 1ターン1個の付箋：ダミー枠は幅だけ確保（table風の見た目） */
-#cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
-#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
-#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
-#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
-#cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
-
-/* マウス操作時のフォーカス枠を消す（キーボード操作の :focus-visible は維持） */
-#cgpt-nav button:focus,
-#cgpt-nav label:focus,
-#cgpt-list-panel button:focus,
-#cgpt-list-panel label:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
-#cgpt-nav button:focus-visible,
-#cgpt-list-panel button:focus-visible {
-  outline: 2px solid rgba(0,0,0,.25);
-  outline-offset: 2px;
-}
-/* マウス操作時のフォーカス枠を確実に消す（キーボードの :focus-visible は残す） */
-#cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
-#cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible) {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
-.cgtn-cursor-pin{ cursor: url("${pinCurURL}"), pointer; }
-.cgtn-cursor-pin.off{ cursor: url("${pinCurURL}"), pointer; }
-
-/* 行の本文は従来どおり“指” */
-#cgpt-list-body .row { cursor: pointer; }
-
-/* 付箋カーソルを最優先で適用（!important で上書き） */
-#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {
-  cursor: url("${pinCurURL}"), pointer !important;
-}
-#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
-  cursor: url("${pinCurURL}"), pointer !important;
-}
-
-/* リストを最新にする（ミニボタン） */
-#cgpt-list-refresh.cgtn-mini-btn{
-  all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px;
-}
-#cgpt-list-refresh.cgtn-mini-btn:hover{ background: rgba(0,0,0,.08); }
-
-/* リストパネル内の行（ライト読みやすさ重視） */
-#cgpt-list-panel .row{ background: #fafafa; color: #0b0d12; }
-/* 交互やホバーがあれば微差で */
-#cgpt-list-panel .row:hover{ background:#f2f5f8; }
-
-/* =========================
-   5) PREVIEW（ポップ/吹き出し）
-========================= */
-.cgtn-preview-popup {
-  position: absolute;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.15);
-  border-radius: 6px;
-  padding: 8px 10px;
-  max-width: 320px;
-  max-height: 240px;
-  overflow: auto;
-  box-shadow: 0 6px 24px rgba(0,0,0,.18);
-  font-size: 12px;
-  z-index: 2147483647;
-  white-space: normal;
-}
-.cgtn-preview-btn {
-  all: unset; cursor: pointer; font-size: 14px; padding: 0 4px; color: #555;
-}
-.cgtn-preview-btn,
-.cgtn-clip-pin {
-  all: unset;
-  font-size: 12px;
-  padding: 3px 5px;
-  color: #555;
-}
-.cgtn-preview-btn:hover,
-.cgtn-clip-pin:hover {
-  color: White;
-  background: DarkBlue;
-  filter:brightness(1.1);
-}
-
-/* 追加のプレビュー吹き出し（ポップオーバー） */
-.cgtn-popover {
-  position: fixed;
-  z-index: 2147483647 !important;  /* ほぼ最大。モーダルより前面へ */
-  max-width: 520px; max-height: 320px;
-  padding: 10px 12px; border-radius: 10px;
-  background: rgba(20,20,20,.96); color: #fff;
-  box-shadow: 0 10px 28px rgba(0,0,0,.35);
-  overflow: auto; display: none;
-  font-size: 12px; line-height: 1.5;
-  transform: translate(10px, 14px); /* マウスから少し離す */
-  white-space: pre-wrap;             /* 改行保持しつつ折返し */
-  will-change: left, top, transform; /* 位置追従を滑らかに */
-  pointer-events: none;              /* ホバー中にポップに引っかからない */
-}
-.cgtn-popover[data-show="1"] { display: block; }
-
-/* 省略時「…」のトグルボタン */
-.cgtn-more {
-  border: none; background: transparent; cursor: pointer;
-  padding: 2px 6px; border-radius: 6px; font-size: 14px;
-}
-.cgtn-more:hover { background: rgba(255,255,255,.08); }
-
-/* =========================
-   6) PREVIEW DOCK（常駐プレビュー）
-   ※ 同じ .cgtn-dock の定義が2回あり → 下が最終適用
-========================= */
-.cgtn-dock {
-  position: absolute;
-  z-index: 2147483647 !ント;
-  width: 460px; max-width: 80vw;
-  height: 300px; max-height: 80vh;
-  background: rgba(20,20,20,.96);
-  color: #fff;
-  box-shadow: 0 10px 28px rgba(0,0,0,.35);
-  border-radius: 10px;
-  display: none;                /* クリックで表示に切り替え */
-  overflow: hidden;             /* ヘッダー/ボディを内側で制御 */
-  user-select: none;
-}
-.cgtn-dock[data-show="1"] { display: block; }
-
-.cgtn-dock-head {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; background: rgba(255,255,255,.08);
-  cursor: move;                 /* ドラッグで移動 */
-}
-.cgtn-dock-title { font-weight: 600; font-size: 12px; opacity: .9; }
-.cgtn-dock-close {
-  margin-left: auto; border: none; background: transparent;
-  color: #fff; cursor: pointer; font-size: 14px;
-}
-.cgtn-dock-body {
-  height: calc(100% - 40px);    /* だいたいヘッダー分 */
-  overflow: auto; padding: 10px 12px; white-space: pre-wrap; user-select: text;
-}
-.cgtn-dock-resize { position: absolute; right: 6px; bottom: 6px; width: 14px; height: 14px; cursor: nwse-resize; opacity: .7; }
-.cgtn-dock[data-pinned="1"] .cgtn-dock-head { background: rgba(255,255,255,.16); }
-
-/* CONFLICT: ここで .cgtn-dock が「ライト基調」に再定義される（上を上書き） */
-.cgtn-dock{
-  /* ライト基調（少し濃いめのグレー） */
-  background: #eceff3;              /* ← 上の rgba(20,20,20,.96) を上書き */
-  color: #0b0d12;
-  border: 1px solid #cfd6de;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
-  backdrop-filter: none;
-}
-.cgtn-dock .cgtn-dock-head{
-  background: #dfe5ec; color: #0b0d12; font-weight: 600;
-  padding: 6px 8px; border-bottom: 1px solid #cfd6de;
-}
-.cgtn-dock .cgtn-dock-body{
-  padding: 10px 12px; line-height: 1.6; overflow: auto; max-height: 60vh;
-}
-.cgtn-dock .cgtn-dock-close,
-.cgtn-dock .cgtn-dock-resize{ color: #2c313a; opacity: .9; }
-.cgtn-dock .cgtn-dock-close:hover,
-.cgtn-dock .cgtn-dock-resize:hover{ opacity: 1; }
-
-/* ダーク環境でも読める最低限（影は弱めに） */
-@media (prefers-color-scheme: dark){
-  .cgtn-dock{
-    background: #1e2126; color: #eef2f6;
-    border-color: #313842; box-shadow: 0 8px 20px rgba(0,0,0,.35);
-  }
-  .cgtn-dock .cgtn-dock-head{
-    background:#2a2f36; color:#eef2f6; border-bottom-color:#313842;
-  }
-  .cgtn-dock .cgtn-dock-close,
-  .cgtn-dock .cgtn-dock-resize{ color:#cfd8e3; }
-}
-
-/* =========================
-   7) リスト補助（情報/色/スクロールバー）
-========================= */
-#cgpt-list-foot { display:flex; align-items:center; gap:6px; }
-#cgpt-list-foot-info { margin-left:auto; }
-
-/* トグルラベルの文字色を黒固定 */
-.cgpt-viz-toggle span[data-i18n="line"] { color: #000; }
-.cgpt-list-toggle span[data-i18n="list"] { color: #000; }
-
-/* フッタ系ボタンの色 */
-#cgpt-list-foot,      /* リストパネルのフッタ */
-#cgpt-list-refresh,   /* 最新にする */
-#cgpt-pin-filter,     /* 畳む/開くボタン */
-#cgpt-list-collapse { /* 付箋フィルターボタン */
-  color:#000
-}
-
-/* スクロールバー（WebKit系） */
-.cgtn-dock-body::-webkit-scrollbar,
-#cgpt-list-body::-webkit-scrollbar{ width: 10px; }
-.cgtn-dock-body::-webkit-scrollbar,
-#cgpt-list-body::-webkit-scrollbar-track{
-  background: rgba(0,0,0,.05); border-radius: 10px;
-}
-.cgtn-dock-body::-webkit-scrollbar,
-#cgpt-list-body::-webkit-scrollbar-thumb{
-  background: rgba(0,0,0,.28); border-radius: 10px;
-  border: 1px solid transparent; background-clip: padding-box;
-}
-.cgtn-dock-body::-webkit-scrollbar,
-#cgpt-list-body::-webkit-scrollbar-thumb:hover{ background: rgba(0,0,0,.45); }
-`;
-
-  function injectCss(css){
-    const s = document.createElement('style');
-    s.textContent = css;
-    document.head.appendChild(s);
-  }
-
-  injectCss(BASE_CSS);
 
 /*ｺｺｶﾗ*/
 // いちばん最後に差すフォーカス無効CSS（:focus-visible は保持）
@@ -500,6 +134,10 @@ const BASE_CSS = `
 
 
     document.body.appendChild(box);
+console.debug('appendChild[nav:init] before-restore', {
+  style: nav.getAttribute('style'),
+  rect: nav.getBoundingClientRect()
+});
 
     // 言語リゾルバ（tooltipsの言語切替に使用）
     window.CGTN_SHARED?.setLangResolver?.(() =>
@@ -628,6 +266,11 @@ const BASE_CSS = `
     })();
 /*ｺｺﾏﾃﾞ*/
 
+    // どこかの初期化で:
+//    const nav = document.getElementById('cgpt-nav');
+//    if (nav) placeNav(nav);
+
+
   }
 
   function applyLang(){
@@ -712,6 +355,34 @@ function toggleLang() {
   NS.clampPanelWithinViewport = clampPanelWithinViewport;
   NS.applyLang = applyLang;
   NS.toggleLang = toggleLang;
+
+// ui.js — ナビの座標適用まわり（作成直後に呼ぶ）
+function placeNav(navEl){
+  // まずは余計な inline を掃除（今回の主因）
+  navEl.style.left   = '';
+  navEl.style.top    = '';
+  navEl.style.inset  = '';
+
+  // 右下デフォルト（CSSと一致）
+  navEl.style.right  = '12px';
+  navEl.style.bottom = '140px';
+
+  // もし「保存済みパネル位置（CFG.panel）」があれば画面内に収めて適用
+  const cfg = window.CGTN_SHARED?.getCFG?.() || {};
+  const p   = cfg.panel || {};
+  if (Number.isFinite(p.x) && Number.isFinite(p.y)) {
+    const vw = innerWidth, vh = innerHeight;
+    const x  = Math.max(8, Math.min(vw - 100, Math.round(p.x)));
+    const y  = Math.max(8, Math.min(vh - 100, Math.round(p.y)));
+    // left/top で固定するなら right/bottom を解除してからセット
+    navEl.style.right  = 'auto';
+    navEl.style.bottom = 'auto';
+    navEl.style.left   = `${x}px`;
+    navEl.style.top    = `${y}px`;
+  }
+}
+
+
 
   // 起動直後に一度だけ適用（navがまだ無ければ無害）
   document.addEventListener('DOMContentLoaded', applyLang);

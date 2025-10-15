@@ -1,0 +1,32 @@
+/* =========================
+   7) リスト補助（情報/色/スクロールバー）
+========================= */
+#cgpt-list-foot { display:flex; align-items:center; gap:6px; }
+#cgpt-list-foot-info { margin-left:auto; }
+
+/* トグルラベルの文字色を黒固定 */
+.cgpt-viz-toggle span[data-i18n="line"] { color: #000; }
+.cgpt-list-toggle span[data-i18n="list"] { color: #000; }
+
+/* フッタ系ボタンの色 */
+#cgpt-list-foot,      /* リストパネルのフッタ */
+#cgpt-list-refresh,   /* 最新にする */
+#cgpt-pin-filter,     /* 畳む/開くボタン */
+#cgpt-list-collapse { /* 付箋フィルターボタン */
+  color:#000
+}
+
+/* スクロールバー（WebKit系） */
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar{ width: 10px; }
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar-track{
+  background: rgba(0,0,0,.05); border-radius: 10px;
+}
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar-thumb{
+  background: rgba(0,0,0,.28); border-radius: 10px;
+  border: 1px solid transparent; background-clip: padding-box;
+}
+.cgtn-dock-body::-webkit-scrollbar,
+#cgpt-list-body::-webkit-scrollbar-thumb:hover{ background: rgba(0,0,0,.45); }

@@ -1,0 +1,83 @@
+/* =========================
+   1) NAV (ナビパネル)
+========================= */
+#cgpt-nav{
+  position:fixed; right:12px; bottom:140px;
+  display:flex; flex-direction:column; gap:12px;
+  z-index:2147483647
+}
+.cgpt-nav-group{
+  width:92px; border-radius:14px; padding:10px;
+  border:1px solid rgba(0,0,0,.12);
+  background:rgba(255,255,255,.95);
+  box-shadow:0 6px 24px rgba(0,0,0,.18);
+  display:flex; flex-direction:column; gap:6px
+}
+.cgpt-nav-label{
+  text-align:center; font-weight:600; opacity:.9;
+  margin-bottom:2px; font-size:12px; color:#000
+}
+#cgpt-nav button{
+  all:unset; height:34px; border-radius:10px;
+  font:12px/1.1 system-ui,-apple-system,sans-serif;
+  display:grid; place-items:center; cursor:pointer;
+  background:#f2f2f7; color:#111; border:1px solid rgba(0,0,0,.08)
+}
+#cgpt-nav button:hover{ background:#fff }
+.cgpt-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px }
+#cgpt-nav .cgpt-lang-btn{ height:28px; margin-top:4px; color:#000 }
+#cgpt-nav input[type=checkbox] { cursor: pointer; }
+.cgpt-viz-toggle,.cgpt-list-toggle{
+  margin-top:6px; display:flex; gap:8px; align-items:center;
+  justify-content:flex-start; font-size:12px; cursor:pointer
+}
+.cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{ cursor:pointer; opacity:.9 }
+
+/* --- ナビ: ボタンに軽い立体感 --- */
+#cgpt-nav .cgpt-nav-group > button:not(.cgtn-open-settings){
+  background:#fff; border:1px solid rgba(0,0,0,.06);
+  border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,.12);
+}
+/* 押下中の沈み込み */
+#cgpt-nav .cgpt-nav-group > button:active{
+  box-shadow: 0 2px 8px rgba(0,0,0,.18) inset, 0 2px 8px rgba(0,0,0,.08);
+}
+/* ダーク時だけ少し強め */
+@media (prefers-color-scheme: dark){
+  #cgpt-nav .cgpt-nav-group > button{
+    background:#1d1f23; border-color:rgba(255,255,255,.06);
+    box-shadow:0 6px 18px rgba(0,0,0,.35); color:#e8eaed;
+  }
+}
+
+/* --- 設定ボタン（ナビ内） --- */
+#cgtn-open-settings.cgtn-open-settings {
+  all: unset;
+  font: inherit;                 /* 既存のフォント系を継承 */
+  font-size: 16px;
+  color: var(--fg);
+  background: #fff;
+  border: none;
+  box-shadow: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 28px; line-height: 1; padding: 0 8px; border-radius: 6px;
+  cursor: pointer;
+}
+#cgtn-open-settings.cgtn-open-settings {
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+#cgtn-open-settings.cgtn-open-settings:hover {
+  background: color-mix(in srgb, #fff 92%, var(--bd) 8%);
+  transform: translateY(-1px);  /* クリック感をほんの少し */
+}
+#cgtn-open-settings.cgtn-open-settings:active { transform: translateY(0); }
+
+/* 強制右下。インラインの left/top/inset を無効化 */
+//#cgpt-nav {
+//  position: fixed;
+//  right: 12px;
+//  bottom: 140px;
+//  left: auto;
+//  top: auto;
+//  inset: auto auto 140px auto;
+//}

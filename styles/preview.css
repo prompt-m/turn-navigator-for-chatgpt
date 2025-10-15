@@ -1,0 +1,132 @@
+/* =========================
+   5) PREVIEW（ポップ/吹き出し）
+========================= */
+.cgtn-preview-popup {
+  position: absolute;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.15);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-width: 320px;
+  max-height: 240px;
+  overflow: auto;
+  box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  font-size: 12px;
+  z-index: 2147483647;
+  white-space: normal;
+}
+.cgtn-preview-btn {
+  all: unset; cursor: pointer; font-size: 14px; padding: 0 4px; color: #555;
+}
+.cgtn-preview-btn,
+.cgtn-clip-pin {
+  all: unset;
+  font-size: 12px;
+  padding: 3px 5px;
+  color: #555;
+}
+.cgtn-preview-btn:hover,
+.cgtn-clip-pin:hover {
+  color: White;
+  background: DarkBlue;
+  filter:brightness(1.1);
+}
+
+/* 追加のプレビュー吹き出し（ポップオーバー） */
+.cgtn-popover {
+  position: fixed;
+  z-index: 2147483647 !important;  /* ほぼ最大。モーダルより前面へ */
+  max-width: 520px; max-height: 320px;
+  padding: 10px 12px; border-radius: 10px;
+  background: rgba(20,20,20,.96); color: #fff;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+  overflow: auto; display: none;
+  font-size: 12px; line-height: 1.5;
+  transform: translate(10px, 14px); /* マウスから少し離す */
+  white-space: pre-wrap;             /* 改行保持しつつ折返し */
+  will-change: left, top, transform; /* 位置追従を滑らかに */
+  pointer-events: none;              /* ホバー中にポップに引っかからない */
+}
+.cgtn-popover[data-show="1"] { display: block; }
+
+/* 省略時「…」のトグルボタン */
+.cgtn-more {
+  border: none; background: transparent; cursor: pointer;
+  padding: 2px 6px; border-radius: 6px; font-size: 14px;
+}
+.cgtn-more:hover { background: rgba(255,255,255,.08); }
+
+/* =========================
+   6) PREVIEW DOCK（常駐プレビュー）
+   ※ 同じ .cgtn-dock の定義が2回あり → 下が最終適用
+========================= */
+.cgtn-dock {
+  position: absolute;
+  z-index: 2147483647 !ント;
+  width: 460px; max-width: 80vw;
+  height: 300px; max-height: 80vh;
+  background: rgba(20,20,20,.96);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+  border-radius: 10px;
+  display: none;                /* クリックで表示に切り替え */
+  overflow: hidden;             /* ヘッダー/ボディを内側で制御 */
+  user-select: none;
+}
+.cgtn-dock[data-show="1"] { display: block; }
+
+.cgtn-dock-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: rgba(255,255,255,.08);
+  cursor: move;                 /* ドラッグで移動 */
+}
+.cgtn-dock-title { font-weight: 600; font-size: 12px; opacity: .9; }
+.cgtn-dock-close {
+  margin-left: auto; border: none; background: transparent;
+  color: #fff; cursor: pointer; font-size: 14px;
+}
+.cgtn-dock-body {
+  height: calc(100% - 40px);    /* だいたいヘッダー分 */
+  overflow: auto; padding: 10px 12px; white-space: pre-wrap; user-select: text;
+}
+.cgtn-dock-resize { position: absolute; right: 6px; bottom: 6px; width: 14px; height: 14px; cursor: nwse-resize; opacity: .7; }
+.cgtn-dock[data-pinned="1"] .cgtn-dock-head { background: rgba(255,255,255,.16); }
+
+/* CONFLICT: ここで .cgtn-dock が「ライト基調」に再定義される（上を上書き） */
+.cgtn-dock{
+  /* ライト基調（少し濃いめのグレー） */
+  background: #eceff3;              /* ← 上の rgba(20,20,20,.96) を上書き */
+  color: #0b0d12;
+  border: 1px solid #cfd6de;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
+  backdrop-filter: none;
+}
+.cgtn-dock .cgtn-dock-head{
+  background: #dfe5ec; color: #0b0d12; font-weight: 600;
+  padding: 6px 8px; border-bottom: 1px solid #cfd6de;
+}
+.cgtn-dock .cgtn-dock-body{
+  padding: 10px 12px; line-height: 1.6; overflow: auto; max-height: 60vh;
+}
+.cgtn-dock .cgtn-dock-close,
+.cgtn-dock .cgtn-dock-resize{ color: #2c313a; opacity: .9; }
+.cgtn-dock .cgtn-dock-close:hover,
+.cgtn-dock .cgtn-dock-resize:hover{ opacity: 1; }
+
+/* ---------- Preview window ---------- */
+#cgpt-preview{ border-radius:var(--cgtn-radius); }
+#cgpt-preview .header .cgtn-iconbtn{ /* 共通ボタン */ }
+
+/* ダーク環境でも読める最低限（影は弱めに） */
+@media (prefers-color-scheme: dark){
+  .cgtn-dock{
+    background: #1e2126; color: #eef2f6;
+    border-color: #313842; box-shadow: 0 8px 20px rgba(0,0,0,.35);
+  }
+  .cgtn-dock .cgtn-dock-head{
+    background:#2a2f36; color:#eef2f6; border-bottom-color:#313842;
+  }
+  .cgtn-dock .cgtn-dock-close,
+  .cgtn-dock .cgtn-dock-resize{ color:#cfd8e3; }
+}
