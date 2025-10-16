@@ -366,15 +366,15 @@
     else btn.classList.remove('golden');
   }
 
-function paintPinRow(row, pinned){
-  const clip = row.querySelector('.cgtn-clip-pin');
-  if (!clip) return;
+  function paintPinRow(row, pinned){
+    const clip = row.querySelector('.cgtn-clip-pin');
+    if (!clip) return;
 
-  const on = !!pinned;
-  clip.setAttribute('aria-pressed', String(on));
-  clip.classList.toggle('off', !on);
-  clip.textContent = '🔖\uFE0E';
-}
+    const on = !!pinned;
+    clip.setAttribute('aria-pressed', String(on));
+    clip.classList.toggle('off', !on);
+    clip.textContent = '🔖\uFE0E';
+  }
 
   function bindClipPinByIndex(clipEl, rowEl, chatId){
     clipEl.addEventListener('click', (ev) => {
@@ -959,19 +959,7 @@ function paintPinRow(row, pinned){
     } else {
     }
   }
-/*
-  function updateListFooterInfo(){
-    try {
-      const info = document.getElementById('cgpt-list-foot-info');
-      const body = document.getElementById('cgpt-list-body');
-      if (!info || !body) return;
 
-      info.textContent = `${body.children.length}行（${ST.all.length}ターン中）`;
-    } catch(e){
-      console.warn('updateListFooterInfo failed', e);
-    }
-  }
-*/
   function updateListFooterInfo() {
     const total = ST.all.length;
     const cfg = SH.getCFG?.() || {};
@@ -998,6 +986,31 @@ function paintPinRow(row, pinned){
     }
   }
 
+// --- pins-updated イベントを UI に橋渡し（重複登録ガードつき） ---
+//if (!window.__cgtnPinsHooked) {
+//  window.__cgtnPinsHooked = true;
+
+  window.addEventListener('cgtn:pins-updated', (ev) => {
+    const { chatId, count } = ev.detail || {};
+
+    // 件数表示などの小物を同期
+    try { updateListFooterInfo?.(); } catch {}
+
+    // 「付箋のみ表示」モード中は見た目も即時反映
+    const pinOnly = document.querySelector('#cgpt-pin-filter[aria-pressed="true"]');
+    if (pinOnly) {
+      // いちばん堅いのは全体再描画
+      NS.renderList?.(true);
+
+      // もし各行に data-chatid を付けているなら差分更新も可
+      // if (count === 0) {
+      //   document
+      //     .querySelectorAll(`#cgpt-list-body .row[data-chatid="${chatId}"]`)
+      //     .forEach(el => el.remove());
+      // }
+    }
+  });
+//}
 
 
   // --- expose ---

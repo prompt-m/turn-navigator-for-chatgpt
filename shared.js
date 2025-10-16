@@ -359,6 +359,7 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
     return raw.map(v => (v ? 1 : 0));
   };
 
+
   NS.savePinsArr = function savePinsArr(arr, chatId = NS.getChatId?.()) {
     const cfg = NS.getCFG() || {};
     const map = { ...(cfg.pinsByChat || {}) };
@@ -367,8 +368,8 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
     const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
     const hasAny  = safeArr.some(Boolean);
 
-/*
     // 0件なら削除（幽霊防止）※挙動は維持
+/*
     if (!hasAny) {
       if (map[chatId]) {
         console.debug('[savePinsArr] delete record because zero pins', { chatId });
@@ -399,12 +400,13 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
 
     map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
 
-    // 保存前の直前に入れる一行（両方共通）
-    if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
+// 保存前の直前に入れる一行（両方共通）
+if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
 
 
     NS.saveSettingsPatch({ pinsByChat: map });
   };
+
 
 
   // トグル（1始まり）←この実装でOK
