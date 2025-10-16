@@ -367,6 +367,7 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
     const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
     const hasAny  = safeArr.some(Boolean);
 
+/*
     // 0件なら削除（幽霊防止）※挙動は維持
     if (!hasAny) {
       if (map[chatId]) {
@@ -378,13 +379,13 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
       }
       return;
     }
-
+*/
     const oldTitle = map[chatId]?.title || '';
     const newTitle = NS.getChatTitle?.() || '';
     const title    = oldTitle || newTitle || '(No Title)';
 
     // ★計測ログ：ここが肝
-/*
+
     console.debug('[savePinsArr] about to save', {
       chatId,
       pinsCount: safeArr.filter(Boolean).length,
@@ -394,12 +395,12 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
       path: location.pathname,
       time: new Date().toISOString()
     }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
-*/
+
 
     map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
 
-// 保存前の直前に入れる一行（両方共通）
-if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
+    // 保存前の直前に入れる一行（両方共通）
+    if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
 
 
     NS.saveSettingsPatch({ pinsByChat: map });
