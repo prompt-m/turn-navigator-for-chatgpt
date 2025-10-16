@@ -10,7 +10,7 @@
     "128": "icon128.png"
   },
   "web_accessible_resources": [{
-    "resources": ["assets/*.cur"],
+    "resources": ["assets/*.cur","assets/*.png"],
     "matches": ["<all_urls>"]
   }],
   "permissions": ["storage","tabs"],

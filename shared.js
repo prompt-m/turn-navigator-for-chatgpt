@@ -51,8 +51,53 @@
     } catch { return 'unknown'; }
   };
 
+/*
+NS.getChatTitle = function(){
+  try {
+    const docTitle = (document.title || '').trim();
+
+    // 例: ["ChatGPT Turn Navigator（Chrome 拡張・MV3）","設定画面修正提案","ChatGPT"]
+    let parts = docTitle.split(' - ').map(s => s.trim()).filter(Boolean);
+
+    // 末尾のサイト名は捨てる
+    while (parts.length && /^(ChatGPT|OpenAI)$/i.test(parts.at(-1))) parts.pop();
+
+    // ドキュメント由来の候補：いちばん“右側”（=チャット名）を優先
+    const fromDoc = parts.at(-1) || '';
+
+    // DOM 由来の候補（将来のUI変化も拾えるように数種類）
+    const main = document.querySelector('main') || document.body;
+    const sels = [
+      '[data-testid="conversation-name"]',
+      '[data-testid*="conversation"] :is(h1,h2)',
+      'header h1','h1','h2','[data-testid="title"]'
+    ];
+    let fromMain = '';
+    for (const sel of sels){
+      const el = main.querySelector(sel);
+      const txt = (el?.textContent || '').trim();
+      if (txt){ fromMain = txt; break; }
+    }
+
+    const cand = (fromMain || fromDoc || '').slice(0,120);
+
+    // 計測ログ（そのまま残してOK）
+    console.debug('[getChatTitle]', { docTitle,  cand, path: location.pathname });
+
+    return cand;
+  } catch(e) {
+    console.warn('[getChatTitle] error', e);
+    return '';
+  }
+};
+*/
+/*
   NS.getChatTitle = function(){
     try {
+
+      const dTitle = document.title;
+      console.debug('[getChatTitle]',{ documentTitle:dTitle});
+
       const docTitle = (document.title || '').trim();
       const fromDoc  = docTitle.includes(' - ') ? docTitle.split(' - ')[0].trim() : docTitle;
       const main = document.querySelector('main') || document.body;
@@ -63,7 +108,7 @@
 
       // ★計測ログ
       console.debug('[getChatTitle]',
-        { cand, fromMain, fromDoc, path: location.pathname, time: new Date().toISOString() },
+        { docTitle,cand, fromMain, fromDoc, path: location.pathname, time: new Date().toISOString() },
         new Error('trace').stack?.split('\n').slice(1,4).join('\n')); // 上位3フレーム
 
       return cand; // ← 何も弾かない。純粋に候補を返す
@@ -72,6 +117,19 @@
       return '';
     }
   };
+*/
+
+  NS.getChatTitle = function(){
+    try {
+      const docTitle = (document.title || '').trim();
+      return docTitle;
+    } catch(e) {
+      console.warn('[getChatTitle] error', e);
+      return '';
+    }
+  };
+
+
 
   function _ensurePinsByChat(cfg){
     cfg.pinsByChat = cfg.pinsByChat || {};

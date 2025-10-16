@@ -22,8 +22,11 @@
 
 
 // === Cursor assets ===
-const pinCurURL = chrome.runtime.getURL('assets/cursor_pin.cur');
-const prvCurURL = chrome.runtime.getURL('assets/cursor_preview.cur');
+const pinCurURL = chrome.runtime.getURL('assets/pin16.png');
+const prvCurURL = chrome.runtime.getURL('assets/prev16.png');
+
+console.log("pinCurURL:",pinCurURL);
+console.log("prvCurURL:",prvCurURL);
 
 /* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
 const NAV_CSS = `
@@ -122,11 +125,14 @@ const LIST_CSS = `
 #cgpt-list-head{ display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px }
 /* DUPLICATE: 下に同じセレクタの再定義あり（position:sticky 含む） */
 
-#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px; cursor:pointer }
+/*#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px; cursor:pointer }
+*/
+#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px }
 #cgpt-list-body{ overflow:auto; padding:6px 8px }
 #cgpt-list-body .row{
   display:flex; gap:8px; align-items:center;
-  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
+/*  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer*/
+  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08);
 }
 #cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
 #cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
@@ -160,16 +166,28 @@ const LIST_CSS = `
   display:flex; align-items:center; gap:8px;
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
 }
+/*
 #cgpt-list-collapse{
   all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; color:#000;
   padding:6px 8px; cursor:pointer; display:inline-grid; place-items:center;
+}*/
+#cgpt-list-collapse{
+  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; color:#000;
+  padding:6px 8px; display:inline-grid; place-items:center;
 }
+
 /* 本文は可変。ここだけスクロールさせる（再定義） */
 #cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }  /* ← flex:1 を追加 */
+/*
 #cgpt-list-body .row{
   display:flex; gap:8px; align-items:center;
   padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
+}*/
+#cgpt-list-body .row{
+  display:flex; gap:8px; align-items:center;
+  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08);
 }
+
 #cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
 #cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
 #cgpt-list-foot{
@@ -189,8 +207,12 @@ const LIST_CSS = `
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
   position:sticky; top:0; background:rgba(255,255,255,.98)
 }
-#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; cursor:pointer; }
-#cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px; cursor:pointer; }
+/*#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; cursor:pointer; }
+*/
+#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; }
+/*#cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px; cursor:pointer; }
+*/
+#cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px;}
 
 /* =========================
    4) LIST: 行/ピン/操作子
@@ -198,7 +220,9 @@ const LIST_CSS = `
 #cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
-#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }
+
+/*#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }*/
+
 #cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
 
 #cgpt-nav button:focus,
@@ -219,25 +243,23 @@ const LIST_CSS = `
   box-shadow: none !important;
 }
 
-/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
-.cgtn-cursor-pin{ cursor: url("${pinCurURL}"), pointer; }
-.cgtn-cursor-pin.off{ cursor: url("${pinCurURL}"), pointer; }
-
 /* 行の本文は従来どおり“指” */
 #cgpt-list-body .row { cursor: pointer; }
 
-/* 付箋カーソルを最優先で適用（!important で上書き） */
-#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin {
-  cursor: url("${pinCurURL}"), pointer !important;
-}
-#cgpt-list-body .row .cgtn-clip-pin.cgtn-cursor-pin.off {
-  cursor: url("${pinCurURL}"), pointer !important;
-}
+/* プレビュー領域の専用カーソル */
+#cgpt-list-body .cgtn-preview-btn {cursor:url("${prvCurURL}"), pointer; }
+
+/* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
+#cgpt-list-body .cgtn-clip-pin {cursor:url("${pinCurURL}"), pointer; }
 
 /* リストを最新にする（ミニボタン） */
 #cgpt-list-refresh.cgtn-mini-btn{
   all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px;
 }
+#cgpt-list-refresh.cgtn-mini-btn{
+  all: unset; padding: 2px 6px; border-radius: 6px;
+}
+
 #cgpt-list-refresh.cgtn-mini-btn:hover{ background: rgba(0,0,0,.08); }
 
 /* リストパネル内の行（ライト読みやすさ重視） */
@@ -262,15 +284,12 @@ const LIST_CSS = `
   z-index: 2147483647;
   white-space: normal;
 }
-.cgtn-preview-btn {
-  all: unset; cursor: pointer; font-size: 14px; padding: 0 4px; color: #555;
-}
+
 .cgtn-preview-btn,
 .cgtn-clip-pin {
   all: unset;
   font-size: 12px;
   padding: 3px 5px;
-  color: #555;
 }
 .cgtn-preview-btn:hover,
 .cgtn-clip-pin:hover {

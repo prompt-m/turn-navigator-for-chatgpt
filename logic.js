@@ -366,26 +366,15 @@
     else btn.classList.remove('golden');
   }
 
-  function paintPinRow(row, pinned){
-    const clip = row.querySelector('.clip');
-    if (!clip) return;
-    clip.classList.add('cgtn-clip-pin');
-    clip.classList.add('cgtn-cursor-pin');
-    clip.classList.toggle('off', !pinned);
+function paintPinRow(row, pinned){
+  const clip = row.querySelector('.cgtn-clip-pin');
+  if (!clip) return;
 
-    // ダミーは見せずに幅だけ確保
-    if (clip.classList.contains('clip-dummy')){
-      clip.setAttribute('aria-pressed', 'false');
-      clip.style.visibility = 'hidden';
-      clip.style.pointerEvents = 'none';
-      return;
-    }
-
-    clip.style.visibility = 'visible';
-    clip.style.pointerEvents = 'auto';
-    clip.textContent = '🔖\uFE0E';
-    clip.setAttribute('aria-pressed', String(!!pinned));
-  }
+  const on = !!pinned;
+  clip.setAttribute('aria-pressed', String(on));
+  clip.classList.toggle('off', !on);
+  clip.textContent = '🔖\uFE0E';
+}
 
   function bindClipPinByIndex(clipEl, rowEl, chatId){
     clipEl.addEventListener('click', (ev) => {
@@ -856,7 +845,7 @@
         row.innerHTML = `
           <div class="txt"></div>
           <div class="ops">
-            <button class="cgtn-clip-pin cgtn-iconbtn off" title="${T('row.pin')}" aria-label="${T('row.pin')}">🔖\uFE0E</button>
+            <button class="cgtn-clip-pin cgtn-iconbtn off" title="${T('row.pin')}" aria-pressed ="false" aria-label="${T('row.pin')}">🔖\uFE0E</button>
             <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
           </div>
         `;
@@ -867,11 +856,7 @@
         // 付箋の色設定(初期ピン色)：配列の index で決める
         const on = !!pinsArr[index1 - 1];
         paintPinRow(row, on);
-
         if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.cgtn-clip-pin'), row, chatId);
-
-        window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row);
-        window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
 
         body.appendChild(row);
       }
@@ -893,7 +878,7 @@
         row2.innerHTML = `
           <div class="txt"></div>
           <div class="ops">
-            ${showClipOnBody ? `<button class="cgtn-clip-pin cgtn-iconbtn off" aria-pressed="false" title="${T('row.pin')}">🔖\uFE0E</button>` : ``}
+            ${showClipOnBody ? `<button class="cgtn-clip-pin cgtn-iconbtn off" title="${T('row.pin')}" aria-pressed ="false" aria-label="${T('row.pin')}" >🔖\uFE0E</button>` : ``}
             <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
           </div>
         `;
@@ -907,10 +892,6 @@
 
         if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
 
-        window.CGTN_SHARED?.applyTooltips?.({'.cgtn-preview-btn': 'row.previewBtn'}, row2);
-        window.CGTN_SHARED?.applyTooltips?.({'#cgpt-list-body .cgtn-clip-pin' : 'row.pin'}, listBox);
-
-
         body.appendChild(row2);
       }
     }
@@ -919,9 +900,6 @@
     let madeRows = body.querySelectorAll('.row').length;
     if (madeRows === 0 && pinOnly) {
       const T = window.CGTN_I18N?.t || ((k) => k);
-
-//      const msg = T('list.noPins');    // ← DICTにあるキーを利用
-//      const showAll = T('list.showAll');
 
       const empty = document.createElement('div');
       empty.className = 'cgtn-empty';
