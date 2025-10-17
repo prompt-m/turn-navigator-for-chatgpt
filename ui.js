@@ -25,9 +25,6 @@
 const pinCurURL = chrome.runtime.getURL('assets/pin16.png');
 const prvCurURL = chrome.runtime.getURL('assets/prev16.png');
 
-console.log("pinCurURL:",pinCurURL);
-console.log("prvCurURL:",prvCurURL);
-
 /* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
 const NAV_CSS = `
 /* =========================
@@ -650,7 +647,6 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
     const box = document.getElementById('cgpt-nav');
     if (!box) return;
     const cur = (SH.getCFG?.() || {}).lang;
-//console.log("applyLang cur:",cur);
     // 共通翻訳関数を取得
     const t = window.CGTN_I18N?.t || ((k)=>k);
 

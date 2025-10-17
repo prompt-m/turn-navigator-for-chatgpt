@@ -19,6 +19,7 @@
       list: '一覧',
       // === リスト／プレビュー関連 ===
       image: '（image）',
+      'list.unknown': '（unknown）',
       'list.showAll': "すべて表示",
       'list.noPins': "このチャットには付箋がありません。",
       'list.collapse': '畳む / 開く',
@@ -100,6 +101,7 @@
       list: 'List',
       // === List / Preview ===
       image: '(image)',
+      'list.unknown': '(unknown)',
       'list.showAll': "Show all",
       'list.noPins': "No pins in this chat.",
       'list.collapse': 'Collapse / Expand',

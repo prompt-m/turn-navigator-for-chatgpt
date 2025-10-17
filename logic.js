@@ -2,7 +2,12 @@
 (() => {
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
-  const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
+
+  // const TURN_SEL = 'div[data-testid^="conversation-turn-"]'; // keep for history
+  const TURN_SEL = 'article'; // 1 <article> を 1 ターンとして扱う
+  // 互換を残したい場合:
+  // const TURN_SEL = 'article, div[data-testid^="conversation-turn-"]';
+
   const titleEscape = SH.titleEscape;
 
   const t = window.CGTN_I18N?.t || ((k)=>k);
@@ -22,19 +27,20 @@
     }
   }
 
-  // 必ず役割を決定する（なければ既定で assistant）
+  // --- NEW: 役割判定（無ければ assistant） ---
   function getTurnRole(turnEl){
-    // 直下 or 配下から探す
-    const r = turnEl.querySelector('[data-message-author-role]');
-    let role = r?.getAttribute('data-message-author-role');
-    if (!role) {
-      // 稀に turnEl 直下にいないケースへの保険
-      const any = turnEl.querySelector('*[data-message-author-role]');
-      role = any?.getAttribute('data-message-author-role') || '';
+    try{
+      const n = turnEl.querySelector('[data-message-author-role]') 
+             || turnEl.querySelector('*[data-message-author-role]');
+      let role = (n?.getAttribute('data-message-author-role') || '')
+                  .trim().toLowerCase();
+      if (role === 'tool') role = 'assistant';
+console.log("getTurnRole:role",role);
+      return (role === 'user' || role === 'assistant') ? role : 'assistant';
+    }catch(_){
+console.log("getTurnRole:catch******* assistant");
+      return 'assistant';
     }
-    // tool はアシスタント寄りに扱う（既存UIとの整合）
-    if (role === 'tool') role = 'assistant';
-    return (role === 'user' || role === 'assistant') ? role : 'assistant';
   }
 
   function isPinnedByKey(turnId){
@@ -242,13 +248,32 @@
       ? (window.CGTN_UI?.t?.('image') || '(image)')
       : '';
 
-    const line = [kindsStr, imgLabel, namesStr].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
-    const max = Math.max(10, Number(maxChars)||0);
-    return max ? (line.length > max ? line.slice(0, max) : line) : line;
+//    const line = [kindsStr, imgLabel, namesStr].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+//    const max = Math.max(10, Number(maxChars)||0);
+//    return max ? (line.length > max ? line.slice(0, max) : line) : line;
+   // 仕様：テキストが無くても、添付があれば ⭳（ファイル名）/ ⭳（画像）
+    let dlStr = '';
+    if (names.length){
+      dlStr = `⭳（${names[0]}）`;
+    } else if (hasImg){
+console.log("**0**getTurnRole");
+      const role = getTurnRole(el);
+      const imgWord = (window.CGTN_I18N?.t?.('image') || '画像').replace(/[()]/g,'');
+      dlStr = (role === 'assistant') ? `⭳（${imgWord}）` : `（${imgWord}）`;
+    }
+    const line = (dlStr || [kindsStr, imgLabel, namesStr].filter(Boolean).join(' '))
+               .replace(/\s+/g,' ').trim();
+   const max = Math.max(10, Number(maxChars)||0);
+console.log("buildAttachmentLine line:",line);
+   return max ? (line.length > max ? line.slice(0, max) : line) : line;
+
   }
 
+  // NEW: 先頭の「この / This」を除去
+  function _trimThisHead(s){ return String(s||'').replace(/^\s*(この|this)\s*/i, ''); }
+
   // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
-  // ここ変えたよ：トリム＆maxChars 厳密適用
+  // トリム＆maxChars 厳密適用
   function extractBodySnippet(head, maxChars){
     if (!head) return '';
     const clone = head.cloneNode(true);
@@ -258,6 +283,7 @@
     ].join(',')).forEach(n => n.remove());
 
     let txt = (clone.innerText || '').replace(/\s+/g, ' ').trim();
+    txt = _trimThisHead(txt); //　←「この/This」頭トリムの導入
     return truncate(txt, maxChars);
   }
 
@@ -449,8 +475,11 @@
     if (!head) return false;
     const r = head.getBoundingClientRect();
     if (r.height < 8 || !isVisible(head)) return false;
-    const txt = (head.textContent || head.innerText || '').trim();
-    const hasText  = txt.length > 0;
+      const txt = (head.textContent || head.innerText || '').trim();
+      const hasText  = txt.length > 0 || !!(article.textContent||'').trim();
+//console.log("isRealTurn txt:",txt);
+//    const txt = (head.textContent || head.innerText || '').trim();
+//    const hasText  = txt.length > 0;
 //★★★    const hasMedia = !!head.querySelector('img,video,canvas,figure,[data-testid*="download"]');
     const hasMedia = !!article.querySelector(
       'img,video,canvas,figure,' +
@@ -511,10 +540,18 @@
 
     const allRaw = pickAllTurns().filter(isRealTurn);
     ST.all = sortByY(allRaw);
-    ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
-    ST.assistant = ST.all.filter(a => a.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
+//    ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
+//    ST.assistant = ST.all.filter(a => a.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
+console.log("**3**getTurnRole");
+    ST.user = ST.all.filter(a => getTurnRole(a) === 'user');
+console.log("**4**getTurnRole");
+    ST.assistant = ST.all.filter(a => getTurnRole(a) === 'assistant');
+
     // 全要素にキーを確実に紐付け
-    for (const a of ST.all){ getTurnKey(a); }
+    for (const a of ST.all){
+console.log("**5**getTurnRole");
+      getTurnKey(a); 
+    }
   }
 
   // --- list panel ---
@@ -807,6 +844,7 @@
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
+
     // === 行生成 ===
     for (const art of turns){
       // “元の全体順”の1始まり index を算出して、行に刻む
@@ -826,7 +864,12 @@
       const PREVIEW_MAX   = Math.max(600, Math.min(2000, (SH?.getCFG?.()?.list?.previewMax || 1200)));
       const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
       const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
-      const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
+//      const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
+console.log("**1**getTurnRole");
+      const role = getTurnRole(art);
+      const unknown = (window.CGTN_I18N?.t?.('list.unknown') || '（不明）');
+      const previewText = (bodyPreview || attachPreview || (role==='assistant' ? unknown : ''))
+                            .replace(/\s+\n/g, '\n').trim();
 
       // 添付行
       if (attachLine){
@@ -836,10 +879,18 @@
         row.dataset.idx  = String(index1);
         row.dataset.kind = 'attach';
 
-        const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
-        const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
+        //const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
+        //const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
+console.log("**2**getTurnRole");
+        const role = getTurnRole(art);
+        const isUser = role === 'user';
+        const isAsst = role === 'assistant';
+
         if (isUser) row.style.background = 'rgba(240,246,255,.60)';
         if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
+
+if (isUser) console.log(index1,"件目user art.matches:",art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
+if (isAsst) console.log(index1,"件目Asst art.matches:",art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
 
         // 本文行テンプレート
         row.innerHTML = `

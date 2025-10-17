@@ -117,7 +117,7 @@
   }
 
   function flashMsgPins(key='options.deleted'){
-console.log("flashMsgPins ");
+//console.log("flashMsgPins ");
     const T = window.CGTN_I18N?.t || (s=>s);
     const el = document.getElementById('msg-pins');
     if (!el) return;
@@ -213,14 +213,12 @@ console.log("flashMsgPins ");
   }
 
   document.getElementById('lang-ja')?.addEventListener('click', ()=>{
-console.log("lang-ja");
     SH.setLang?.('ja'); // i18n.js にある setter を想定（無ければ自前で保持）
     applyI18N();
     applyToUI();
     renderPinsManager();
   });
   document.getElementById('lang-en')?.addEventListener('click', ()=>{
-console.log("lang-en");
     SH.setLang?.('en');
     applyI18N();
     applyToUI();
@@ -236,7 +234,6 @@ console.log("lang-en");
       SH.renderViz?.(cfgNow, on);
     } catch {}
     // 2) 設定も保存（他と整合）
-//    SH.saveSettingsPatch?.({ showViz: on });
     // 3) ChatGPT タブにも反映を通知
     chrome.tabs.query({ url: ['*://chatgpt.com/*','*://chat.openai.com/*'] }, tabs=>{
       tabs.forEach(tab=>{
