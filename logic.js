@@ -2,7 +2,9 @@
 (() => {
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
-  const TURN_SEL = 'div[data-testid^="conversation-turn-"]';
+  const TURN_SEL = 'div[data-testid^="conversation-turn-"]'; // keep (legacy)
+//  const TURN_SEL = 'article[data-turn]'; // 1 <article> = 1 turn
+
   const titleEscape = SH.titleEscape;
 
   const t = window.CGTN_I18N?.t || ((k)=>k);
@@ -508,7 +510,7 @@
     // 会話スレッドが切り替わったらリストは閉じる ここまで
 
     NS._scroller = getTrueScroller();
-
+console.log("*******call pickAllTurns********");
     const allRaw = pickAllTurns().filter(isRealTurn);
     ST.all = sortByY(allRaw);
     ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
