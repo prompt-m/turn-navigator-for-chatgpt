@@ -850,7 +850,16 @@
           </div>
         `;
         row.querySelector('.txt').textContent = attachLine;
-        row.addEventListener('click', () => scrollToHead(art));
+//        row.addEventListener('click', () => scrollToHead(art));
+        row.addEventListener('click', (ev) =>{
+           // 他のUIパーツやリンクはスルー
+          if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
+          const txt = ev.target.closest('.txt');
+          if (!txt) return;
+          const row = txt.closest('.row');
+          if (!row) return;
+          scrollToHead(art);
+        }); 
         row.dataset.preview = previewText || attachLine || '';
 
         // 付箋の色設定(初期ピン色)：配列の index で決める
@@ -884,7 +893,16 @@
         `;
 
         row2.querySelector('.txt').textContent = bodyLine;
-        row2.addEventListener('click', () => scrollToHead(art));
+        //row2.addEventListener('click', () => scrollToHead(art));
+        row2.addEventListener('click', (ev) =>{
+           // 他のUIパーツやリンクはスルー
+          if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
+          const txt = ev.target.closest('.txt');
+          if (!txt) return;
+          const row = txt.closest('.row');
+          if (!row) return;
+          scrollToHead(art);
+        }); 
         row2.dataset.preview = previewText || bodyLine || '';
 
         const on2 = !!pinsArr[index1 - 1];

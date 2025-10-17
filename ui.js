@@ -128,15 +128,6 @@ const LIST_CSS = `
 /*#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px; cursor:pointer }
 */
 #cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px }
-#cgpt-list-body{ overflow:auto; padding:6px 8px }
-#cgpt-list-body .row{
-  display:flex; gap:8px; align-items:center;
-/*  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer*/
-  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08);
-}
-#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
-#cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
-
 #cgpt-bias-line,#cgpt-bias-band{ pointer-events:none!important }
 .cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
 .cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
@@ -177,19 +168,18 @@ const LIST_CSS = `
 }
 
 /* 本文は可変。ここだけスクロールさせる（再定義） */
-#cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }  /* ← flex:1 を追加 */
-/*
-#cgpt-list-body .row{
-  display:flex; gap:8px; align-items:center;
-  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08); cursor:pointer
-}*/
+#cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }
+
 #cgpt-list-body .row{
   display:flex; gap:8px; align-items:center;
   padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08);
 }
 
-#cgpt-list-body .row:hover{ background:rgba(0,0,0,.04) }
 #cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
+#cgpt-list-body .txt:hover {background: lightgray;}
+
+
+
 #cgpt-list-foot{
   display:flex; gap:8px; align-items:center; justify-content:flex-end;
   flex-wrap:wrap; padding:6px 8px; border-top:1px solid rgba(0,0,0,.08);
@@ -221,10 +211,6 @@ const LIST_CSS = `
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
 
-/*#cgpt-list-panel .row .cgtn-clip-pin { cursor:pointer; }*/
-
-#cgpt-list-panel .row .cgtn-clip-pin:hover { filter:brightness(1.1); }
-
 #cgpt-nav button:focus,
 #cgpt-nav label:focus,
 #cgpt-list-panel button:focus,
@@ -243,8 +229,10 @@ const LIST_CSS = `
   box-shadow: none !important;
 }
 
-/* 行の本文は従来どおり“指” */
+/* 行、無しにすると違和感あるので */
 #cgpt-list-body .row { cursor: pointer; }
+/* 本文のみ */
+#cgpt-list-body .txt { cursor: pointer; }
 
 /* プレビュー領域の専用カーソル */
 #cgpt-list-body .cgtn-preview-btn {cursor:url("${prvCurURL}"), pointer; }
@@ -294,8 +282,8 @@ const LIST_CSS = `
 .cgtn-preview-btn:hover,
 .cgtn-clip-pin:hover {
   color: White;
-  background: DarkBlue;
-  filter:brightness(1.1);
+  background: lightgray;
+/*  filter:brightness(1.1);*/
 }
 
 /* 追加のプレビュー吹き出し（ポップオーバー） */
