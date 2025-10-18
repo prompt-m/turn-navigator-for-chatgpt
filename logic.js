@@ -276,7 +276,6 @@
 
   // [追記] 本文からプレビュー用テキストを抽出（改行・空白を整理、長すぎるときはカット）
   function extractPreviewText(node){
-//console.log("プレビュー用テキストnode:",node);
     try {
       const raw = (node?.innerText || node?.textContent || '').trim();
       // 行頭・行末の連続空白を整理し、内部の過剰連続空白も縮める
@@ -284,7 +283,6 @@
                       .replace(/[ \t]+\n/g, '\n')
                       .replace(/\n{3,}/g, '\n\n')
                       .replace(/[ \t]{2,}/g, ' ');
-//console.log("プレビュー用テキストnorm:",norm);
       return norm.length > 2000 ? norm.slice(0, 2000) + '' : norm;
     } catch {
       return '';
@@ -469,54 +467,18 @@
   // rebuild の最後にキーを必ず割り振る
   function rebuild(){
 
-    ensurePinsCache();
-
-    if (isLocked && isLocked()) return;
-
-    // --- 会話スレッドが切り替わったらリストは閉じる（★一度だけインストール） ---
-    if (!window.CGTN_LOGIC?._threadHooked) {
-      (function(){
-        let _lastUrl = location.pathname + location.search;
-
-        // idempotent にする（過去のハンドラを外してから入れる）
-        if (window.CGTN_LOGIC._popHandler) {
-          window.removeEventListener('popstate', window.CGTN_LOGIC._popHandler);
-        }
-        window.CGTN_LOGIC._popHandler = () => {
-          _lastUrl = location.pathname + location.search;
-        };
-        window.addEventListener('popstate', window.CGTN_LOGIC._popHandler);
-
-        const _ensureOffOnThreadChange = () => {
-          const now = location.pathname + location.search;
-          if (now !== _lastUrl) {
-            _lastUrl = now;
-            try {
-              const chk = document.getElementById('cgpt-list-toggle');
-              if (chk) chk.checked = false;
-              window.CGTN_LOGIC?.setListEnabled?.(false, false);
-            } catch {}
-          }
-        };
-        // rebuild の最初で呼ぶ
-        const _origRebuild = window.CGTN_LOGIC?.rebuild;
-        window.CGTN_LOGIC.rebuild = function(){
-          _ensureOffOnThreadChange();
-          return _origRebuild?.apply(this, arguments);
-        };
-      })();
-      window.CGTN_LOGIC._threadHooked = true; // ★これで以降は再インストールされない
-    }
-    // 会話スレッドが切り替わったらリストは閉じる ここまで
-
     NS._scroller = getTrueScroller();
-console.log("*******call pickAllTurns********");
+
+console.log("*******rebuild call pickAllTurns********");
     const allRaw = pickAllTurns().filter(isRealTurn);
     ST.all = sortByY(allRaw);
     ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
     ST.assistant = ST.all.filter(a => a.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
-    // 全要素にキーを確実に紐付け
-    for (const a of ST.all){ getTurnKey(a); }
+
+    // 可能なら Set も用意（描画側が速くなる）
+    ST._userSet = new Set(ST.user);
+    ST._asstSet = new Set(ST.assistant);
+
   }
 
   // --- list panel ---
@@ -965,6 +927,7 @@ console.log("*******call pickAllTurns********");
       ensurePinsCache();  // ← 追加
 
       // ①まず即時スキャン（ある程度は出る）★★★
+console.debug('[setListEnabled*1]LG.rebuild() ');
       rebuild();
       panel.classList.remove('collapsed');
       const btn = panel.querySelector('#cgpt-list-collapse');
@@ -974,6 +937,7 @@ console.log("*******call pickAllTurns********");
       // ②遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
       //    rAF×2 でペイント後、さらに少し待ってから確定
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
+console.debug('[setListEnabled*2]LG.rebuild() ');
         setTimeout(()=>{ rebuild(); NS.renderList(true); }, 180);
       }));
     } else {

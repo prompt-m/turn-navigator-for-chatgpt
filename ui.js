@@ -25,9 +25,6 @@
 const pinCurURL = chrome.runtime.getURL('assets/pin16.png');
 const prvCurURL = chrome.runtime.getURL('assets/prev16.png');
 
-console.log("pinCurURL:",pinCurURL);
-console.log("prvCurURL:",prvCurURL);
-
 /* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
 const NAV_CSS = `
 /* =========================
@@ -567,8 +564,9 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
           : { list:{ ...(cur.list||{}), enabled:false, pinOnly:false } };
 
         SH.saveSettingsPatch(patch);
-
-        window.CGTN_LOGIC?.setListEnabled?.(on);
+//★★★もしかしたら不要？★★★
+//console.debug('[installUI] window.CGTN_LOGIC?.setListEnabled on: ',on);
+//        window.CGTN_LOGIC?.setListEnabled?.(on);
 
         // フォーカスを外して“カーソル残り”を防ぐ ★★★★
         try{ listChk.blur(); }catch{}

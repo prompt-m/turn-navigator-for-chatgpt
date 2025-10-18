@@ -10,14 +10,17 @@
 
   // --- チャット切替パイプライン（1回だけ動かすデバウンス付き） ---
   let _switchingChatId = null;
+
+/*
   function scheduleSyncForChat(chatId){
-//console.debug('[schedule] start chat=', chatId);
+console.debug('[scheduleSyncForChat] start chat=', chatId);
     if (!chatId) return;
     if (_switchingChatId === chatId) return; // 同一IDでの多重起動防止
     _switchingChatId = chatId;
 
     setTimeout(async () => {
       try {
+console.debug('[scheduleSyncForChat]  LG.rebuild?.() charID:', chatId);
         LG.rebuild?.();                  // 1) ST.all を作る
         LG.hydratePinsCache?.(chatId);   // 2) pins -> _pinsCache（引数で固定）
         if (SH.getCFG?.()?.list?.enabled) LG.renderList?.(true);
@@ -27,7 +30,7 @@
       }
     }, 250); // ChatGPT DOM置換待ち
   }
-
+*/
 
   // ========= 小さなユーティリティ =========
   function inOwnUI(node){
@@ -446,7 +449,7 @@
     // 初回も一度呼ぶ（初期描画）
     requestAnimationFrame(redraw); // 初期描画
   }
-
+/*
   // ========= 4) DOM変化→rebuild（自作UIは無視） =========
   function observeAndRebuild(){
     // 自前UIの変化は無視してループを断つ
@@ -454,12 +457,13 @@
       for (const m of muts){ if (inOwnUI(m.target)) return; }
       // 既存の「再初期化」フローに便乗して閉じる（併用可）
       window.CGTN_PREVIEW?.hide?.('reinit');
-      LG.rebuild();
+//console.debug('[observeAndRebuild]LG.rebuild() ');
+      //LG.rebuild();
     });
     mo.observe(document.body, { childList:true, subtree:true });
     return mo;
   }
-
+*/
   // ========= 5) URL変化でのクローズ・再描画 =========
   function closeDockOnUrlChange(){
     let last = location.pathname + location.search;
@@ -471,6 +475,7 @@
         try {
           LG?.hydratePinsCache?.();   // 新チャットのピンをロード
           // pinOnly の状態は既存CFGを尊重
+console.debug('[closeDockOnUrlChange]LG.rebuild() ');
           LG?.rebuild?.();
           LG?.renderList?.(true);
         } catch {}
@@ -490,6 +495,7 @@
       document.getElementById('cgpt-list-toggle').checked = false;
       const pinOnlyChk = document.getElementById('cgpt-pinonly');
       if (pinOnlyChk){ pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
+console.debug('[forceListPanelOffOnBoot] LG?.setListEnabled false ');
       LG?.setListEnabled?.(false, /*save*/ false);
     } catch {}
   }
@@ -520,6 +526,7 @@
       const aKind = anchor?.dataset?.kind || null;
 
       // 再スキャン & 再描画
+console.debug('[bindListRefreshButton]LG.rebuild() ');
       LG?.rebuild?.();
       LG?.renderList?.(true);
       // 復元
@@ -566,6 +573,7 @@
     });
   }catch{}
 
+/*
   // ========= 8) サイドバーから会話一覧を1回収集 =========
   const C_ID_RE = /\/c\/([0-9a-f-]{8,})/i;
   function _pickChatId(href){
@@ -573,6 +581,7 @@
     const m = C_ID_RE.exec(href);
     return m ? m[1] : null;
   }
+
   function _pickTitle(a){
     const t1 = a.querySelector('.truncate')?.getAttribute('title');
     if (t1 && t1.trim()) return t1.trim();
@@ -591,6 +600,7 @@
     });
     return out;
   }
+
   function refreshChatIndexOnce(){
     try {
       const idx = scrapeSidebarChats();
@@ -600,7 +610,7 @@
       });
     } catch {}
   }
-
+*/
   function watchChatIdChange(){
     let prev = null;
     setInterval(() => {
@@ -608,10 +618,18 @@
 //console.debug('[watch] chat switch ->', cur);
       if (cur && cur !== prev) {
         prev = cur;
+        //チャットを切り替えたらリストを閉じる処理
         // チャット切替時は一旦リストOFF（勝手に開かない）
         SH.saveSettingsPatch({ list:{ enabled:false } });
+        // 実UIも即クローズ（チェックボックスとAPIの両方を叩く）
+        try {
+          const chk = document.getElementById('cgpt-list-toggle');
+          if (chk) chk.checked = false;
+          window.CGTN_LOGIC?.setListEnabled?.(false, false); // 描画しない/副作用なしのフラグ更新だけ
+        } catch {}
+
         // スケジュール実行（chatIdを確定して渡す）
-        scheduleSyncForChat(cur);
+//        scheduleSyncForChat(cur);
       }
     }, 800);
   }
@@ -620,15 +638,10 @@
   function initialize(){
     SH.loadSettings(() => {
       UI.installUI();
-//      ↓こいつが悪さしてた
-//      SH?.touchChatMeta?.();   // あればメタ更新（try不要な場合のみ）
-
       ensureFocusPark();
       installFocusStealGuard();
       UI.applyLang();
       UI.clampPanelWithinViewport();
-
-      LG.rebuild();
 
       // 基準線の初期表示（保存 showViz を尊重）
       try {
@@ -636,16 +649,18 @@
         SH?.renderViz?.(cfg, !!cfg?.showViz);
       } catch {}
 
+console.log("initialize bindEvents");
       EV.bindEvents();
       bindPreviewDockOnce();
       bindBaselineAutoFollow();
-      observeAndRebuild();
+//★★★もしかしたら不要？★★★
+//      observeAndRebuild();
       closeDockOnUrlChange();
       bindListRefreshButton();
       forceListPanelOffOnBoot();
 
       // ★★★ 起動時1回：サイドバー会話一覧を保存（あなたの運用ポリシー） ★★★
-      setTimeout(refreshChatIndexOnce, 400);
+//      setTimeout(refreshChatIndexOnce, 400);
       watchChatIdChange();
 
       // ★ここで一発クリーンアップ！

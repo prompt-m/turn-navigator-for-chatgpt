@@ -117,7 +117,6 @@
   }
 
   function flashMsgPins(key='options.deleted'){
-console.log("flashMsgPins ");
     const T = window.CGTN_I18N?.t || (s=>s);
     const el = document.getElementById('msg-pins');
     if (!el) return;
@@ -213,14 +212,12 @@ console.log("flashMsgPins ");
   }
 
   document.getElementById('lang-ja')?.addEventListener('click', ()=>{
-console.log("lang-ja");
     SH.setLang?.('ja'); // i18n.js にある setter を想定（無ければ自前で保持）
     applyI18N();
     applyToUI();
     renderPinsManager();
   });
   document.getElementById('lang-en')?.addEventListener('click', ()=>{
-console.log("lang-en");
     SH.setLang?.('en');
     applyI18N();
     applyToUI();
@@ -246,14 +243,12 @@ console.log("lang-en");
   });
 
   async function deletePinsFromOptions(chatId){
-console.log("deletePinsFromOptions");
     const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
 
     const ok = await SH.deletePinsForChat(chatId);
 
     if (ok){
-console.log("deletePinsFromOptions call chatId: ",chatId," OK?:",ok);
       // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）
       try {
        const targets = [
@@ -268,12 +263,9 @@ console.log("deletePinsFromOptions call chatId: ",chatId," OK?:",ok);
       } catch {}
 
       await renderPinsManager();
-console.log("deletePinsFromOptions flashMsgPins直前: ",chatId," OK?:",ok);
       // 近くにポワン
       toastNearPointer(T('options.deleted') || 'Deleted');
-//      flashMsgPins('options.deleted');
     }
-console.log("deletePinsFromOptions call chatId: ",chatId," not OK?:",ok);
 
   }
 
@@ -298,7 +290,6 @@ console.log("deletePinsFromOptions call chatId: ",chatId," not OK?:",ok);
       const form = $('cgtn-options');
       // 入力で即保存
       form?.addEventListener('input', (ev)=>{
-console.log("入力で即保存");
         try {
           const c2 = uiToCfg();
           SH.saveSettingsPatch?.(c2);
