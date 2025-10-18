@@ -921,7 +921,11 @@ console.log("*******rebuild call pickAllTurns********");
 
     const panel = ensureListBox();
     panel.style.display = on ? 'flex' : 'none';
-  
+
+    // リストが開いているかどうか
+    // ← 追加：ランタイムフラグ（UI即時状態）
+    NS._panelOpen = !!on;
+
     // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
     if (on) {
       ensurePinsCache();  // ← 追加

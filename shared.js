@@ -543,6 +543,21 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
     });
   } catch {}
 
+  // === UIの実状態: 今まさにリストが開いているか？ ===
+  /** UI(checkbox) → ランタイムフラグ → 保存値 の順で判定 */
+  NS.isListOpen = function isListOpen(){
+    try{
+      const cb = document.getElementById('cgpt-list-toggle');
+      if (cb) return !!cb.checked;
+      if (window.CGTN_LOGIC && typeof window.CGTN_LOGIC._panelOpen === 'boolean') {
+        return !!window.CGTN_LOGIC._panelOpen;
+      }
+      return !!(NS.getCFG?.()?.list?.enabled);
+    }catch{
+      return !!(NS.getCFG?.()?.list?.enabled);
+    }
+  };
+
   NS.DEFAULTS = DEFAULTS;
   NS.getCFG = () => CFG;
   NS.loadSettings = loadSettings;

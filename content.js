@@ -477,8 +477,9 @@ console.debug('[scheduleSyncForChat]  LG.rebuild?.() charID:', chatId);
           // pinOnly の状態は既存CFGを尊重
 console.debug('[closeDockOnUrlChange]LG.rebuild() ');
           LG?.rebuild?.();
-          LG?.renderList?.(true);
-        } catch {}
+//          LG?.renderList?.(true);
+          // 閉じているなら無駄描画しない
+          if (SH.isListOpen?.()) LG?.renderList?.(true);        } catch {}
       }
     };
     window.addEventListener('popstate', check);
@@ -555,12 +556,13 @@ console.debug('[bindListRefreshButton]LG.rebuild() ');
         // 表示中のチャットなら一覧をリフレッシュ
         const cid = SH.getChatId?.();
         if (!cid || (msg.chatId && msg.chatId !== cid)) return;
-        //LG.hydratePinsCache?.(cid);
-        //LG.renderList?.(true);
         LG.hydratePinsCache?.(cid);
-        const wasOpen = !!window.CGTN_SHARED?.getCFG?.()?.list?.enabled;
-        // wasOpen === true のときだけ描画（閉じていれば何もしない）
-        if (wasOpen) window.CGTN_LOGIC?.renderList?.(false);
+        //const wasOpen = !!window.CGTN_SHARED?.getCFG?.()?.list?.enabled;
+        //if (wasOpen) window.CGTN_LOGIC?.renderList?.(false);
+        // isListOpen === true のときだけ描画（閉じていれば何もしない）
+        //　設定画面で付箋データが削除されたとき、リストを更新する処理
+console.log("設定画面で付箋データが削除されたとき、リストを更新する処理");
+        if (SH.isListOpen?.()) window.CGTN_LOGIC?.renderList?.(false);
 
       }
       if (msg.type === 'cgtn:viz-toggle'){
