@@ -7,32 +7,14 @@
   const UI = window.CGTN_UI;
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
-   // リスト開状態なら自動で中身を新チャットへ差し替える
-   const AUTO_SYNC_OPEN_LIST = true;
 
-  // --- チャット切替パイプライン（1回だけ動かすデバウンス付き） ---
-  let _switchingChatId = null;
 
-/*
-  function scheduleSyncForChat(chatId){
-console.debug('[scheduleSyncForChat] start chat=', chatId);
-    if (!chatId) return;
-    if (_switchingChatId === chatId) return; // 同一IDでの多重起動防止
-    _switchingChatId = chatId;
-
-    setTimeout(async () => {
-      try {
-console.debug('[scheduleSyncForChat]  LG.rebuild?.() charID:', chatId);
-        LG.rebuild?.();                  // 1) ST.all を作る
-        LG.hydratePinsCache?.(chatId);   // 2) pins -> _pinsCache（引数で固定）
-        if (SH.getCFG?.()?.list?.enabled) LG.renderList?.(true);
-        await Promise.resolve(LG.renderList?.()); // 3) 描画（末尾でフッター更新）
-      } finally {
-        _switchingChatId = null;
-      }
-    }, 250); // ChatGPT DOM置換待ち
-  }
-*/
+  // --- 自動同期フラグ（最小差分用） ---
+  // リスト開状態なら「チャット切替時」に中身だけ差し替える
+  const AUTO_SYNC_OPEN_LIST = true;
+  // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
+  const USE_INJECT_URL_HOOK = true;
+  const URL_HOOK_EVENT = 'cgtn:url-change';
 
   // ========= 小さなユーティリティ =========
   function inOwnUI(node){
@@ -467,87 +449,66 @@ console.debug('[scheduleSyncForChat]  LG.rebuild?.() charID:', chatId);
   }
 */
   // ========= 5) URL変化でのクローズ・再描画 =========
-/*
-  function closeDockOnUrlChange(){
-    let last = location.pathname + location.search;
-    const AUTO_SYNC_OPEN_LIST = true; // リスト開状態なら自動で中身を新チャットへ差し替える
-
-    const check = () => {
-      const cur = location.pathname + location.search;
-      if (cur !== last){
-
-        last = cur;
-        window.CGTN_PREVIEW?.hide?.('url-change');
-        try {
-          LG?.hydratePinsCache?.();   // 新チャットのピンをロード
-          // pinOnly の状態は既存CFGを尊重
-          LG?.rebuild?.();
-//          LG?.renderList?.(true);
-          // 閉じているなら無駄描画しない
-          if (SH.isListOpen?.()) LG?.renderList?.(true);        } catch {}
-      }
-    };
-    window.addEventListener('popstate', check);
-    window.addEventListener('hashchange', check);
-    const _push = history.pushState;
-    history.pushState = function(...args){ const ret=_push.apply(this,args); try{ check(); }catch{} return ret; };
-  }
-*/
 
   function closeDockOnUrlChange(){
+
+    if (!USE_INJECT_URL_HOOK){
+     // ここに既存の popstate/hashchange/setInterval(check, …) などを有効のまま
+    // インジェクト方式を使う場合は発火源が二重になるのでバイパス
+
 console.log("＊＊＊＊closeDockOnUrlChange＊＊＊＊");
+      let last = location.pathname + location.search;
 
-    let last = location.pathname + location.search;
+      // リスト開状態なら自動で中身を新チャットへ差し替える
+      const AUTO_SYNC_OPEN_LIST = true; // ← ここでON/OFFできる
 
-    // リスト開状態なら自動で中身を新チャットへ差し替える
-    const AUTO_SYNC_OPEN_LIST = true; // ← ここでON/OFFできる
-
-    const check = () => {
-      const cur = location.pathname + location.search;
+      const check = () => {
+        const cur = location.pathname + location.search;
 console.log("＊＊＊＊closeDockOnUrlChange 1＊＊＊＊ cur:",cur);
-      if (cur === last) return;
+        if (cur === last) return;
 
 console.log("＊＊＊＊closeDockOnUrlChange 2＊＊＊＊");
-      last = cur;
-      window.CGTN_PREVIEW?.hide?.('url-change');
+        last = cur;
+        window.CGTN_PREVIEW?.hide?.('url-change');
 
-      // ★ 開いている時だけ自動更新（閉じているなら何もしない）
-      if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()) {
-        try {
+        // ★ 開いている時だけ自動更新（閉じているなら何もしない）
+        if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()) {
+          try {
 console.log("＊＊＊＊closeDockOnUrlChange 3 open＊＊＊＊");
-          const cid = SH.getChatId?.();
-          // pins → 新チャットへ切替（引数省略版でもOK）
-          if (cid) LG?.hydratePinsCache?.(cid); else LG?.hydratePinsCache?.();
-          LG?.rebuild?.('auto:chat-switch');
-          LG?.renderList?.(true);
-        } catch (e) {
-          console.debug('[auto-sync] chat switch update failed:', e);
+            const cid = SH.getChatId?.();
+            // pins → 新チャットへ切替（引数省略版でもOK）
+            if (cid) LG?.hydratePinsCache?.(cid); else LG?.hydratePinsCache?.();
+            LG?.rebuild?.('auto:chat-switch');
+            LG?.renderList?.(true);
+          } catch (e) {
+            console.debug('[auto-sync] chat switch update failed:', e);
+          }
         }
-      }
 console.log("＊＊＊＊closeDockOnUrlChange 4 close＊＊＊＊");
-      // ※ 閉じている時は描画しない＝無駄コストをかけない
-    };
+        // ※ 閉じている時は描画しない＝無駄コストをかけない
+      };
 
 console.log("＊＊＊＊closeDockOnUrlChange 5 ＊＊＊＊");
 
-    window.addEventListener('popstate', check);
-    window.addEventListener('hashchange', check);
+      window.addEventListener('popstate', check);
+      window.addEventListener('hashchange', check);
 
-    // SPA用: pushState / replaceState をフック
-    const _push = history.pushState;
-    history.pushState = function(...args){
-      const ret = _push.apply(this, args);
-      try { check(); } catch {}
+      // SPA用: pushState / replaceState をフック
+      const _push = history.pushState;
+      history.pushState = function(...args){
+        const ret = _push.apply(this, args);
+        try { check(); } catch {}
 console.log("＊＊＊＊closeDockOnUrlChange 6 ＊＊＊＊");
-      return ret;
-    };
-    const _repl = history.replaceState;
-    history.replaceState = function(...args){
-      const ret = _repl.apply(this, args);
-      try { check(); } catch {}
+        return ret;
+      };
+      const _repl = history.replaceState;
+      history.replaceState = function(...args){
+        const ret = _repl.apply(this, args);
+        try { check(); } catch {}
 console.log("＊＊＊＊closeDockOnUrlChange 7 ＊＊＊＊");
-      return ret;
-    };
+        return ret;
+      };
+    }
 }
 
   // ========= 6) 一覧パネルの初期状態をOFFに強制 =========
@@ -637,44 +598,7 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     });
   }catch{}
 
-/*
-  // ========= 8) サイドバーから会話一覧を1回収集 =========
-  const C_ID_RE = /\/c\/([0-9a-f-]{8,})/i;
-  function _pickChatId(href){
-    if (!href || href.includes('/library')) return null;
-    const m = C_ID_RE.exec(href);
-    return m ? m[1] : null;
-  }
 
-  function _pickTitle(a){
-    const t1 = a.querySelector('.truncate')?.getAttribute('title');
-    if (t1 && t1.trim()) return t1.trim();
-    const t2 = a.querySelector('.truncate')?.textContent;
-    if (t2 && t2.trim()) return t2.trim().replace(/\s+/g,' ');
-    const t3 = a.textContent;
-    return (t3 || '').trim().replace(/\s+/g,' ');
-  }
-  function scrapeSidebarChats(){
-    const out = { ids:{}, titles:{} };
-    const nav = document.querySelector('nav') || document;
-    nav.querySelectorAll('a[href]').forEach(a=>{
-      const id = _pickChatId(a.getAttribute('href')); if (!id) return;
-      out.ids[id] = true;
-      const title = _pickTitle(a); if (title) out.titles[id] = title;
-    });
-    return out;
-  }
-
-  function refreshChatIndexOnce(){
-    try {
-      const idx = scrapeSidebarChats();
-      SH.saveSettingsPatch?.({
-        chatIndex: { updatedAt: Date.now(), ids: idx.ids, titles: idx.titles },
-        currentChatId: SH.getChatId()
-      });
-    } catch {}
-  }
-*/
   function watchChatIdChange(){
     let prev = null;
     setInterval(() => {
@@ -685,12 +609,20 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
         //チャットを切り替えたらリストを閉じる処理
         // チャット切替時は一旦リストOFF（勝手に開かない）
         SH.saveSettingsPatch({ list:{ enabled:false } });
+
+        // チャット切替で強制OFFする旧挙動（残しつつフラグでガード）
+        if (!AUTO_SYNC_OPEN_LIST){
+          SH.saveSettingsPatch({ list:{ enabled:false } });
+          // （既存のチェックボックス連動処理もこの if 内に残す）
+        }
+
+
         // 実UIも即クローズ（チェックボックスとAPIの両方を叩く）
-        try {
-          const chk = document.getElementById('cgpt-list-toggle');
-          if (chk) chk.checked = false;
-          window.CGTN_LOGIC?.setListEnabled?.(false, false); // 描画しない/副作用なしのフラグ更新だけ
-        } catch {}
+//        try {
+//          const chk = document.getElementById('cgpt-list-toggle');
+//          if (chk) chk.checked = false;
+//          window.CGTN_LOGIC?.setListEnabled?.(false, false); // 描画しない/副作用なしのフラグ更新だけ
+//        } catch {}
 
         // スケジュール実行（chatIdを確定して渡す）
 //        scheduleSyncForChat(cur);
@@ -698,37 +630,82 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     }, 800);
   }
 
+  // ========= URL変化をページ文脈でフックして postMessage させる =========
+  function injectUrlChangeHook(){
+    try{
+      const s = document.createElement('script');
+      s.src = chrome.runtime.getURL('inject_url_hook.js');
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    }catch(e){ console.warn('injectUrlChangeHook failed', e); }
+  }
+
+  let _lastUrlSig = location.pathname + location.search;
+  function handleUrlChangeMessage(){
+    const cur = location.pathname + location.search;
+    if (cur === _lastUrlSig) return;
+    _lastUrlSig = cur;
+    window.CGTN_PREVIEW?.hide?.('url-change');
+    try{
+      if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()){
+        LG?.hydratePinsCache?.();  // 引数省略で現チャットID取得の実装に合わせる
+        LG?.rebuild?.();
+        LG?.renderList?.(true);
+        console.debug('[auto-sync] chat switch (list open) → rebuild+render');
+      } else {
+        console.debug('[auto-sync] chat switch (list closed) → noop');
+      }
+    }catch(e){}
+  }
+
+  // ========= リスト表示中の「ターン追加」自動更新（MOは1本のみ） =========
   function installAutoSyncForTurns(){
+console.log("installAutoSyncForTurns top");
     if (document._cgtnAutoSyncBound) return;
     document._cgtnAutoSyncBound = true;
 
-    const inOwnUI = (node)=> node?.closest?.('[data-cgtn-ui]') || 
-                             document.getElementById('cgpt-nav')?.contains(node) ||
-                             document.getElementById('cgpt-list-panel')?.contains(node);
-
-    const root = document.querySelector('main') || document.body;
-    let t = 0;
-    const kick = ()=> {
-      if (!SH.isListOpen?.()) return;
-      cancelAnimationFrame(t);
-      t = requestAnimationFrame(()=> {
-        setTimeout(()=>{ LG.rebuild?.(); LG.renderList?.(true); }, 0);
-      });
+console.log("installAutoSyncForTurns 1");
+  
+    // 自作UI除外（無限ループ防止）
+    const inOwnUI = (node) => {
+      if (!node || node.nodeType !== 1) return false;
+      return node.closest?.('[data-cgtn-ui]') ||
+             document.getElementById('cgpt-nav')?.contains(node) ||
+             document.getElementById('cgpt-list-panel')?.contains(node);
     };
+console.log("installAutoSyncForTurns 2");
+  
+    const root = document.querySelector('main') || document.body;
+    let to = 0;
+    const kick = () => {
+      if (!SH.isListOpen?.()) return;        // 閉じている間は完全ノーオペ
+      clearTimeout(to);
+      to = setTimeout(() => {
+        try{
+          LG.rebuild?.();
+          LG.renderList?.(true);
+          console.debug('[auto-sync] turns+ (list open) → rebuild+render');
+        }catch(e){}
+      }, 300); // 300msデバウンス
+    };
+console.log("installAutoSyncForTurns 3");
 
-    const mo = new MutationObserver(muts=>{
-      if (!SH.isListOpen?.()) return;
+    const mo = new MutationObserver((muts)=>{
+      if (!SH.isListOpen?.()) return;        // リスト閉なら処理しない
       for (const m of muts){
-        if (inOwnUI(m.target)) continue;
-        if ([...m.addedNodes].some(n =>
-             n?.nodeType===1 && (n.matches?.('article,[data-message-author-role]') ||
-             n.querySelector?.('article,[data-message-author-role]')))) {
-          kick();
-          break;
-        }
+        if (inOwnUI(m.target)) continue;     // 自作UIは無視
+        // 追加ノードに会話要素が含まれるか
+        const hit = [...m.addedNodes].some(n =>
+          n?.nodeType===1 && (
+            n.matches?.('article,[data-message-author-role]') ||
+            n.querySelector?.('article,[data-message-author-role]')
+          )
+        );
+        if (hit){ kick(); break; }
       }
     });
-    mo.observe(root, { childList:true, subtree:true });
+console.log("installAutoSyncForTurns 4");
+    try{ mo.observe(root, { childList:true, subtree:true }); }catch(e){}
   }
 
   // ========= 9) 初期セットアップ =========
@@ -757,18 +734,26 @@ console.log("initialize closeDockOnUrlChange");
       bindListRefreshButton();
       forceListPanelOffOnBoot();
 
+      if (USE_INJECT_URL_HOOK){
+        injectUrlChangeHook();
+        window.addEventListener('message', (ev)=>{
+          if (ev?.data?.source==='cgtn' && ev?.data?.type==='url-change'){
+            handleUrlChangeMessage();
+          }
+        });
+      }
+      installAutoSyncForTurns(); // MOは1本のみ
 
-
-
-      // ★★★ 起動時1回：サイドバー会話一覧を保存（あなたの運用ポリシー） ★★★
-//      setTimeout(refreshChatIndexOnce, 400);
       watchChatIdChange();
 
       // ★ここで一発クリーンアップ！
       SH.cleanupZeroPinRecords();
     });
+    // ナビが動かなくなったので、入れてみる
+    LG.rebuild?.();
+
     // リスト自動更新処理
-    installAutoSyncForTurns();
+    //installAutoSyncForTurns();
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });

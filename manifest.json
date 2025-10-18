@@ -10,8 +10,8 @@
     "128": "icon128.png"
   },
   "web_accessible_resources": [{
-    "resources": ["assets/*.cur","assets/*.png"],
-    "matches": ["<all_urls>"]
+    "resources": ["inject_url_hook.js","assets/*.cur","assets/*.png"],
+    "matches": ["*://chat.openai.com/*", "*://chatgpt.com/*","<all_urls>"]
   }],
   "permissions": ["storage","tabs"],
   "host_permissions": [

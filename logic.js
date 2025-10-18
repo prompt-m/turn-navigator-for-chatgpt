@@ -24,21 +24,6 @@
     }
   }
 
-  // 必ず役割を決定する（なければ既定で assistant）
-  function getTurnRole(turnEl){
-    // 直下 or 配下から探す
-    const r = turnEl.querySelector('[data-message-author-role]');
-    let role = r?.getAttribute('data-message-author-role');
-    if (!role) {
-      // 稀に turnEl 直下にいないケースへの保険
-      const any = turnEl.querySelector('*[data-message-author-role]');
-      role = any?.getAttribute('data-message-author-role') || '';
-    }
-    // tool はアシスタント寄りに扱う（既存UIとの整合）
-    if (role === 'tool') role = 'assistant';
-    return (role === 'user' || role === 'assistant') ? role : 'assistant';
-  }
-
   function isPinnedByKey(turnId){
     return !!(_pinsCache && _pinsCache[String(turnId)]);
   }
