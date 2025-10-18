@@ -7,6 +7,8 @@
   const UI = window.CGTN_UI;
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
+   // リスト開状態なら自動で中身を新チャットへ差し替える
+   const AUTO_SYNC_OPEN_LIST = true;
 
   // --- チャット切替パイプライン（1回だけ動かすデバウンス付き） ---
   let _switchingChatId = null;
@@ -465,17 +467,20 @@ console.debug('[scheduleSyncForChat]  LG.rebuild?.() charID:', chatId);
   }
 */
   // ========= 5) URL変化でのクローズ・再描画 =========
+/*
   function closeDockOnUrlChange(){
     let last = location.pathname + location.search;
+    const AUTO_SYNC_OPEN_LIST = true; // リスト開状態なら自動で中身を新チャットへ差し替える
+
     const check = () => {
       const cur = location.pathname + location.search;
       if (cur !== last){
+
         last = cur;
         window.CGTN_PREVIEW?.hide?.('url-change');
         try {
           LG?.hydratePinsCache?.();   // 新チャットのピンをロード
           // pinOnly の状態は既存CFGを尊重
-console.debug('[closeDockOnUrlChange]LG.rebuild() ');
           LG?.rebuild?.();
 //          LG?.renderList?.(true);
           // 閉じているなら無駄描画しない
@@ -487,6 +492,63 @@ console.debug('[closeDockOnUrlChange]LG.rebuild() ');
     const _push = history.pushState;
     history.pushState = function(...args){ const ret=_push.apply(this,args); try{ check(); }catch{} return ret; };
   }
+*/
+
+  function closeDockOnUrlChange(){
+console.log("＊＊＊＊closeDockOnUrlChange＊＊＊＊");
+
+    let last = location.pathname + location.search;
+
+    // リスト開状態なら自動で中身を新チャットへ差し替える
+    const AUTO_SYNC_OPEN_LIST = true; // ← ここでON/OFFできる
+
+    const check = () => {
+      const cur = location.pathname + location.search;
+console.log("＊＊＊＊closeDockOnUrlChange 1＊＊＊＊ cur:",cur);
+      if (cur === last) return;
+
+console.log("＊＊＊＊closeDockOnUrlChange 2＊＊＊＊");
+      last = cur;
+      window.CGTN_PREVIEW?.hide?.('url-change');
+
+      // ★ 開いている時だけ自動更新（閉じているなら何もしない）
+      if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()) {
+        try {
+console.log("＊＊＊＊closeDockOnUrlChange 3 open＊＊＊＊");
+          const cid = SH.getChatId?.();
+          // pins → 新チャットへ切替（引数省略版でもOK）
+          if (cid) LG?.hydratePinsCache?.(cid); else LG?.hydratePinsCache?.();
+          LG?.rebuild?.('auto:chat-switch');
+          LG?.renderList?.(true);
+        } catch (e) {
+          console.debug('[auto-sync] chat switch update failed:', e);
+        }
+      }
+console.log("＊＊＊＊closeDockOnUrlChange 4 close＊＊＊＊");
+      // ※ 閉じている時は描画しない＝無駄コストをかけない
+    };
+
+console.log("＊＊＊＊closeDockOnUrlChange 5 ＊＊＊＊");
+
+    window.addEventListener('popstate', check);
+    window.addEventListener('hashchange', check);
+
+    // SPA用: pushState / replaceState をフック
+    const _push = history.pushState;
+    history.pushState = function(...args){
+      const ret = _push.apply(this, args);
+      try { check(); } catch {}
+console.log("＊＊＊＊closeDockOnUrlChange 6 ＊＊＊＊");
+      return ret;
+    };
+    const _repl = history.replaceState;
+    history.replaceState = function(...args){
+      const ret = _repl.apply(this, args);
+      try { check(); } catch {}
+console.log("＊＊＊＊closeDockOnUrlChange 7 ＊＊＊＊");
+      return ret;
+    };
+}
 
   // ========= 6) 一覧パネルの初期状態をOFFに強制 =========
   function forceListPanelOffOnBoot(){
@@ -636,6 +698,39 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     }, 800);
   }
 
+  function installAutoSyncForTurns(){
+    if (document._cgtnAutoSyncBound) return;
+    document._cgtnAutoSyncBound = true;
+
+    const inOwnUI = (node)=> node?.closest?.('[data-cgtn-ui]') || 
+                             document.getElementById('cgpt-nav')?.contains(node) ||
+                             document.getElementById('cgpt-list-panel')?.contains(node);
+
+    const root = document.querySelector('main') || document.body;
+    let t = 0;
+    const kick = ()=> {
+      if (!SH.isListOpen?.()) return;
+      cancelAnimationFrame(t);
+      t = requestAnimationFrame(()=> {
+        setTimeout(()=>{ LG.rebuild?.(); LG.renderList?.(true); }, 0);
+      });
+    };
+
+    const mo = new MutationObserver(muts=>{
+      if (!SH.isListOpen?.()) return;
+      for (const m of muts){
+        if (inOwnUI(m.target)) continue;
+        if ([...m.addedNodes].some(n =>
+             n?.nodeType===1 && (n.matches?.('article,[data-message-author-role]') ||
+             n.querySelector?.('article,[data-message-author-role]')))) {
+          kick();
+          break;
+        }
+      }
+    });
+    mo.observe(root, { childList:true, subtree:true });
+  }
+
   // ========= 9) 初期セットアップ =========
   function initialize(){
     SH.loadSettings(() => {
@@ -657,9 +752,13 @@ console.log("initialize bindEvents");
       bindBaselineAutoFollow();
 //★★★もしかしたら不要？★★★
 //      observeAndRebuild();
+console.log("initialize closeDockOnUrlChange");
       closeDockOnUrlChange();
       bindListRefreshButton();
       forceListPanelOffOnBoot();
+
+
+
 
       // ★★★ 起動時1回：サイドバー会話一覧を保存（あなたの運用ポリシー） ★★★
 //      setTimeout(refreshChatIndexOnce, 400);
@@ -668,6 +767,8 @@ console.log("initialize bindEvents");
       // ★ここで一発クリーンアップ！
       SH.cleanupZeroPinRecords();
     });
+    // リスト自動更新処理
+    installAutoSyncForTurns();
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
