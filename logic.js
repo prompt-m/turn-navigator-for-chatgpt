@@ -220,26 +220,73 @@
     return picked || '（内容なし）';
   }
 
+  // 「…をダウンロード」抽出 → ラベル化（⭳（…））
+  function _extractDownloadLabelFromText(el){
+    if (!el) return '';
+    const raw = (el.innerText || '').replace(/\s+/g,' ').trim();
+    // 「この」を任意化し、全角半角の「 をダウンロード 」を吸収
+    const m = raw.match(/(?:この)?\s*([^。\n\r]+?)\s*をダウンロード/);
+    let name = (m && m[1] || '').trim();
+    if (!name) return '';
+    // 先頭の「この」を除去
+    name = name.replace(/^この\s*/,'');
+    return `⭳（${name}）`;
+  }
+
+  function getTurnRole(el){
+    if (!el) return 'unknown';
+    const roleHint = el.dataset?.turn;
+    if (roleHint) return roleHint; // data-turn優先
+    if (el.matches('[data-message-author-role="user"], div [data-message-author-role="user"]')) return 'user';
+    if (el.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]')) return 'assistant';
+    return 'unknown';
+  }
+
+  // ===== 添付ファイル検出（Article.txt対応） =====
+  // 添付UIの実在判定（本文の単語では反応しない）
+  function hasAttachmentUI(root){
+    const el = root || document;
+    return !!el.querySelector(
+      'a[download], a[href^="blob:"], ' +
+      '.border.rounded-xl .truncate.font-semibold, ' +
+      'img, picture img, video, source[type^="video/"]'
+    );
+  }
+
+
+  // 仕様に合わせて「添付行」テキストを構築
   function buildAttachmentLine(root, maxChars){
     const el = root || document;
 
-    const kinds = Array.from(new Set(detectAttachmentKinds(el) || []));
-    const order = ['🖼','🎞','📝'];
-    kinds.sort((a,b)=> order.indexOf(a) - order.indexOf(b));
-    const kindsStr = kinds.join('');
+//    const role = getTurnRole(el); // ← 先ほど作った関数（追加必須）
 
-    const hasImg = !!el.querySelector('img, picture img');
+//    // 1) 本文テキストを解析
+//    const text = (el.innerText || '').replace(/\s+/g, ' ').trim();
+//    const m = text.match(/(?:この)?\s*([^\n\r。]+?)\s*をダウンロード/);
+//    if (m && m[1]) {
+//      let name = m[1].trim().replace(/^この\s*/, '');
+//      return `⭳（${name}）`;
+//    }
+
+    // 2) a[download] / data-testid="attachment" 等を検出
     const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
-    const namesStr = names.join(' ');
+    if (names.length){
+      return `⭳（${names.join('、 ')}）`;
+    }
 
-    // ★I18N経由で（画像）/(image)
-    const imgLabel = (!namesStr && hasImg)
-      ? (window.CGTN_UI?.t?.('image') || '(image)')
-      : '';
+    // 3) メディアタグ検出
+    const hasImg = !!el.querySelector('img, picture img');
+    const hasVid = !!el.querySelector('video, source[type^="video/"]');
+    if (hasImg || hasVid){
+      const kind = hasImg && hasVid ? 'メディア' : (hasImg ? '画像' : '動画');
+      return `⭳（${kind}）`;
+    }
 
-    const line = [kindsStr, imgLabel, namesStr].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
-    const max = Math.max(10, Number(maxChars)||0);
-    return max ? (line.length > max ? line.slice(0, max) : line) : line;
+    // 4) アシスタントなのに何も添付が無い → （不明）
+//    if (role === 'assistant') return '（不明）';
+
+    // 実体が無ければ空文字（本文中の“ダウンロード”には反応しない）
+    return '';
   }
 
   // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
@@ -525,11 +572,11 @@ console.log("★★★★★★rebuild ST.all:",ST.all);
     ST._asstSet = new Set(ST.assistant);
 
     // ★追加：添付（ダウンロード）ラベル抽出をここで付与
-    try {
-      for (const el of ST.all) {
-        el.dataset.cgtnAttach = getDownloadLabelForTurn(el);
-      }
-    } catch {}
+    //try {
+    //  for (const el of ST.all) {
+    //    el.dataset.cgtnAttach = getDownloadLabelForTurn(el);
+    //  }
+    //} catch {}
   }
 
   //ダウンロード文抽出ヘルパ（本文・画像・不明の3分岐）
@@ -861,12 +908,17 @@ console.log("getDownloadLabelForTurn catch");
       const index1 = ST.all.indexOf(art) + 1;
 
       const head        = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
-      const attachLine  = buildAttachmentLine(art, maxChars);
+      const attachLine  = buildAttachmentLine(art, maxChars); // 実体ありのときだけ非空
       const bodyLine    = extractBodySnippet(head, maxChars);
 
       // 🔖をどちらに出すか：添付があれば添付行、無ければ本文行
-      const showClipOnAttach = !!attachLine;
-      const showClipOnBody   = !attachLine && !!bodyLine;
+      //const showClipOnAttach = !!attachLine;
+      //const showClipOnBody   = !attachLine && !!bodyLine;
+
+      // 🔖は「実体ありの添付行」か、なければ本文行に出す
+      const hasRealAttach    = !!attachLine;       // “（不明）”は来ない設計
+      const showClipOnAttach = hasRealAttach;
+      const showClipOnBody   = !hasRealAttach && !!bodyLine;
 
       // ★追記: プレビュー用（長め）テキストを生成
       //   - 長さは 1200 文字を基準（設定があればそれを優先）
@@ -887,9 +939,9 @@ console.log("getDownloadLabelForTurn catch");
         ? roleHint === 'assistant'
         : art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
 
-
-      // 添付行
-      if (attachLine){
+      // 添付行：実体があるときだけ出す
+//      if (attachLine){
+      if (hasRealAttach){
         const row = document.createElement('div');
         row.className = 'row';
         row.style.fontSize = fontPx;
@@ -941,7 +993,7 @@ console.log("getDownloadLabelForTurn catch");
         if (isUser) row2.classList.add('user-turn');
         if (isAsst) row2.classList.add('asst-turn');
 
-        // 本文行テンプレート（★attach 追加）
+        // 本文行テンプレート（★右側に attach 表示欄あり）
         row2.innerHTML = `
           <div class="txt"></div><span class="attach" aria-label="attachment"></span>
           <div class="ops">
@@ -952,7 +1004,12 @@ console.log("getDownloadLabelForTurn catch");
 
         row2.querySelector('.txt').textContent = bodyLine;
         // ★ 添付ラベル（⭳（ファイル名）／⭳（画像）／（不明）／''）
-        const attach = art?.dataset?.cgtnAttach || '';
+        //const attach = art?.dataset?.cgtnAttach || '';
+
+        // ★ 添付ラベル（“実体あり”のみ）
+        let attach = attachLine || '';
+        // 必要なら、「アシスタントなのに実体が無い」場合だけ “（不明）” を右側に表示（行は増やさない）
+        if (!attach && isAsst) attach = '（不明）';
         const attachEl = row2.querySelector('.attach');
         if (attach && attachEl) attachEl.textContent = ' ' + attach;
 
@@ -1173,4 +1230,5 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
   NS.goNext = goNext;
   NS.getTurnKey = getTurnKey;
   NS.pickAllTurns = pickAllTurns;
+  NS.isRealTurn   = isRealTurn;
 })();
