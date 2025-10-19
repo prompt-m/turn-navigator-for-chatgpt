@@ -207,6 +207,16 @@ const LIST_CSS = `
 #cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
+/* ★ 添付ラベルの視認性（最小差分） */
+#cgpt-list-panel .row .attach {
+  margin-left: .5em;
+  opacity: .75;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+#cgpt-list-panel .row.user-turn  { background: rgba(240,246,255,.60); }
+#cgpt-list-panel .row.asst-turn  { background: rgba(234,255,245,.60); }
 
 #cgpt-nav button:focus,
 #cgpt-nav label:focus,

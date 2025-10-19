@@ -3,7 +3,7 @@
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
   const TURN_SEL = 'div[data-testid^="conversation-turn-"]'; // keep (legacy)
-//  const TURN_SEL = 'article[data-turn]'; // 1 <article> = 1 turn
+//  const TURN_SEL = 'article'; // 1 <article> = 1 turn
 
   const titleEscape = SH.titleEscape;
 
@@ -63,7 +63,6 @@
     NS._scroller = document.scrollingElement || document.documentElement;
     return NS._scroller;
   }
-
   // ★スクロール用 厳しめ（安定版のまま）
   function headNodeOf(article){
     if (!article) return null;
@@ -89,7 +88,16 @@
 
   //行へスクロールする関数
   function scrollListToTurn(turnKey){
-    if (!turnKey) return;
+    const sc = document.getElementById('cgpt-list-body');
+    if (!sc) return;
+
+    // ★ 改修: turnKey が未指定なら末尾にスクロール
+    if (!turnKey) {
+      sc.scrollTop = sc.scrollHeight;
+      console.debug('[scrollListToTurn] turnKey undefined → scroll to bottom');
+      return;
+    }
+
     const list = document.getElementById('cgpt-list-body');
     if (!list) return;
     const row = list.querySelector(`.row[data-turn="${CSS.escape(turnKey)}"]`);
@@ -410,16 +418,31 @@
     NS._currentTurnKey = getTurnKey(article);
   }
 
-  // --- collect ---
-  function pickAllTurns(){
-    let list = Array.from(document.querySelectorAll(TURN_SEL));
-    if (!list.length){
-      const seen = new Set();
-      const nodes = Array.from(document.querySelectorAll('[data-message-author-role]'));
-      list = nodes.map(n => n.closest(TURN_SEL) || n).filter(el => el && !seen.has(el) && (seen.add(el), true));
-    }
-    return list.filter(a => a.getBoundingClientRect().height > 10 && getComputedStyle(a).display !== 'none');
+  // ターン検出<article>
+function pickAllTurns(){
+  const seen = new Set();
+  let list = Array.from(document.querySelectorAll(TURN_SEL));
+  if (!list.length){
+    const nodes = Array.from(document.querySelectorAll('[data-message-author-role]'));
+    list = nodes.map(n => n.closest('article') || n)
+                .filter(el => el && !seen.has(el) && (seen.add(el), true));
   }
+
+  // ★追加：DIVが紛れていたら、上位にある<article>を辿る
+  list = list.map(el => el.tagName === 'ARTICLE' ? el : el.closest('article') || el);
+
+  const visible = list.filter(a => {
+    try {
+      const r = a.getBoundingClientRect();
+      const disp = getComputedStyle(a).display;
+      return r.height > 10 && disp !== 'none';
+    } catch { return false; }
+  });
+console.log("pickAllTurns 3 visible.length",visible.length);
+
+  return visible;
+}
+
 
   function sortByY(list){
     const sc = getTrueScroller();
@@ -429,10 +452,21 @@
     }catch{ return list; }
   }
 
+
   function isRealTurn(article){
+    // === 軽い堅牢化 ===
+    // ChatGPT の各発話は <article> 要素単位。
+    // よって、記事ノードならそのまま「実ターン」とみなす。
+    // （過剰フィルタで落とさないための早期リターン）
+
+console.log("isRealTurn article.tagName:",article.tagName);
+
+    if (article?.tagName === 'ARTICLE') return true;
+
     const head = headNodeOf(article);
     if (!head) return false;
     const r = head.getBoundingClientRect();
+
     if (r.height < 8 || !isVisible(head)) return false;
     const txt = (head.textContent || head.innerText || '').trim();
     const hasText  = txt.length > 0;
@@ -443,27 +477,94 @@
       'a[download],a[href^="blob:"]'
     );
     const busy = head.getAttribute?.('aria-busy') === 'true';
+
     return (hasText || hasMedia) && !busy;
   }
 
-  // --- state & rebuild ---
+  // ST: 現在ページ（チャット）内のターン情報を保持する状態オブジェクト。
+  //   - all        : ページ中の全ターン（<article>）要素を上から順に格納
+  //   - user       : ユーザーの発話ターンだけを抽出した配列
+  //   - assistant  : アシスタントの発話ターンだけを抽出した配列
+  //   - page       : 将来的にページ分割やリストのページングを想定した番号（現状は未使用）
+  //
+  // この ST は LG.rebuild() 実行時に毎回再構築され、ナビゲーションやリスト表示で
+  // 「どの発話へスクロールするか」「どこまで描画済みか」を判断する基準として使われる。
+  //
+  // ─ 役割まとめ ─
+  //   LG.rebuild() → ST.all / user / assistant を更新
+  //   ナビボタン(goTop/goNext/...) → ST 参照してスクロール位置を決定
+  //   リスト描画(renderList) → ST.all を元に各行を生成
+  // 要するにST は 「ターン一覧のキャッシュ」 です。
   const ST = { all: [], user: [], assistant: [], page:1 };
 
-  // rebuild の最後にキーを必ず割り振る
   function rebuild(){
-
     NS._scroller = getTrueScroller();
 
-console.log("*******rebuild call pickAllTurns********");
     const allRaw = pickAllTurns().filter(isRealTurn);
+//console.log("★★★★★★rebuild allRaw:",allRaw);
+
     ST.all = sortByY(allRaw);
-    ST.user = ST.all.filter(a => a.matches('[data-message-author-role="user"], div [data-message-author-role="user"]'));
-    ST.assistant = ST.all.filter(a => a.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'));
+
+console.log("★★★★★★rebuild ST.all:",ST.all);
+
+
+    const isRole = (el, role) => {
+      // ★改修：data-turn を優先、なければ従来セレクタで補完
+      const dt = el?.dataset?.turn;
+      if (dt) return dt === role;
+      return el.matches?.(
+        `[data-message-author-role="${role}"], div [data-message-author-role="${role}"]`
+      );
+    };
+
+    ST.user = ST.all.filter(el => isRole(el, 'user'));
+    ST.assistant = ST.all.filter(el => isRole(el, 'assistant'));
 
     // 可能なら Set も用意（描画側が速くなる）
     ST._userSet = new Set(ST.user);
     ST._asstSet = new Set(ST.assistant);
 
+    // ★追加：添付（ダウンロード）ラベル抽出をここで付与
+    try {
+      for (const el of ST.all) {
+        el.dataset.cgtnAttach = getDownloadLabelForTurn(el);
+      }
+    } catch {}
+  }
+
+  //ダウンロード文抽出ヘルパ（本文・画像・不明の3分岐）
+  //これで PDF 例は ⭳（ChatGPT_Turn_Navigator_Promo.pdf）
+  //画像系は ⭳（画像）
+  //アシスタント発話で未検出なら （不明）
+  function getDownloadLabelForTurn(el){
+    try {
+      const role = el?.dataset?.turn || (el.matches?.('[data-message-author-role="assistant"]') ? 'assistant' :
+                                         el.matches?.('[data-message-author-role="user"]') ? 'user' : 'unknown');
+console.log("getDownloadLabelForTurn role:",role);
+
+      // headNodeOf() で主要ノードを取得し、そのテキストをtrimして本文扱いとする。
+      const head = headNodeOf(el);
+      const text = (head?.textContent || head?.innerText || '').trim();
+//console.log("getDownloadLabelForTurn test:",text);
+      // 「〇〇をダウンロード」 or 「この〇〇をダウンロード」の検出
+      const m = text.match(/(.+?)をダウンロード/);
+      if (m) {
+        let name = (m[1] || '').trim();
+        name = name.replace(/^この/, '').trim(); // 「この」をトリミング
+        if (/画像/.test(name)) name = '画像';
+        return `⭳（${name || '不明'}）`;
+      }
+
+      // アシスタントターンでダウンロードが無い場合
+      if (role === 'assistant') return '（不明）';
+
+      // ユーザー/不明は空ラベル
+      return '';
+   
+    } catch {
+console.log("getDownloadLabelForTurn catch");
+      return ''; 
+    }
   }
 
   // --- list panel ---
@@ -716,8 +817,6 @@ console.log("*******rebuild call pickAllTurns********");
 //console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
     await SH.whenLoaded?.();
 
-//    const cfg = (SH && SH.getCFG && SH.getCFG()) || SH?.DEFAULTS || {};
-//    const enabled = forceOn ? true : !!(cfg.list && cfg.list.enabled);
     const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!cfg.list?.enabled;
 
@@ -777,6 +876,18 @@ console.log("*******rebuild call pickAllTurns********");
       const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
       const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
 
+      // --- 役割判定（dataset.turn を優先し、旧属性をフォールバック） ---
+      // row / row2 共通で使用するため attachLine より上に配置。
+      const roleHint = art?.dataset?.turn;
+      const isUser = roleHint
+        ? roleHint === 'user'
+        : art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
+
+      const isAsst = roleHint
+        ? roleHint === 'assistant'
+        : art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
+
+
       // 添付行
       if (attachLine){
         const row = document.createElement('div');
@@ -785,10 +896,9 @@ console.log("*******rebuild call pickAllTurns********");
         row.dataset.idx  = String(index1);
         row.dataset.kind = 'attach';
 
-        const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
-        const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
-        if (isUser) row.style.background = 'rgba(240,246,255,.60)';
-        if (isAsst) row.style.background = 'rgba(234,255,245,.60)';
+        // 背景色はCSSクラスで定義（JS側はclassListで付与）
+        if (isUser) row.classList.add('user-turn');
+        if (isAsst) row.classList.add('asst-turn');
 
         // 本文行テンプレート
         row.innerHTML = `
@@ -827,14 +937,13 @@ console.log("*******rebuild call pickAllTurns********");
         row2.dataset.idx  = String(index1);
         row2.dataset.kind = 'body';
 
-        const isUser = art.matches('[data-message-author-role="user"], div [data-message-author-role="user"]');
-        const isAsst = art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
-        if (isUser) row2.style.background = 'rgba(240,246,255,.60)';
-        if (isAsst) row2.style.background = 'rgba(234,255,245,.60)';
+        // 背景色はCSSクラスで定義（JS側はclassListで付与）
+        if (isUser) row2.classList.add('user-turn');
+        if (isAsst) row2.classList.add('asst-turn');
 
-        // 本文行テンプレート
+        // 本文行テンプレート（★attach 追加）
         row2.innerHTML = `
-          <div class="txt"></div>
+          <div class="txt"></div><span class="attach" aria-label="attachment"></span>
           <div class="ops">
             ${showClipOnBody ? `<button class="cgtn-clip-pin cgtn-iconbtn off" title="${T('row.pin')}" aria-pressed ="false" aria-label="${T('row.pin')}" >🔖\uFE0E</button>` : ``}
             <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
@@ -842,11 +951,18 @@ console.log("*******rebuild call pickAllTurns********");
         `;
 
         row2.querySelector('.txt').textContent = bodyLine;
-        //row2.addEventListener('click', () => scrollToHead(art));
+        // ★ 添付ラベル（⭳（ファイル名）／⭳（画像）／（不明）／''）
+        const attach = art?.dataset?.cgtnAttach || '';
+        const attachEl = row2.querySelector('.attach');
+        if (attach && attachEl) attachEl.textContent = ' ' + attach;
+
+
+//         row2.addEventListener('click', () => scrollToHead(art));
         row2.addEventListener('click', (ev) =>{
            // 他のUIパーツやリンクはスルー
           if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
-          const txt = ev.target.closest('.txt');
+          //const txt = ev.target.closest('.txt');
+          const txt = ev.target.closest('.txt, .attach'); // ★ .attach もクリックでジャンプ
           if (!txt) return;
           const row = txt.closest('.row');
           if (!row) return;
@@ -894,7 +1010,7 @@ console.log("*******rebuild call pickAllTurns********");
     NS.updateListFooterInfo();
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
-//console.debug('[renderList 末尾] done pinsCount=', Object.keys(_pinsCache||{}).length);
+console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
   function setListEnabled(on){
@@ -995,11 +1111,19 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
 
   // --- navigation ---
   function goTop(role){
+    if (!ST?.all?.length) {
+      console.debug('[nav-guard] ST.all empty → rebuild()');
+      rebuild?.();
+    }
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
     scrollToHead(L[0]);
   }
   function goBottom(role){
+    if (!ST?.all?.length) {
+      console.debug('[nav-guard] ST.all empty → rebuild()');
+      rebuild?.();
+    }
     const sc = getTrueScroller();
     if (role==='all'){
       lockFor(SH.getCFG().lockMs);
@@ -1011,6 +1135,10 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
     scrollToHead(L[L.length-1]);
   }
   function goPrev(role){
+    if (!ST?.all?.length) {
+      console.debug('[nav-guard] ST.all empty → rebuild()');
+      rebuild?.();
+    }
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
     const sc = getTrueScroller();
@@ -1021,6 +1149,10 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
     }
   }
   function goNext(role){
+    if (!ST?.all?.length) {
+      console.debug('[nav-guard] ST.all empty → rebuild()');
+      rebuild?.();
+    }
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
     const sc = getTrueScroller();
@@ -1040,5 +1172,5 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
   NS.goPrev = goPrev;
   NS.goNext = goNext;
   NS.getTurnKey = getTurnKey;
-
+  NS.pickAllTurns = pickAllTurns;
 })();
