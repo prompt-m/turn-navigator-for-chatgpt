@@ -137,11 +137,62 @@
     el._to = setTimeout(()=> el.classList.remove('show'), 1600);
   }
 
+  //表示直前での正規化
+  function loadAndRenderPins(){
+    const cfg = SH.getCFG() || {};
+    const raw = cfg.pinsByChat || {};
+    // ★ 正規化をかける（ゼロ件削除＋タイトル最新化）
+    const norm = SH.normalizePinsByChat?.(raw, { dropZero: true, preferNewTitle: true }) || raw;
+  
+    // 以降は norm を使う
+    renderPinsTable(norm); // ← あなたの実装に合わせた関数名でOK
+  }
+
+  //エクスポート直前での正規化
+  function onExportPinsClick(){
+    const cfg = SH.getCFG() || {};
+    //const pins = cfg.pinsByChat || {};
+    const pins = getNormalizedPinsForOptions(cfg);  // ★ゼロ件除去＋タイトル最新化
+    //const norm = SH.normalizePinsByChat?.(raw, { dropZero: true, preferNewTitle: true }) || raw;
+
+    const payload = { pinsByChat: pins };
+    const blob = new Blob([ JSON.stringify({ pinsByChat: norm }, null, 2) ], { type: 'application/json' });
+    // 既存のダウンロード処理へ
+    triggerDownload(blob, 'pins_backup.json');
+  }
+
+  //正規化ヘルパ
+  // === pinsByChat を設定画面向けに正規化 ===
+  // ・ゼロ件ピンは除外
+  // ・タイトルは可能なら最新（getChatTitle or chatIndex.titles）に更新
+  function getNormalizedPinsForOptions(cfg){
+    const raw = (cfg && cfg.pinsByChat) || {};
+    const out = {};
+    const getTitle = (cid, rec)=>{
+      return (SH.getChatTitle?.(cid))
+          || (cfg?.chatIndex?.titles?.[cid])
+          || (rec?.title)
+          || '(No Title)';
+    };
+
+    for (const [cid, rec] of Object.entries(raw)){
+      const pinsObj = rec?.pins || {};
+      const count = Object.values(pinsObj).filter(Boolean).length;
+      if (count === 0) continue;                 // ★ 0件は削除（表示・エクスポート対象外）
+      out[cid] = { ...rec, title: getTitle(cid, rec) }; // ★ タイトルを最新へ
+    }
+    return out;
+  }
+
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
     const cfg = (SH.getCFG && SH.getCFG()) || {};
-    const pins = cfg.pinsByChat || {};
+
+//    const pins = cfg.pinsByChat || {};
+    const pins = getNormalizedPinsForOptions(cfg);  // ★ここで正規化してから使う
+
+
     const aliveMap = (cfg.chatIndex && cfg.chatIndex.ids) || {};
     const nowOpen  = cfg.currentChatId || null;
 

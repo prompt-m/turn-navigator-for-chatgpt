@@ -28,6 +28,27 @@
     pins: {}// ← 付箋（key: true）
   });
 
+  // shared.js に追記（削除しない）
+  NS.normalizePinsByChat = function (pinsByChat, { dropZero=true, preferNewTitle=true } = {}){
+    const map = { ...(pinsByChat || {}) };
+    for (const id of Object.keys(map)){
+      const pins = map[id]?.pins || [];
+      // 1) ゼロ件は削除
+      if (dropZero && pins.length === 0) {
+        delete map[id];
+        continue;
+      }
+      // 2) タイトルの最新化（savePinsArrの順序に合わせて同等の優先度）
+      if (preferNewTitle) {
+        const oldTitle = map[id]?.title || '';
+        const newTitle = NS.getChatTitle?.(id) || ''; // 取れない環境なら '' のまま
+        const title    = newTitle || oldTitle || '(No Title)';
+        map[id] = { ...map[id], title };
+      }
+    }
+    return map;
+  };
+
   NS.dumpPinsIndex = function(){
     const cfg = NS.getCFG?.() || {};
     const map = cfg.pinsByChat || {};
@@ -51,74 +72,6 @@
     } catch { return 'unknown'; }
   };
 
-/*
-NS.getChatTitle = function(){
-  try {
-    const docTitle = (document.title || '').trim();
-
-    // 例: ["ChatGPT Turn Navigator（Chrome 拡張・MV3）","設定画面修正提案","ChatGPT"]
-    let parts = docTitle.split(' - ').map(s => s.trim()).filter(Boolean);
-
-    // 末尾のサイト名は捨てる
-    while (parts.length && /^(ChatGPT|OpenAI)$/i.test(parts.at(-1))) parts.pop();
-
-    // ドキュメント由来の候補：いちばん“右側”（=チャット名）を優先
-    const fromDoc = parts.at(-1) || '';
-
-    // DOM 由来の候補（将来のUI変化も拾えるように数種類）
-    const main = document.querySelector('main') || document.body;
-    const sels = [
-      '[data-testid="conversation-name"]',
-      '[data-testid*="conversation"] :is(h1,h2)',
-      'header h1','h1','h2','[data-testid="title"]'
-    ];
-    let fromMain = '';
-    for (const sel of sels){
-      const el = main.querySelector(sel);
-      const txt = (el?.textContent || '').trim();
-      if (txt){ fromMain = txt; break; }
-    }
-
-    const cand = (fromMain || fromDoc || '').slice(0,120);
-
-    // 計測ログ（そのまま残してOK）
-    console.debug('[getChatTitle]', { docTitle,  cand, path: location.pathname });
-
-    return cand;
-  } catch(e) {
-    console.warn('[getChatTitle] error', e);
-    return '';
-  }
-};
-*/
-/*
-  NS.getChatTitle = function(){
-    try {
-
-      const dTitle = document.title;
-      console.debug('[getChatTitle]',{ documentTitle:dTitle});
-
-      const docTitle = (document.title || '').trim();
-      const fromDoc  = docTitle.includes(' - ') ? docTitle.split(' - ')[0].trim() : docTitle;
-      const main = document.querySelector('main') || document.body;
-      const h = main.querySelector('h1, h2, [data-testid="title"], [data-testid*="conversation"]');
-      const fromMain = (h?.textContent || '').trim();
-
-      const cand = (fromMain || fromDoc || '').slice(0,120);
-
-      // ★計測ログ
-      console.debug('[getChatTitle]',
-        { docTitle,cand, fromMain, fromDoc, path: location.pathname, time: new Date().toISOString() },
-        new Error('trace').stack?.split('\n').slice(1,4).join('\n')); // 上位3フレーム
-
-      return cand; // ← 何も弾かない。純粋に候補を返す
-    } catch(e) {
-      console.warn('[getChatTitle] error', e);
-      return '';
-    }
-  };
-*/
-
   NS.getChatTitle = function(){
     try {
       const docTitle = (document.title || '').trim();
@@ -128,8 +81,6 @@ NS.getChatTitle = function(){
       return '';
     }
   };
-
-
 
   function _ensurePinsByChat(cfg){
     cfg.pinsByChat = cfg.pinsByChat || {};
@@ -193,8 +144,13 @@ NS.getChatTitle = function(){
 
     map[chatId] = { pins: rec.pins || {}, title: picked, updatedAt: Date.now() };
 
-// 保存前の直前に入れる一行（両方共通）
-if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
+    // 保存前の直前に入れる一行（両方共通）
+    //if (map[chatId]?.title) {
+    //  map[chatId] = {
+    //     ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() 
+    //  }; 
+    //  return NS.saveSettingsPatch({ pinsByChat: map }); 
+    //}
 
 
     NS.saveSettingsPatch?.({ pinsByChat: map });
@@ -383,7 +339,8 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
 */
     const oldTitle = map[chatId]?.title || '';
     const newTitle = NS.getChatTitle?.() || '';
-    const title    = oldTitle || newTitle || '(No Title)';
+//    const title    = oldTitle || newTitle || '(No Title)';
+    const title    = newTitle || oldTitle || '(No Title)';
 
     // ★計測ログ：ここが肝
 
@@ -400,9 +357,11 @@ if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pin
 
     map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
 
-// 保存前の直前に入れる一行（両方共通）
-if (map[chatId]?.title) { map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() }; return NS.saveSettingsPatch({ pinsByChat: map }); }
-
+    // 保存前の直前に入れる一行（両方共通）
+    //if (map[chatId]?.title) {
+    //  map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now()};
+    //  return NS.saveSettingsPatch({ pinsByChat: map }); 
+    //}
 
     NS.saveSettingsPatch({ pinsByChat: map });
   };
