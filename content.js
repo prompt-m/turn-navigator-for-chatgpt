@@ -664,7 +664,7 @@ console.log("installAutoSyncForTurns top");
     if (document._cgtnAutoSyncBound) return;
     document._cgtnAutoSyncBound = true;
 
-console.log("installAutoSyncForTurns 1");
+//console.log("installAutoSyncForTurns 1");
   
     // 自作UI除外（無限ループ防止）
     const inOwnUI = (node) => {
@@ -673,7 +673,7 @@ console.log("installAutoSyncForTurns 1");
              document.getElementById('cgpt-nav')?.contains(node) ||
              document.getElementById('cgpt-list-panel')?.contains(node);
     };
-console.log("installAutoSyncForTurns 2");
+//console.log("installAutoSyncForTurns 2");
   
     const root = document.querySelector('main') || document.body;
     let to = 0;
@@ -688,7 +688,7 @@ console.log("installAutoSyncForTurns 2");
         }catch(e){}
       }, 300); // 300msデバウンス
     };
-console.log("installAutoSyncForTurns 3");
+//console.log("installAutoSyncForTurns 3");
 
     const mo = new MutationObserver((muts)=>{
       if (!SH.isListOpen?.()) return;        // リスト閉なら処理しない
@@ -704,7 +704,7 @@ console.log("installAutoSyncForTurns 3");
         if (hit){ kick(); break; }
       }
     });
-console.log("installAutoSyncForTurns 4");
+//console.log("installAutoSyncForTurns 4");
     try{ mo.observe(root, { childList:true, subtree:true }); }catch(e){}
   }
 
@@ -723,13 +723,13 @@ console.log("installAutoSyncForTurns 4");
         SH?.renderViz?.(cfg, !!cfg?.showViz);
       } catch {}
 
-console.log("initialize bindEvents");
+//console.log("initialize bindEvents");
       EV.bindEvents();
       bindPreviewDockOnce();
       bindBaselineAutoFollow();
 //★★★もしかしたら不要？★★★
 //      observeAndRebuild();
-console.log("initialize closeDockOnUrlChange");
+//console.log("initialize closeDockOnUrlChange");
       closeDockOnUrlChange();
       bindListRefreshButton();
       forceListPanelOffOnBoot();
@@ -758,12 +758,31 @@ console.log("initialize closeDockOnUrlChange");
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
     window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
-  }
 
+    // タイトル変更を監視→保存（1回だけバインド）
+    (function watchDocTitle(){
+      if (document._cgtnTitleWatch) return;
+      document._cgtnTitleWatch = true;
+      let last = (document.title || '');
+      const mo = new MutationObserver(()=>{
+        const cur = (document.title || '');
+        if (cur !== last) {
+          last = cur;
+          // ここで最新タイトルを保存（pinsByChat / chatIndex 同期）
+          try { window.CGTN_SHARED?.refreshCurrentChatTitle?.(); } catch {}
+        }
+      });
+      mo.observe(document.querySelector('title') || document.head, { subtree:true, characterData:true, childList:true });
+    })();
+
+    
+  }
   // ========= 10) DOM Ready =========
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize, { once:true });
   } else {
     initialize();
+    // 付箋バッジ
+    window.CGTN_LOGIC?.updatePinOnlyBadge?.();
   }
 })();

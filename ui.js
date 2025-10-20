@@ -407,6 +407,26 @@ const MISC_CSS = `
 #cgpt-list-collapse { /* 付箋フィルターボタン */
   color:#000
 }
+/* 付箋フィルター　装飾 */
+.cgtn-badgehost { position: relative; }
+.cgtn-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 14px; height: 14px;
+  line-height: 14px; padding: 0 4px;
+  border-radius: 999px;
+  background: #e11; color: #fff;
+  font-size: 10px; font-weight: 700;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff; /* 背景と縁切り */
+}
+
+/* 付箋のみONのときはバッジ色を反転 */
+.cgtn-iconbtn.active .cgtn-badge {
+  background: #0a84ff;
+}
+
+
 
 /* スクロールバー（WebKit系） */
 .cgtn-dock-body::-webkit-scrollbar,
@@ -571,7 +591,7 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
         const cur = SH.getCFG() || {};
         const patch = on
           ? { list:{ ...(cur.list||{}), enabled:true } }
-          : { list:{ ...(cur.list||{}), enabled:false, pinOnly:false } };
+          : { list:{ ...(cur.list||{}), enabled:false,  Only:false } };
 
         SH.saveSettingsPatch(patch);
 //★★★もしかしたら不要？★★★
@@ -684,37 +704,37 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
     if (h) h.textContent = T('preview');
   }
 
+  function toggleLang() {
+    // 現在の言語を取得（設定がなければ ja をデフォルトに）
+    const cur = (SH.getCFG?.() || {}).lang || 'ja';
+    const next = (cur && String(cur).toLowerCase().startsWith('en')) ? 'ja' : 'en';
 
-function toggleLang() {
-  // 現在の言語を取得（設定がなければ ja をデフォルトに）
-  const cur = (SH.getCFG?.() || {}).lang || 'ja';
-  const next = (cur && String(cur).toLowerCase().startsWith('en')) ? 'ja' : 'en';
-
-  // --- 言語設定の共有と即時反映 ---
-  try {
-    SH.saveSettingsPatch?.({ lang: next }); // ← LANG ではなく next
-    if (window.CGTN_I18N) {
-      window.CGTN_I18N._forceLang = next; // ← 即反映
+    // --- 言語設定の共有と即時反映 ---
+    try {
+      SH.saveSettingsPatch?.({ lang: next }); // ← LANG ではなく next
+      if (window.CGTN_I18N) {
+        window.CGTN_I18N._forceLang = next; // ← 即反映
+      }
+    } catch (e) {
+      console.warn("toggleLang error", e);
     }
-  } catch (e) {
-    console.warn("toggleLang error", e);
+
+    // --- UI反映 ---
+    applyLang();
+
+    // --- ツールチップ再翻訳 ---
+    SH.updateTooltips?.();
+
+    // --- 必要な場合のみリスト再描画 ---
+    const isListVisible = window.CGTN_LOGIC?.isListVisible?.();
+    const isPinOnly = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
+
+    window.CGTN_LOGIC?.updateListFooterInfo?.();
+    if (isListVisible || isPinOnly) {
+      window.CGTN_LOGIC.renderList(true);
+    }
   }
 
-  // --- UI反映 ---
-  applyLang();
-
-  // --- ツールチップ再翻訳 ---
-  SH.updateTooltips?.();
-
-  // --- 必要な場合のみリスト再描画 ---
-  const isListVisible = window.CGTN_LOGIC?.isListVisible?.();
-  const isPinOnly = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
-
-  window.CGTN_LOGIC?.updateListFooterInfo?.();
-  if (isListVisible || isPinOnly) {
-    window.CGTN_LOGIC.renderList(true);
-  }
-}
 
   function clampPanelWithinViewport(){
     const box = document.getElementById('cgpt-nav'); if (!box) return;

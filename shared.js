@@ -28,6 +28,42 @@
     pins: {}// ← 付箋（key: true）
   });
 
+  // いまのタブのチャットIDとタイトルを保存（pinsByChat / chatIndex を同時に更新）
+  NS.setChatTitleForId = function(chatId, title){
+    if (!chatId) return;
+    const cfg = NS.getCFG() || {};
+    const byChat = cfg.pinsByChat || {};
+    const rec    = byChat[chatId] || {};
+    const now    = Date.now();
+
+    // pinsByChat 側のタイトルを“最新で”上書き（空なら残ってしまうので newTitle→oldTitle の順）
+    const newTitle = (title || '').trim();
+    const oldTitle = (rec.title || '').trim();
+    const nextTitle = newTitle || oldTitle || '(No Title)';
+
+    byChat[chatId] = {
+      ...rec,
+      title: nextTitle,
+      updatedAt: now,
+      pins: rec.pins || {}     // 既存ピンは維持
+    };
+
+    // chatIndex（設定画面で参照する“現在の一覧”）も同期
+    const idx = cfg.chatIndex || {};
+    const ids = idx.ids || {};
+    ids[chatId] = { title: nextTitle, updatedAt: now };
+
+    NS.saveSettingsPatch({ pinsByChat: byChat, chatIndex: { ...idx, ids } });
+  };
+  // ドキュメントタイトルを使って現在チャットの名前を更新
+  NS.refreshCurrentChatTitle = function(){
+    try{
+      const id = NS.getChatId && NS.getChatId();
+      const title = (document.title || '').trim();
+      if (id && title && title !== 'ChatGPT') NS.setChatTitleForId(id, title);
+    }catch{}
+  };
+
   // shared.js に追記（削除しない）
   NS.normalizePinsByChat = function (pinsByChat, { dropZero=true, preferNewTitle=true } = {}){
     const map = { ...(pinsByChat || {}) };
@@ -71,12 +107,58 @@
       return (location.host + location.pathname).toLowerCase();
     } catch { return 'unknown'; }
   };
-
+/*
   NS.getChatTitle = function(){
     try {
       const docTitle = (document.title || '').trim();
       return docTitle;
     } catch(e) {
+      console.warn('[getChatTitle] error', e);
+      return '';
+    }
+  };
+*/
+
+  NS.getChatTitle = function getChatTitle(){
+    try {
+      const isConcreteChat = /\/c\/[a-z0-9-]+/i.test(location.pathname);
+      const raw = (document.title || '').trim();
+
+      // 形を分解（"＜名前＞ - ChatGPT" 想定）
+      const parts = raw.split(' - ').map(s => s.trim()).filter(Boolean);
+      const isSiteName = (s) => /^(ChatGPT|OpenAI)$/i.test(s);
+
+      // 1) 具体チャットなら、左側（サイト名以外）を優先採用
+      if (isConcreteChat) {
+        if (parts.length >= 2 && isSiteName(parts.at(-1))) {
+          // ex. "ChatGPT - ChatGPT" → "ChatGPT" をそのまま採用（ユーザー命名）
+          return parts.slice(0, -1).join(' - ').slice(0, 200);
+        }
+        // まれに単独名だけ入るケース
+        if (parts.length === 1 && !isSiteName(parts[0])) {
+          return parts[0].slice(0, 200);
+        }
+        // それでも決まらなければ DOM を当たる
+        const main = document.querySelector('main') || document.body;
+        const domName =
+          main.querySelector('[data-testid="conversation-name"]') ||
+          main.querySelector('[data-testid*="conversation"] :is(h1,h2)') ||
+          main.querySelector('header h1, h1, h2, [data-testid="title"]');
+        const txt = (domName?.textContent || '').trim();
+        if (txt) return txt.slice(0, 200);
+
+        // まだ水和前で取れないときは「未決定」を返す（シェル扱い）
+        return '';
+      }
+
+      // 2) 具体チャットではない（ホーム/一覧/水和前など）
+      //    raw が "ChatGPT" だけならシェルなので弾く
+      if (/^ChatGPT$/i.test(raw)) return '';
+
+      // サイト名以外が含まれていれば、それを返す（保険）
+      if (parts.length && !isSiteName(parts[0])) return parts[0].slice(0, 200);
+      return '';
+    } catch (e) {
       console.warn('[getChatTitle] error', e);
       return '';
     }
@@ -376,6 +458,9 @@
     const next = arr[index1 - 1] ? 0 : 1;
     arr[index1 - 1] = next;
     NS.savePinsArr(arr, chatId);
+    // 付箋バッジ
+    try{ document.dispatchEvent(new CustomEvent('cgtn:pins-updated',{detail:{chatId}})); }catch{}
+
     return !!next;
   };
 
@@ -384,6 +469,14 @@
     try{
       const arr = NS.getCFG?.()?.pinsByChat?.[chatId]?.pins || [];
       return arr.reduce((a,b)=> a + (b ? 1 : 0), 0);
+    }catch{ return 0; }
+  };
+
+  NS.getPinsCountByChat = function(chatId){
+    try{
+      const cfg = NS.getCFG?.() || {};
+      const pinsObj = cfg?.pinsByChat?.[chatId]?.pins || {};
+      return Object.values(pinsObj).filter(Boolean).length;
     }catch{ return 0; }
   };
 

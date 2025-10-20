@@ -1,5 +1,6 @@
 // logic.js
 (() => {
+  const UI = window.CGTN_UI;
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
 //  const TURN_SEL = 'div[data-testid^="conversation-turn-"]'; // keep (legacy)
@@ -516,7 +517,7 @@ function pickAllTurns(){
       return r.height > 10 && disp !== 'none';
     } catch { return false; }
   });
-console.log("pickAllTurns 3 visible.length",visible.length);
+//console.log("pickAllTurns 3 visible.length",visible.length);
 
   return visible;
 }
@@ -644,7 +645,9 @@ console.log("getDownloadLabelForTurn catch");
     listBox.innerHTML = `
       <div id="cgpt-list-head">
         <div id="cgpt-list-grip"></div>
-        <button id="cgpt-pin-filter" type="button" aria-pressed="false" style="cursor:pointer">🔖\uFE0E</button>
+        <button id="cgpt-pin-filter" class="cgtn-badgehost" type="button" aria-pressed="false" style="cursor:pointer">🔖\uFE0E
+          <span class="cgtn-badge" hidden>0</span>
+        </button>
         <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
       </div>
       <div id="cgpt-list-body"></div>
@@ -1090,6 +1093,9 @@ console.log("getDownloadLabelForTurn catch");
     const rowsCount = body.querySelectorAll('.row').length;   // ← 空行は .row じゃないので除外される
     NS._lastVisibleRows = rowsCount;
     NS.updateListFooterInfo();
+    // 付箋バッジ
+console.log("[renderList] updatePinOnlyBadge call");
+    updatePinOnlyBadge?.();
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
 console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
@@ -1130,6 +1136,35 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
     } else {
     }
   }
+
+  function updatePinOnlyBadge(){
+    try {
+      const btn = document.getElementById('cgtn-pin-only');
+      const badge = btn?.querySelector('.cgtn-badge');
+console.log("updatePinOnlyBadge badge:",badge);
+      if (!badge) return;
+
+      const cid = SH.getChatId?.();
+      const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
+console.log("updatePinOnlyBadge count:",count);
+      // 表示制御
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+
+      // 付箋ON/OFFモードの視覚強調（既存クラス利用）
+      const cfg = SH.getCFG?.() || {};
+      const pinOnly = !!cfg.list?.pinOnly;
+      btn.classList.toggle('active', pinOnly);
+
+    } catch (e) {
+      console.warn('[updatePinOnlyBadge]', e);
+    }
+  }
+
 
   function updateListFooterInfo() {
     const total = ST.all.length;
@@ -1246,6 +1281,7 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
   }
 
   // --- expose ---
+  NS.updatePinOnlyBadge = updatePinOnlyBadge;
   NS.updateListFooterInfo = updateListFooterInfo;
   NS.rebuild = rebuild;
   NS.setListEnabled = setListEnabled;

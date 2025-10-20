@@ -184,26 +184,34 @@
     return out;
   }
 
+  // 表示直前に“最新タイトルへ置換”してから描画
   async function renderPinsManager(){
     const box = $('pins-table'); if (!box) return;
     await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
     const cfg = (SH.getCFG && SH.getCFG()) || {};
 
-//    const pins = cfg.pinsByChat || {};
-    const pins = getNormalizedPinsForOptions(cfg);  // ★ここで正規化してから使う
-
+    //const pins = cfg.pinsByChat || {};
+    const pins = getNormalizedPinsForOptions(cfg);
+    const liveIdx = (cfg.chatIndex && cfg.chatIndex.ids) || {};
 
     const aliveMap = (cfg.chatIndex && cfg.chatIndex.ids) || {};
     const nowOpen  = cfg.currentChatId || null;
 
     const rows = Object.entries(pins).map(([cid, rec]) => {
-      const title = String(rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
+//      const title = String(rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
+
+    // 1) live側にタイトルがあればそれを最優先
+    const liveTitle = (liveIdx[cid]?.title || '').trim();
+    const savedTitle = (rec?.title || '').trim();
+    const titlePicked = liveTitle || savedTitle || '(No Title)';
+    const title = titlePicked.replace(/\s+/g,' ').slice(0,120);
 
       // pins はオブジェクト想定：true の数だけを数える
       const pinsCount = Object.values(rec?.pins || {}).filter(Boolean).length;
 
       const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
-      const existsInSidebar = !!aliveMap[cid];
+//      const existsInSidebar = !!aliveMap[cid];
+      const existsInSidebar = !!liveIdx[cid]; // ここも liveIdx に揃える
       const isNowOpen = (cid === nowOpen);
       const canDelete = true; // 仕様：常に削除可（必要なら条件に戻す）
 
