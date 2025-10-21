@@ -284,6 +284,7 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
 
 
+/*
   // 仕様に合わせて「添付行」テキストを構築
   function buildAttachmentLine(root, maxChars){
     const el = root || document;
@@ -334,6 +335,104 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
     // 実体が無い場合は空（本文中の「ダウンロード」では反応しない）
    return '';
   }
+*/
+
+  // --- logic.js: buildAttachmentLine 置き換え版 -------------------------------
+  // 目的：
+  // ・アシスタント：非PDFファイルを添付行に列挙（複数時は ⭳（<本文から抽出したFileラベル>）a b c）
+  //                  単数時は ⭳（a）
+  // ・ユーザー：PDFは ⭳ ではなく 📄 を添付行に出す（例：📄 Spec.pdf）
+  // ・PDFのみのアシスタント配布時は添付行は空（本文側の処理は別途）
+  // ・画像/動画の既存処理は維持
+  function buildAttachmentLine(root, maxChars) {
+    const el   = root || document;
+    const role = (typeof getTurnRole === 'function' ? getTurnRole(el) : 'unknown') || 'unknown';
+
+    // 1) 既存抽出でファイル名を取得
+    const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
+    if (names.length) {
+      // ローカル小ヘルパ：PDF抽出
+      const pickPdfNames = (arr) => (arr || []).filter(n => /\.pdf(\b|$)/i.test(String(n)));
+      const pdfs   = pickPdfNames(names);
+      const nonPdf = names.filter(n => !pdfs.includes(n));
+
+      // ローカル小ヘルパ：アシスタント本文の「File」ラベル抽出
+      // - 近傍の chip/attachment っぽい要素から "File" / "ファイル" を拾う
+      // - 見つからなければ 'File' をフォールバック
+      const extractAssistantFileLabel = () => {
+        // 1) よくある data-testid / class 名称を総当りで捜索
+        const candidates = el.querySelectorAll(
+          '[data-testid*="file"],[data-testid*="attachment"],[class*="file"],[class*="attachment"]'
+        );
+        for (const c of candidates) {
+          const t = (c.textContent || '').trim();
+          const m = t.match(/\b(File|ファイル)\b/i);
+          if (m) return m[0]; // 本文で使われている表記をそのまま採用
+        }
+        // 2) <a download> の親周辺（2〜3階層）からテキストノードを捜索
+        const a = el.querySelector('a[download], a[href]');
+        if (a) {
+          let p = a.parentElement;
+          for (let hop = 0; hop < 3 && p; hop++, p = p.parentElement) {
+            const t = (p.textContent || '').trim();
+            const m = t.match(/\b(File|ファイル)\b/i);
+            if (m) return m[0];
+          }
+        }
+        return 'File';
+      };
+
+      // 役割ごとの分岐
+      if (role === 'user') {
+        // ユーザー投稿PDFは ⭳ ではなく 📄 を添付行に出す（複数なら空白区切り）
+        if (pdfs.length) return `📄 ${pdfs.join(' ')}`;
+        // 非PDFは従来どおり（必要なら別仕様に差し替え）
+        if (nonPdf.length > 1) return `⭳（${nonPdf.join(' ')}）`;
+        if (nonPdf.length === 1) return `⭳（${nonPdf[0]}）`;
+        return '';
+      }
+
+      if (role === 'assistant') {
+        // アシスタント：非PDFのみ添付行に列挙。PDFは本文側（別処理）に任せる
+        if (nonPdf.length > 1) {
+          const label = extractAssistantFileLabel();
+          return `⭳（${label}）${nonPdf.join(' ')}`;
+        }
+        if (nonPdf.length === 1) {
+          return `⭳（${nonPdf[0]}）`;
+        }
+        // PDFのみ → 添付行は空（本文側で ⭳(pdf) を出す想定／本文が無い場合）
+        return '';
+      }
+  
+      // 未知の役割：無難に非PDFを列挙
+      if (nonPdf.length > 1) return `⭳（${nonPdf.join(' ')}）`;
+      if (nonPdf.length === 1) return `⭳（${nonPdf[0]}）`;
+      return '';
+    }
+  
+    // 2) 実体メディア（画像/動画）検出は従来維持
+    const hasImg = !!el.querySelector('img, picture img');
+    const hasVid = !!el.querySelector('video, source[type^="video/"]');
+    if (hasImg || hasVid) {
+      const kind = hasImg && hasVid ? T('media') : hasImg ? T('image') : T('video');
+      // ここは従来仕様：アシスタントは ⭳、ユーザーはアイコンなど別処理にしたい場合は適宜拡張
+      const role = getTurnRole?.(el) || 'unknown';
+      if (role === 'assistant') {
+        // アシスタントはダウンロード可として扱う
+        return `⭳${kind}`;
+      } else if (role === 'user') {
+        // ユーザー投稿は送信アイコンに変更
+        if (hasImg) return `🖼 ${T('image')}`;
+        if (hasVid) return `🎞 ${T('video')}`;
+      }
+      return '';
+    }
+  
+    return '';
+  }
+  // ---------------------------------------------------------------------------
+
 
   // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
   // ここ変えたよ：トリム＆maxChars 厳密適用
