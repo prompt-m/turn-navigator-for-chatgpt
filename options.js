@@ -170,7 +170,7 @@
     const out = {};
     const getTitle = (cid, rec)=>{
       return (SH.getChatTitle?.(cid))
-          || (cfg?.chatIndex?.titles?.[cid])
+          || (cfg?.chatIndex?.titles?.[cid]?.title)
           || (rec?.title)
           || '(No Title)';
     };

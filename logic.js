@@ -135,6 +135,10 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
     return s.length > max ? s.slice(0, max) + '' : s;
   }
 
+  function pickPdfNames(names){
+    return (names || []).filter(n => /\.pdf(\b|$)/i.test(String(n)));
+  }
+
   // ===== 添付ファイル検出（Article.txt対応） =====
 
   // 1) ファイル名の収集
@@ -289,7 +293,24 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
     // 2) a[download] / data-testid="attachment" 等を検出
     const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
     if (names.length){
-      return `⭳（${names.join('、 ')}）`;
+      const pdfs   = pickPdfNames(names);
+      const nonPdf = names.filter(n => !pdfs.includes(n));
+
+      // ユーザー：PDFは「添付行」に 📄 で表示（ダウンロード矢印にしない）
+      if (role === 'user' && pdfs.length){
+        return `📄 ${pdfs.join(' ')}`;             // 例）📄 Spec.pdf [複数なら空白区切り]
+      }
+      // アシスタント：非PDFだけを「添付行」に列挙（PDFは本文側で扱う可能性）
+      if (role === 'assistant'){
+        if (nonPdf.length > 1) return `⭳（File）${nonPdf.join(' ')}`;
+        if (nonPdf.length === 1) return `⭳（${nonPdf[0]}）`;
+        return ''; // PDFのみ → 添付行は空（本文側で出す場合あり）
+      }
+
+      // それ以外の役割は従来挙動にフォールバック
+      if (nonPdf.length > 1) return `⭳（File）${nonPdf.join(' ')}`;
+      if (nonPdf.length === 1) return `⭳（${nonPdf[0]}）`;
+      return '';
     }
 
    // 3) メディアタグ検出（画像/動画 実体）
@@ -658,6 +679,48 @@ console.log("getDownloadLabelForTurn catch");
     }
   }
 
+  // どこからでも呼べるよう公開
+/*
+  CGTN_LOGIC.updateListChatTitle = function updateListChatTitle(){
+    const box = document.getElementById('cgpt-chat-title');
+    if (!box) return;
+    const cfg  = CGTN_SHARED.getCFG?.() || {};
+    const cid  = CGTN_SHARED.getChatId?.();
+    // まず live（<title>）→ 次に保存済み chatIndex.ids → それでも無ければ rec.title → 既定
+    const live = CGTN_SHARED.getChatTitle?.() || '';
+    const saved = cfg?.chatIndex?.ids?.[cid]?.title || '';
+    const fallback = (cfg?.pinsByChat?.[cid]?.title) || '';
+    const full = live || saved || fallback || '(No Title)';
+    box.textContent = full;
+    box.title = full; // ★ ツールチップにフルタイトル
+  };
+*/
+
+  (function(){
+    let _lastShown = '';   // 直近表示
+
+    CGTN_LOGIC.updateListChatTitle = function(){
+      const el = document.getElementById('cgpt-chat-title');
+      if (!el) return;
+
+      const cfg   = CGTN_SHARED.getCFG?.() || {};
+      const cid   = CGTN_SHARED.getChatId?.();
+      const live  = CGTN_SHARED.getChatTitle?.() || '';                 // document.title
+      const saved = cfg?.chatIndex?.ids?.[cid]?.title || '';
+      const fallback = (cfg?.pinsByChat?.[cid]?.title) || '';
+      const candidate = live || saved || fallback || '(No Title)';
+
+      // ★フィルタ例：空は無視 / 文字数が縮む更新は無視 / 同一は無視
+      if (!candidate) return;
+      if (_lastShown && candidate.length < _lastShown.length) return;
+
+      el.textContent = candidate;
+      el.title = candidate;
+      _lastShown = candidate;
+    };
+  })();
+
+
   // --- list panel ---
   let listBox = null;
 
@@ -667,9 +730,23 @@ console.log("getDownloadLabelForTurn catch");
     listBox.id = 'cgpt-list-panel';
 
     listBox.innerHTML = `
-      <div id="cgpt-list-head">
-        <div id="cgpt-list-grip"></div>
-        <button id="cgpt-pin-filter" class="cgtn-badgehost" type="button" aria-pressed="false" style="cursor:pointer">🔖\uFE0E
+      <div id="cgpt-list-head"
+           style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+                  padding:2px 6px 3px;
+                  border-bottom:1px solid rgba(0,0,0,0.15);
+                  background:rgba(255,255,255,0.95);backdrop-filter:blur(4px);
+                  position:sticky;top:0;z-index:1;">        <div id="cgpt-list-grip"></div>
+        <!-- ★ チャット名（つまみの下＝ヘッダ中央）。幅はパネル内に収めて…省略 -->
+        <div id="cgpt-chat-title-wrap" style="order:2;flex:1 0 100%;min-width:0">
+         <div id="cgpt-chat-title"
+               style="max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                      text-align:center;font-weight:600;font-size:13px;opacity:.9;padding:2px 4px;">
+         </div>
+        </div>
+        <!-- 上段右寄せにするため margin-left:auto を付与 -->
+        <button id="cgpt-pin-filter" class="cgtn-badgehost" type="button" aria-pressed="false"
+                style="cursor:pointer;margin-left:auto">🔖\uFE0E
+
           <span class="cgtn-badge" hidden>0</span>
         </button>
         <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
@@ -875,7 +952,8 @@ console.log("getDownloadLabelForTurn catch");
 
 
     bindCollapseOnce(listBox);
-
+    // チャット名表示
+    try { CGTN_LOGIC.updateListChatTitle?.(); } catch {}
     return listBox;
   }
 
@@ -1118,8 +1196,9 @@ console.log("getDownloadLabelForTurn catch");
     NS._lastVisibleRows = rowsCount;
     NS.updateListFooterInfo();
     // 付箋バッジ
-console.log("[renderList] updatePinOnlyBadge call");
     updatePinOnlyBadge?.();
+    // チャット名
+    try { CGTN_LOGIC.updateListChatTitle?.(); } catch {}
     //注目ターンのキー行へスクロール
 //    scrollListToTurn(NS._currentTurnKey);
 //console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);

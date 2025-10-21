@@ -262,6 +262,18 @@ const LIST_CSS = `
 /* 交互やホバーがあれば微差で */
 #cgpt-list-panel .row:hover{ background:#f2f5f8; }
 
+#cgpt-chat-title {
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:center;
+  font-weight:600;
+  font-size:13px;
+  opacity:.9;
+  padding:1px 6px 0;
+  line-height:1.2;
+}
 /* =========================
    5) PREVIEW（ポップ/吹き出し）
 ========================= */

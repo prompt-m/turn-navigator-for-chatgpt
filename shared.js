@@ -54,6 +54,8 @@
     ids[chatId] = { title: nextTitle, updatedAt: now };
 
     NS.saveSettingsPatch({ pinsByChat: byChat, chatIndex: { ...idx, ids } });
+    // チャット名表示（リストパネル）
+    try { window.CGTN_LOGIC?.updateListChatTitle?.(); } catch {}
   };
   // ドキュメントタイトルを使って現在チャットの名前を更新
   NS.refreshCurrentChatTitle = function(){
@@ -107,7 +109,7 @@
       return (location.host + location.pathname).toLowerCase();
     } catch { return 'unknown'; }
   };
-/*
+
   NS.getChatTitle = function(){
     try {
       const docTitle = (document.title || '').trim();
@@ -117,13 +119,14 @@
       return '';
     }
   };
-*/
 
+/*
   NS.getChatTitle = function getChatTitle(){
     try {
       const isConcreteChat = /\/c\/[a-z0-9-]+/i.test(location.pathname);
       const raw = (document.title || '').trim();
 
+console.log("getChatTitle raw:",raw);
       // 形を分解（"＜名前＞ - ChatGPT" 想定）
       const parts = raw.split(' - ').map(s => s.trim()).filter(Boolean);
       const isSiteName = (s) => /^(ChatGPT|OpenAI)$/i.test(s);
@@ -145,6 +148,9 @@
           main.querySelector('[data-testid*="conversation"] :is(h1,h2)') ||
           main.querySelector('header h1, h1, h2, [data-testid="title"]');
         const txt = (domName?.textContent || '').trim();
+
+console.log("getChatTitle txt:",txt);
+
         if (txt) return txt.slice(0, 200);
 
         // まだ水和前で取れないときは「未決定」を返す（シェル扱い）
@@ -163,6 +169,7 @@
       return '';
     }
   };
+*/
 
   function _ensurePinsByChat(cfg){
     cfg.pinsByChat = cfg.pinsByChat || {};
@@ -212,7 +219,8 @@
     }
 
     const oldTitle = rec.title || '';
-    const picked   = oldTitle || title || '(No Title)';
+    //const picked   = oldTitle || title || '(No Title)';
+    const picked   = (title && title.trim()) || oldTitle || '(No Title)';
 
     // ★計測ログ：上書き検知
     if (picked !== oldTitle) {
@@ -406,19 +414,6 @@
     const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
     const hasAny  = safeArr.some(Boolean);
 
-    // 0件なら削除（幽霊防止）※挙動は維持
-/*
-    if (!hasAny) {
-      if (map[chatId]) {
-        console.debug('[savePinsArr] delete record because zero pins', { chatId });
-        delete map[chatId];
-        NS.saveSettingsPatch({ pinsByChat: map });
-      } else {
-        console.debug('[savePinsArr] zero pins but record not exist', { chatId });
-      }
-      return;
-    }
-*/
     const oldTitle = map[chatId]?.title || '';
     const newTitle = NS.getChatTitle?.() || '';
 //    const title    = oldTitle || newTitle || '(No Title)';
