@@ -647,14 +647,24 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     _lastUrlSig = cur;
     window.CGTN_PREVIEW?.hide?.('url-change');
     try{
-      if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()){
-        LG?.hydratePinsCache?.();  // 引数省略で現チャットID取得の実装に合わせる
-        LG?.rebuild?.();
-        LG?.renderList?.(true);
-        console.debug('[auto-sync] chat switch (list open) → rebuild+render');
-      } else {
-        console.debug('[auto-sync] chat switch (list closed) → noop');
-      }
+     // 新チャットDOMが描画されるのを待ってから再構築
+      setTimeout(() => {
+        try {
+          LG?.hydratePinsCache?.();
+          LG?.rebuild?.();
+
+          if (SH.isListOpen?.()) {
+            LG?.renderList?.(true);
+            console.debug('[auto-sync] chat switch (list open) → rebuild+render');
+          } else {
+            console.debug('[auto-sync] chat switch (list closed) → state only');
+          }
+ 
+          window.CGTN_LOGIC?.updatePinOnlyBadge?.();
+        } catch(e) {
+          console.warn('auto-sync failed:', e);
+        }
+      }, 700); // ← ここが重要。0→700ms程度に変更
     }catch(e){}
   }
 

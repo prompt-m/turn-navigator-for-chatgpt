@@ -68,6 +68,7 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
   }
   // ★スクロール用 厳しめ（安定版のまま）
   function headNodeOf(article){
+    if (article?.tagName === 'ARTICLE') return article;
     if (!article) return null;
     const pick = (root, sel) => {
       const n = (root || article).querySelector(sel);
@@ -236,14 +237,6 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
     return `⭳（${name}）`;
   }
 
-  function getTurnRole(el){
-    if (!el) return 'unknown';
-    const roleHint = el.dataset?.turn;
-    if (roleHint) return roleHint; // data-turn優先
-    if (el.matches('[data-message-author-role="user"], div [data-message-author-role="user"]')) return 'user';
-    if (el.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]')) return 'assistant';
-    return 'unknown';
-  }
 
   // ===== 添付ファイル検出（Article.txt対応） =====
   // 添付UIの実在判定（本文の単語では反応しない）
@@ -364,9 +357,28 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
   // 互換の薄ラッパー（他所で使っていても安心・未使用なら残すだけ）
   // --- 互換の薄ラッパー（index方式 → 'turn:n' 文字列）---
   function getTurnKey(article){
+/*
     const rows = (window.ST?.all || []);
     const idx  = rows.indexOf(article);
+console.log("getTurnKey rows:",rows," idx:",idx);　　
     return idx >= 0 ? ('turn:' + (idx + 1)) : '';
+*/
+  const rows = (ST?.all || NS?.ST?.all || []);
+  let target = article;
+  // 引数が article 直下の子要素のことがあるので、closest で補正
+  if (target && !target.matches?.('article')) {
+    target = target.closest?.('article,[data-testid^="conversation-turn-"]') || target;
+  }
+  let idx = rows.indexOf(target);
+  if (idx < 0 && target?.dataset?.turnId){
+    // もし内部で turnId を振っているなら、そのIDで探索（任意）
+    idx = rows.findIndex(n => n?.dataset?.turnId === target.dataset.turnId);
+  }
+  // デバッグ
+console.debug('getTurnKey len:', rows.length, 'idx:', idx);
+  return idx >= 0 ? ('turn:' + (idx + 1)) : '';
+
+
   }
 
   // 行のインデックス取得ヘルパ
@@ -495,6 +507,7 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
     sc.scrollTo({ top: clamped, behavior: 'smooth' });
     //注目ターンのキーを覚える
     NS._currentTurnKey = getTurnKey(article);
+console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
   }
 
   // ターン検出<article>
@@ -522,6 +535,14 @@ function pickAllTurns(){
   return visible;
 }
 
+ // 役割取得: data-turn を最優先。なければ従来の role 属性でフォールバック
+ function getTurnRole(el){
+   const hint = el?.dataset?.turn;
+   if (hint === 'user' || hint === 'assistant') return hint;
+   if (el.matches?.('[data-message-author-role="user"], div [data-message-author-role="user"]')) return 'user';
+   if (el.matches?.('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]')) return 'assistant';
+   return ''; // 不明
+ }
 
   function sortByY(list){
     const sc = getTrueScroller();
@@ -590,12 +611,15 @@ function pickAllTurns(){
       );
     };
 
-    ST.user = ST.all.filter(el => isRole(el, 'user'));
-    ST.assistant = ST.all.filter(el => isRole(el, 'assistant'));
+    ST.user      = ST.all.filter(a => getTurnRole(a) === 'user');
+    ST.assistant = ST.all.filter(a => getTurnRole(a) === 'assistant');
+
 
     // 可能なら Set も用意（描画側が速くなる）
     ST._userSet = new Set(ST.user);
     ST._asstSet = new Set(ST.assistant);
+    NS.ST = ST; // ← デバッグ用に公開（本番運用でも副作用なし）
+console.debug('[rebuild] turns:', ST.all.length, 'user:', ST.user.length, 'asst:', ST.assistant.length);
 
   }
 
@@ -1097,8 +1121,8 @@ console.log("getDownloadLabelForTurn catch");
 console.log("[renderList] updatePinOnlyBadge call");
     updatePinOnlyBadge?.();
     //注目ターンのキー行へスクロール
-    scrollListToTurn(NS._currentTurnKey);
-console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
+//    scrollListToTurn(NS._currentTurnKey);
+//console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
   function setListEnabled(on){
@@ -1139,7 +1163,7 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
 
   function updatePinOnlyBadge(){
     try {
-      const btn = document.getElementById('cgtn-pin-only');
+      const btn = document.getElementById('cgpt-pin-filter');
       const badge = btn?.querySelector('.cgtn-badge');
 console.log("updatePinOnlyBadge badge:",badge);
       if (!badge) return;
@@ -1192,9 +1216,11 @@ console.log("updatePinOnlyBadge count:",count);
     }
   }
 
-// --- pins-updated イベントを UI に橋渡し（重複登録ガードつき） ---
-//if (!window.__cgtnPinsHooked) {
-//  window.__cgtnPinsHooked = true;
+  //付箋バッジ更新
+  document.addEventListener('cgtn:pins-updated', () => {
+    try { NS?.updatePinOnlyBadge?.(); } catch {}
+  });
+
 
   window.addEventListener('cgtn:pins-updated', (ev) => {
     const { chatId, count } = ev.detail || {};
@@ -1208,15 +1234,10 @@ console.log("updatePinOnlyBadge count:",count);
       // いちばん堅いのは全体再描画
       NS.renderList?.(true);
 
-      // もし各行に data-chatid を付けているなら差分更新も可
-      // if (count === 0) {
-      //   document
-      //     .querySelectorAll(`#cgpt-list-body .row[data-chatid="${chatId}"]`)
-      //     .forEach(el => el.remove());
-      // }
     }
+    //付箋バッジ更新
+    NS?.updatePinOnlyBadge?.();
   });
-//}
 
 
   // --- expose ---
