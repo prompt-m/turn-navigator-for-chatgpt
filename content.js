@@ -633,16 +633,32 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
   }
 
   let _lastUrlSig = location.pathname + location.search;
+  let _switchSeq  = 0;
 
   function handleUrlChangeMessage() {
     const cur = location.pathname + location.search;
-    if (cur === _lastUrlSig) return;
+    if (cur === _lastUrlSig){ 
+      console.debug('[cgtn:url] same-url ignored:', cur);
+      return;
+    }
     _lastUrlSig = cur;
-  
+
     window.CGTN_PREVIEW?.hide?.('url-change');
+    const mySeq = ++_switchSeq;
+
+    console.groupCollapsed('[cgtn:url] switched!', { cur, mySeq, t: performance.now().toFixed(1) });
+    console.debug('[cgtn:url] pre-clear UI');
+
+    // ★ここで先に消す
+    window.CGTN_LOGIC?.clearListPanelUI?.();
+
+    // ★ここが肝：まず即クリア（先に前の表示を消す）
+    try { window.CGTN_LOGIC?.clearListPanelUI?.(); } catch {}
 
     // 少し遅らせて、ChatGPTのmainが再描画されてから実行
     waitForChatMain(() => {
+    if (mySeq !== _switchSeq) { console.debug('[cgtn:url] stale seq drop', mySeq, _switchSeq); console.groupEnd(); return; }
+    console.debug('[cgtn:url] main ready, rebuilding…');
       try {
         const LG = window.CGTN_LOGIC;
         const SH = window.CGTN_SHARED;
@@ -767,10 +783,11 @@ console.log("installAutoSyncForTurns top");
 
       if (USE_INJECT_URL_HOOK){
         injectUrlChangeHook();
-        window.addEventListener('message', (ev)=>{
-          if (ev?.data?.source==='cgtn' && ev?.data?.type==='url-change'){
-            handleUrlChangeMessage();
-          }
+        window.addEventListener('message', (e)=>{
+          const d = e && e.data;
+          if (!d || d.source !== 'cgtn' || d.type !== 'url-change') return;
+          console.debug('[cgtn:url-msg] recv', d.href, performance.now().toFixed(1));
+          handleUrlChangeMessage();
         });
       }
       installAutoSyncForTurns(); // MOは1本のみ

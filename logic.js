@@ -717,10 +717,19 @@ console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
   function rebuild(){
     NS._scroller = getTrueScroller();
 
+    const t0 = performance.now();
     const allRaw = pickAllTurns().filter(isRealTurn);
 
     ST.all = sortByY(allRaw);
-//console.log("★★★★★★rebuild ST.all:",ST.all);
+console.debug('[cgtn:rebuild] turns=', ST.all.length, 'in', (performance.now()-t0).toFixed(1), 'ms');
+
+    // ★ 追加: <article>ゼロ件時は完全リセットモード
+    if (ST.all.length === 0) {
+      console.debug('[rebuild] no <article> found → reset list panel');
+      // UIリセット
+      CGTN_LOGIC.clearListPanelUI?.();
+      return;
+    }
 
     const isRole = (el, role) => {
       // ★改修：data-turn を優先、なければ従来セレクタで補完
@@ -778,9 +787,38 @@ console.log("getDownloadLabelForTurn catch");
     }
   }
 
+  // 追加：パネルを完全クリア（タイトル/バッジ/本文）
+  CGTN_LOGIC.clearListPanelUI = function clearListPanelUI(){
+    try {
+      const body  = document.getElementById('cgpt-list-body');
+      if (body) body.innerHTML = '';
+      const title = document.getElementById('cgpt-chat-title');
+      if (title) { title.textContent = ''; title.title = ''; }
+      const badge = document.querySelector('#cgpt-pin-filter .cgtn-badge');
+      if (badge) { badge.textContent = ''; badge.hidden = true; }
+    } catch(e){ console.warn('[clearListPanelUI] failed', e); }
+    // 状態も空に
+    try {
+      const ST = CGTN_LOGIC.ST || (CGTN_LOGIC.ST = {});
+      ST.all = []; ST.user = []; ST.assistant = [];
+    } catch {}
+  };
+
+
   CGTN_LOGIC.updateListChatTitle = function updateListChatTitle(){
     const el = document.getElementById('cgpt-chat-title');
     if (!el) return;
+
+    if ((CGTN_LOGIC.ST?.all?.length ?? 0) === 0) { el.textContent = ''; el.title=''; return; }
+
+    // ★ ターンゼロ時は強制リセット
+    const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
+    if (turns === 0) {
+      el.textContent = '';
+      el.title = '';
+      return;
+    }
+
     const cfg   = CGTN_SHARED.getCFG?.() || {};
     const cid   = CGTN_SHARED.getChatId?.();
     const t1    = CGTN_SHARED.getChatTitle?.() || '';                  // document.title（最優先）
@@ -1315,9 +1353,23 @@ console.debug('[setListEnabled*3]一覧OFF');
   function updatePinOnlyBadge(){
     try {
       const btn = document.getElementById('cgpt-pin-filter');
+      if (!btn) return;
       const badge = btn?.querySelector('.cgtn-badge');
-console.log("updatePinOnlyBadge badge:",badge);
       if (!badge) return;
+
+      if ((CGTN_LOGIC.ST?.all?.length ?? 0) === 0) {
+        badge.hidden = true;
+        badge.textContent='';
+        return; 
+      }
+
+      // ★ articleゼロ件なら非表示
+      const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
+      if (turns === 0) {
+        badge.hidden = true;
+        badge.textContent = '';
+        return;
+      }
 
       const cid = SH.getChatId?.();
       const count = cid ? SH.getPinsCountByChat?.(cid) : 0;

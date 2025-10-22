@@ -1,7 +1,11 @@
-(function(){
+(function () {
   if (window.__CGTN_URL_HOOKED__) return;
   window.__CGTN_URL_HOOKED__ = true;
-  const POST = () => window.postMessage({ source:'cgtn', type:'url-change', href: location.href }, '*');
+  const POST = () => {
+    const href = location.href;
+    console.debug('[cgtn:url-hook] post', href, performance.now().toFixed(1));
+    window.postMessage({ source: 'cgtn', type: 'url-change', href }, '*');
+  };
   const _ps = history.pushState, _rs = history.replaceState;
   if (_ps) history.pushState = function(){ const r=_ps.apply(this, arguments); try{POST();}catch(_){} return r; };
   if (_rs) history.replaceState = function(){ const r=_rs.apply(this, arguments); try{POST();}catch(_){} return r; };
