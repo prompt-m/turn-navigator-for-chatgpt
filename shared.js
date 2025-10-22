@@ -54,8 +54,9 @@
     ids[chatId] = { title: nextTitle, updatedAt: now };
 
     NS.saveSettingsPatch({ pinsByChat: byChat, chatIndex: { ...idx, ids } });
-    // チャット名表示（リストパネル）
-    try { window.CGTN_LOGIC?.updateListChatTitle?.(); } catch {}
+    // 付箋バッジ・チャット名
+    window.CGTN_LOGIC?.updatePinOnlyBadge?.();
+    window.CGTN_LOGIC?.updateListChatTitle?.();
   };
   // ドキュメントタイトルを使って現在チャットの名前を更新
   NS.refreshCurrentChatTitle = function(){

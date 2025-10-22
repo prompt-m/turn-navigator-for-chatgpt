@@ -631,38 +631,38 @@ console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
   }
 
   // ターン検出<article>
-function pickAllTurns(){
-  const seen = new Set();
-  let list = Array.from(document.querySelectorAll(TURN_SEL));
-  if (!list.length){
-    const nodes = Array.from(document.querySelectorAll('[data-message-author-role]'));
-    list = nodes.map(n => n.closest('article') || n)
-                .filter(el => el && !seen.has(el) && (seen.add(el), true));
-  }
+  function pickAllTurns(){
+    const seen = new Set();
+    let list = Array.from(document.querySelectorAll(TURN_SEL));
+    if (!list.length){
+      const nodes = Array.from(document.querySelectorAll('[data-message-author-role]'));
+      list = nodes.map(n => n.closest('article') || n)
+                  .filter(el => el && !seen.has(el) && (seen.add(el), true));
+    }
 
-  // ★追加：DIVが紛れていたら、上位にある<article>を辿る
-  list = list.map(el => el.tagName === 'ARTICLE' ? el : el.closest('article') || el);
-
-  const visible = list.filter(a => {
-    try {
-      const r = a.getBoundingClientRect();
-      const disp = getComputedStyle(a).display;
-      return r.height > 10 && disp !== 'none';
-    } catch { return false; }
-  });
+    // ★追加：DIVが紛れていたら、上位にある<article>を辿る
+    list = list.map(el => el.tagName === 'ARTICLE' ? el : el.closest('article') || el);
+  
+    const visible = list.filter(a => {
+      try {
+        const r = a.getBoundingClientRect();
+        const disp = getComputedStyle(a).display;
+        return r.height > 10 && disp !== 'none';
+      } catch { return false; }
+    });
 //console.log("pickAllTurns 3 visible.length",visible.length);
 
-  return visible;
-}
+    return visible;
+  }
 
- // 役割取得: data-turn を最優先。なければ従来の role 属性でフォールバック
- function getTurnRole(el){
-   const hint = el?.dataset?.turn;
-   if (hint === 'user' || hint === 'assistant') return hint;
-   if (el.matches?.('[data-message-author-role="user"], div [data-message-author-role="user"]')) return 'user';
-   if (el.matches?.('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]')) return 'assistant';
-   return ''; // 不明
- }
+  // 役割取得: data-turn を最優先。なければ従来の role 属性でフォールバック
+  function getTurnRole(el){
+    const hint = el?.dataset?.turn;
+    if (hint === 'user' || hint === 'assistant') return hint;
+    if (el.matches?.('[data-message-author-role="user"], div [data-message-author-role="user"]')) return 'user';
+    if (el.matches?.('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]')) return 'assistant';
+    return ''; // 不明
+  }
 
   function sortByY(list){
     const sc = getTrueScroller();
@@ -778,47 +778,18 @@ console.log("getDownloadLabelForTurn catch");
     }
   }
 
-  // どこからでも呼べるよう公開
-/*
   CGTN_LOGIC.updateListChatTitle = function updateListChatTitle(){
-    const box = document.getElementById('cgpt-chat-title');
-    if (!box) return;
-    const cfg  = CGTN_SHARED.getCFG?.() || {};
-    const cid  = CGTN_SHARED.getChatId?.();
-    // まず live（<title>）→ 次に保存済み chatIndex.ids → それでも無ければ rec.title → 既定
-    const live = CGTN_SHARED.getChatTitle?.() || '';
-    const saved = cfg?.chatIndex?.ids?.[cid]?.title || '';
-    const fallback = (cfg?.pinsByChat?.[cid]?.title) || '';
-    const full = live || saved || fallback || '(No Title)';
-    box.textContent = full;
-    box.title = full; // ★ ツールチップにフルタイトル
+    const el = document.getElementById('cgpt-chat-title');
+    if (!el) return;
+    const cfg   = CGTN_SHARED.getCFG?.() || {};
+    const cid   = CGTN_SHARED.getChatId?.();
+    const t1    = CGTN_SHARED.getChatTitle?.() || '';                  // document.title（最優先）
+    const t2    = cfg?.chatIndex?.ids?.[cid]?.title || '';
+    const t3    = (cfg?.pinsByChat?.[cid]?.title) || '';
+    const title = t1 || t2 || t3 || '(No Title)';
+    el.textContent = title;
+    el.title = title;
   };
-*/
-
-  (function(){
-    let _lastShown = '';   // 直近表示
-
-    CGTN_LOGIC.updateListChatTitle = function(){
-      const el = document.getElementById('cgpt-chat-title');
-      if (!el) return;
-
-      const cfg   = CGTN_SHARED.getCFG?.() || {};
-      const cid   = CGTN_SHARED.getChatId?.();
-      const live  = CGTN_SHARED.getChatTitle?.() || '';                 // document.title
-      const saved = cfg?.chatIndex?.ids?.[cid]?.title || '';
-      const fallback = (cfg?.pinsByChat?.[cid]?.title) || '';
-      const candidate = live || saved || fallback || '(No Title)';
-
-      // ★フィルタ例：空は無視 / 文字数が縮む更新は無視 / 同一は無視
-      if (!candidate) return;
-      if (_lastShown && candidate.length < _lastShown.length) return;
-
-      el.textContent = candidate;
-      el.title = candidate;
-      _lastShown = candidate;
-    };
-  })();
-
 
   // --- list panel ---
   let listBox = null;
@@ -1051,8 +1022,10 @@ console.log("getDownloadLabelForTurn catch");
 
 
     bindCollapseOnce(listBox);
+    // 付箋バッジ
+    NS.updatePinOnlyBadge?.();
     // チャット名表示
-    try { CGTN_LOGIC.updateListChatTitle?.(); } catch {}
+    NS.updateListChatTitle?.()
     return listBox;
   }
 
@@ -1295,9 +1268,9 @@ console.log("getDownloadLabelForTurn catch");
     NS._lastVisibleRows = rowsCount;
     NS.updateListFooterInfo();
     // 付箋バッジ
-    updatePinOnlyBadge?.();
+    NS.updatePinOnlyBadge?.();
     // チャット名
-    try { CGTN_LOGIC.updateListChatTitle?.(); } catch {}
+    NS.updateListChatTitle?.();
     //注目ターンのキー行へスクロール
 //    scrollListToTurn(NS._currentTurnKey);
 //console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
@@ -1306,15 +1279,11 @@ console.log("getDownloadLabelForTurn catch");
   function setListEnabled(on){
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
-    //チャット名を取得しておく
-    //window.CGTN_SHARED?.touchChatMeta?.();
-    // 一覧ONではメタを作らない（ピン操作時にだけ作成/更新する）
 
     const panel = ensureListBox();
     panel.style.display = on ? 'flex' : 'none';
 
     // リストが開いているかどうか
-    // ← 追加：ランタイムフラグ（UI即時状態）
     NS._panelOpen = !!on;
 
     // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
@@ -1336,7 +1305,11 @@ console.debug('[setListEnabled*2]LG.rebuild() ');
         setTimeout(()=>{ rebuild(); NS.renderList(true); }, 180);
       }));
     } else {
+console.debug('[setListEnabled*3]一覧OFF');
     }
+    //付箋バッジ・チャット名
+    NS.updatePinOnlyBadge?.();
+    NS.updateListChatTitle?.();
   }
 
   function updatePinOnlyBadge(){
@@ -1394,9 +1367,10 @@ console.log("updatePinOnlyBadge count:",count);
     }
   }
 
-  //付箋バッジ更新
+  //付箋バッジ/チャット名更新
   document.addEventListener('cgtn:pins-updated', () => {
     try { NS?.updatePinOnlyBadge?.(); } catch {}
+    try { NS?.updateListChatTitle?.(); } catch {}
   });
 
 
@@ -1415,8 +1389,21 @@ console.log("updatePinOnlyBadge count:",count);
     }
     //付箋バッジ更新
     NS?.updatePinOnlyBadge?.();
+    //チャット名
+    NS?.updateListChatTitle?.();
   });
 
+  // リストの内部作業状態を軽く初期化（必要なものだけ）
+  CGTN_LOGIC.onChatSwitched = function(newCid){
+    try {
+      // もし内部に「前回の chatId を覚えている」変数があれば更新
+      CGTN_LOGIC._lastChatId = newCid;
+
+      // リスト作成用の一時キャッシュをクリア（名前は実装に合わせて）
+      CGTN_LOGIC._turnCache = {};           // ← 存在すれば
+      CGTN_LOGIC._lastRenderSig = '';       // ← 変化検知用のシグネチャ類
+    } catch {}
+  };
 
   // --- expose ---
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
