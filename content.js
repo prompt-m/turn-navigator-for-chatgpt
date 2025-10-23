@@ -646,64 +646,98 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     window.CGTN_PREVIEW?.hide?.('url-change');
     const mySeq = ++_switchSeq;
 
-    console.groupCollapsed('[cgtn:url] switched!', { cur, mySeq, t: performance.now().toFixed(1) });
-    console.debug('[cgtn:url] pre-clear UI');
+    //console.groupCollapsed('[cgtn:url] switched!', { cur, mySeq, t: performance.now().toFixed(1) });
+
+    console.debug('[cgtn:url] mySeq:',mySeq);
 
     // ★ここで先に消す
-    window.CGTN_LOGIC?.clearListPanelUI?.();
+//    window.CGTN_LOGIC?.clearListPanelUI?.();
 
     // ★ここが肝：まず即クリア（先に前の表示を消す）
     try { window.CGTN_LOGIC?.clearListPanelUI?.(); } catch {}
+    console.debug('[cgtn:url] pre-clear UI');
 
     // 少し遅らせて、ChatGPTのmainが再描画されてから実行
-    waitForChatMain(() => {
-    if (mySeq !== _switchSeq) { console.debug('[cgtn:url] stale seq drop', mySeq, _switchSeq); console.groupEnd(); return; }
-    console.debug('[cgtn:url] main ready, rebuilding…');
-      try {
-        const LG = window.CGTN_LOGIC;
-        const SH = window.CGTN_SHARED;
-        const cid = SH.getChatId?.();
-        LG?.onChatSwitched?.(cid);
-
-        // タイトル更新フィルタを一度クリア（短縮抑止を解除）
-        LG?.resetListChatTitleFilter?.();
-
-        LG?.hydratePinsCache?.();
+    waitForChatMain(
+      // onReady
+      () => {
+        if (mySeq !== _switchSeq) return; // 古い通知は破棄
+        const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
+        LG?.hydratePinsCache?.(SH.getChatId?.());
         if (SH.isListOpen?.()) {
-          console.debug('[auto-sync] chat switch (list open) → rebuild+render');
+          console.debug('[auto-sync1] chat switch (list open) → rebuild+render');
           LG?.rebuild?.();
           LG?.renderList?.(true);
         } else {
-          console.debug('[auto-sync] chat switch (list closed) → state only');
+          console.debug('[auto-sync2] chat switch (list closed) → state only');
         }
-        // 付箋バッジ
-        LG?.updatePinOnlyBadge?.();
-        // チャット名
-        LG?.updateListChatTitle?.();
-console.debug('＊＊＊[auto-sync][url] switched to', cid, location.pathname);
-console.debug('＊＊＊[auto-sync][list] rebuilt turns=', LG?._lastRenderSig, 'pins=', Object.keys(CGTN_SHARED.getCFG?.().pinsByChat||{}).length);
-      } catch (e) {
-        console.warn('auto-sync failed', e);
+        LG?.updatePinOnlyBadge?.(); LG?.updateListChatTitle?.();
+      },
+      // onIdle (timeout)
+      () => {
+        // ここでは rebuild しない。空のまま待つ
+        watchFirstArticleOnce(() => {
+          // URLがまた変わっていたらやめる
+          if (mySeq !== _switchSeq){
+            console.debug('[auto-sync3]mySeq !== _switchSeq return ');
+            return;
+          }
+          const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
+          LG?.hydratePinsCache?.(SH.getChatId?.());
+          if (SH.isListOpen?.()) {
+            console.debug('[auto-sync4] (list open)→ rebuild+render');
+            LG?.rebuild?.();
+            LG?.renderList?.(true);
+          }
+          // 付箋バッジ
+          LG?.updatePinOnlyBadge?.();
+          // チャット名
+          LG?.updateListChatTitle?.();
+console.debug('＊＊＊[auto-sync5]location.pathname:',location.pathname);
+console.debug('＊＊＊[auto-sync6]LG?._lastRenderSig:', LG?._lastRenderSig, 'pins=', Object.keys(CGTN_SHARED.getCFG?.().pinsByChat||{}).length);
+
+        });
       }
-    });
+    );
+
+
+
   }
 
-  // ChatGPT の main DOM が更新されるまで待機してから callback 実行
-  function waitForChatMain(callback, timeout = 4000) {
-    const started = Date.now();
+  // 成功したら onReady、タイムアウトしたら onIdle を呼ぶ
+  function waitForChatMain(onReady, onIdle, timeout = 4000) {
+    const started = performance.now();
+    const ok = () => {
+      console.debug('[waitForChatMain] ready in', (performance.now()-started).toFixed(1), 'ms');
+      onReady?.();
+    };
+    const idle = () => {
+      console.debug('[waitForChatMain] timeout, will watch for first article');
+      onIdle?.();
+    };
+
     const check = () => {
       const main = document.querySelector('main');
-      if (main && main.querySelector('[data-testid*="conversation"], article')) {
-        callback();
-      } else if (Date.now() - started < timeout) {
-        setTimeout(check, 200);
-      } else {
-        console.warn('[waitForChatMain] timeout, forcing rebuild');
-        callback();
-      }
+      if (main && (main.querySelector('[data-testid*="conversation"], article'))) return ok();
+      if (performance.now() - started < timeout) return setTimeout(check, 200);
+      idle();
     };
     check();
   }
+
+  // <article>が出てきた瞬間に一度だけ実行
+  function watchFirstArticleOnce(cb) {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const mo = new MutationObserver(() => {
+      if (main.querySelector('[data-testid*="conversation"], article')) {
+        mo.disconnect();
+        cb?.();
+      }
+    });
+    mo.observe(main, { childList: true, subtree: true });
+  }
+
 
   // ========= リスト表示中の「ターン追加」自動更新（MOは1本のみ） =========
   function installAutoSyncForTurns(){
@@ -785,8 +819,9 @@ console.log("installAutoSyncForTurns top");
         injectUrlChangeHook();
         window.addEventListener('message', (e)=>{
           const d = e && e.data;
+          console.debug('[cgtn:url-msg*1] recv', d.href, performance.now().toFixed(1));
           if (!d || d.source !== 'cgtn' || d.type !== 'url-change') return;
-          console.debug('[cgtn:url-msg] recv', d.href, performance.now().toFixed(1));
+          console.debug('[cgtn:url-msg*2] recv', d.href, performance.now().toFixed(1));
           handleUrlChangeMessage();
         });
       }

@@ -790,18 +790,29 @@ console.log("getDownloadLabelForTurn catch");
   // 追加：パネルを完全クリア（タイトル/バッジ/本文）
   CGTN_LOGIC.clearListPanelUI = function clearListPanelUI(){
     try {
+console.log("clearListPanelUI*1");
       const body  = document.getElementById('cgpt-list-body');
       if (body) body.innerHTML = '';
-      const title = document.getElementById('cgpt-chat-title');
-      if (title) { title.textContent = ''; title.title = ''; }
+      const el = document.getElementById('cgpt-chat-title');
+      if (el) {
+console.log("clearListPanelUI el.textContent:",el.textContent);
+        el.textContent = '';
+        el.title = ''; 
+      }
       const badge = document.querySelector('#cgpt-pin-filter .cgtn-badge');
       if (badge) { badge.textContent = ''; badge.hidden = true; }
-    } catch(e){ console.warn('[clearListPanelUI] failed', e); }
+    } catch(e){
+      console.warn('[clearListPanelUI] failed', e); 
+    }
     // 状態も空に
     try {
+console.log("clearListPanelUI*2");
       const ST = CGTN_LOGIC.ST || (CGTN_LOGIC.ST = {});
       ST.all = []; ST.user = []; ST.assistant = [];
-    } catch {}
+    } catch {
+console.log("clearListPanelUI catch");
+
+    }
   };
 
 
