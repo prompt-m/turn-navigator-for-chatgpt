@@ -643,16 +643,26 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     }
     _lastUrlSig = cur;
 
+    // ★新方針：遷移時は必ず閉じる。自動再構築は一切しない。
+    try {
+      const LG = window.CGTN_LOGIC;
+      const SH = window.CGTN_SHARED;
+      window.CGTN_PREVIEW?.hide?.('url-change');
+      LG?.setListEnabled?.(false);     // ← 一覧を物理的に閉じる（トグル関数）
+      LG?.clearListPanelUI?.();        // ← 残像を消す（タイトル・バッジも空）
+      LG?.updatePinOnlyBadge?.();
+      LG?.updateListChatTitle?.();
+      console.debug('[cgtn:url] navigated → list closed & cleared:', cur);
+    } catch (e) {
+      console.warn('[cgtn:url] close-on-nav failed', e);
+    }
+/*
     window.CGTN_PREVIEW?.hide?.('url-change');
     const mySeq = ++_switchSeq;
-
     //console.groupCollapsed('[cgtn:url] switched!', { cur, mySeq, t: performance.now().toFixed(1) });
-
     console.debug('[cgtn:url] mySeq:',mySeq);
-
     // ★ここで先に消す
 //    window.CGTN_LOGIC?.clearListPanelUI?.();
-
     // ★ここが肝：まず即クリア（先に前の表示を消す）
     try { window.CGTN_LOGIC?.clearListPanelUI?.(); } catch {}
     console.debug('[cgtn:url] pre-clear UI');
@@ -699,12 +709,13 @@ console.debug('＊＊＊[auto-sync6]LG?._lastRenderSig:', LG?._lastRenderSig, 'p
         });
       }
     );
-
+*/
 
 
   }
 
   // 成功したら onReady、タイムアウトしたら onIdle を呼ぶ
+  /* UNUSED */ 
   function waitForChatMain(onReady, onIdle, timeout = 4000) {
     const started = performance.now();
     const ok = () => {
@@ -725,6 +736,7 @@ console.debug('＊＊＊[auto-sync6]LG?._lastRenderSig:', LG?._lastRenderSig, 'p
     check();
   }
 
+  /* UNUSED */ 
   // <article>が出てきた瞬間に一度だけ実行
   function watchFirstArticleOnce(cb) {
     const main = document.querySelector('main');
@@ -745,7 +757,7 @@ console.log("installAutoSyncForTurns top");
     if (document._cgtnAutoSyncBound) return;
     document._cgtnAutoSyncBound = true;
 
-//console.log("installAutoSyncForTurns 1");
+console.log("installAutoSyncForTurns 1");
   
     // 自作UI除外（無限ループ防止）
     const inOwnUI = (node) => {
@@ -754,7 +766,7 @@ console.log("installAutoSyncForTurns top");
              document.getElementById('cgpt-nav')?.contains(node) ||
              document.getElementById('cgpt-list-panel')?.contains(node);
     };
-//console.log("installAutoSyncForTurns 2");
+console.log("installAutoSyncForTurns 2");
   
     const root = document.querySelector('main') || document.body;
     let to = 0;
@@ -769,7 +781,7 @@ console.log("installAutoSyncForTurns top");
         }catch(e){}
       }, 300); // 300msデバウンス
     };
-//console.log("installAutoSyncForTurns 3");
+console.log("installAutoSyncForTurns 3");
 
     const mo = new MutationObserver((muts)=>{
       if (!SH.isListOpen?.()) return;        // リスト閉なら処理しない
@@ -785,7 +797,7 @@ console.log("installAutoSyncForTurns top");
         if (hit){ kick(); break; }
       }
     });
-//console.log("installAutoSyncForTurns 4");
+console.log("installAutoSyncForTurns 4");
     try{ mo.observe(root, { childList:true, subtree:true }); }catch(e){}
   }
 
