@@ -379,6 +379,8 @@
           }
         };
         SH.saveSettingsPatch?.(patch, ()=> flashMsgInline('msg-list','options.saved'));
+        // リスト幅　文字数から算出
+        window.CGTN_LOGIC?.applyPanelWidthByChars?.(newMaxChars);
       });
 
       // 一覧セクション：規定に戻す（値を戻して保存）
@@ -396,6 +398,8 @@
         document.getElementById('listFontSize').value = patch.list.fontSize;
       
         SH.saveSettingsPatch?.(patch, ()=> flashMsgInline('msg-list','options.reset'));
+        // リスト幅　文字数から算出
+        window.CGTN_LOGIC?.applyPanelWidthByChars?.(newMaxChars);
       });
 
       // 詳細セクションの保存

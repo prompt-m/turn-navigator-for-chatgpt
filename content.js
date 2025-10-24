@@ -632,86 +632,48 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     }
   }
 
-  let _lastUrlSig = location.pathname + location.search;
-  let _switchSeq  = 0;
+  let _lastUrlSig = '';
+  let _navSeq = 0; // 遷移の世代カウンタ
 
-  function handleUrlChangeMessage() {
+  function handleUrlChangeMessage(){
     const cur = location.pathname + location.search;
-    if (cur === _lastUrlSig){ 
+    if (cur === _lastUrlSig){
       console.debug('[cgtn:url] same-url ignored:', cur);
       return;
     }
     _lastUrlSig = cur;
+    const mySeq = ++_navSeq;
 
-    // ★新方針：遷移時は必ず閉じる。自動再構築は一切しない。
-    try {
-      const LG = window.CGTN_LOGIC;
-      const SH = window.CGTN_SHARED;
+    try{
+      const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
       window.CGTN_PREVIEW?.hide?.('url-change');
-      LG?.setListEnabled?.(false);     // ← 一覧を物理的に閉じる（トグル関数）
-      LG?.clearListPanelUI?.();        // ← 残像を消す（タイトル・バッジも空）
+
+      // 1) まず確実に閉じて残像を消す
+      LG?.setListEnabled?.(false);
+      LG?.clearListPanelUI?.();
+
+      // 2) 旧mainを監視していたObserverは切る（後述③のensureが再アタッチ）
+      LG?.detachTurnObserver?.();
+
+      // 3) すぐ再アタッチしてもOK（idempotent：後述③）
+      LG?.installAutoSyncForTurns?.();
+
+      // 4) バッジとタイトルは空に
       LG?.updatePinOnlyBadge?.();
       LG?.updateListChatTitle?.();
+
       console.debug('[cgtn:url] navigated → list closed & cleared:', cur);
-    } catch (e) {
+
+      // （任意の追加）“一覧チェックはONのまま”なら、描画準備完了後に自動再オープン★★★★
+      // ※ 自動再構築はここではせず、setListEnabled(true) に任せる
+      const wantReopen = !!(SH.getCFG?.().list?.enabled);
+      if (wantReopen){
+        waitForChatMain(()=>{ if (mySeq===_navSeq) LG?.setListEnabled?.(true); });
+      }
+
+    }catch(e){
       console.warn('[cgtn:url] close-on-nav failed', e);
     }
-/*
-    window.CGTN_PREVIEW?.hide?.('url-change');
-    const mySeq = ++_switchSeq;
-    //console.groupCollapsed('[cgtn:url] switched!', { cur, mySeq, t: performance.now().toFixed(1) });
-    console.debug('[cgtn:url] mySeq:',mySeq);
-    // ★ここで先に消す
-//    window.CGTN_LOGIC?.clearListPanelUI?.();
-    // ★ここが肝：まず即クリア（先に前の表示を消す）
-    try { window.CGTN_LOGIC?.clearListPanelUI?.(); } catch {}
-    console.debug('[cgtn:url] pre-clear UI');
-
-    // 少し遅らせて、ChatGPTのmainが再描画されてから実行
-    waitForChatMain(
-      // onReady
-      () => {
-        if (mySeq !== _switchSeq) return; // 古い通知は破棄
-        const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
-        LG?.hydratePinsCache?.(SH.getChatId?.());
-        if (SH.isListOpen?.()) {
-          console.debug('[auto-sync1] chat switch (list open) → rebuild+render');
-          LG?.rebuild?.();
-          LG?.renderList?.(true);
-        } else {
-          console.debug('[auto-sync2] chat switch (list closed) → state only');
-        }
-        LG?.updatePinOnlyBadge?.(); LG?.updateListChatTitle?.();
-      },
-      // onIdle (timeout)
-      () => {
-        // ここでは rebuild しない。空のまま待つ
-        watchFirstArticleOnce(() => {
-          // URLがまた変わっていたらやめる
-          if (mySeq !== _switchSeq){
-            console.debug('[auto-sync3]mySeq !== _switchSeq return ');
-            return;
-          }
-          const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
-          LG?.hydratePinsCache?.(SH.getChatId?.());
-          if (SH.isListOpen?.()) {
-            console.debug('[auto-sync4] (list open)→ rebuild+render');
-            LG?.rebuild?.();
-            LG?.renderList?.(true);
-          }
-          // 付箋バッジ
-          LG?.updatePinOnlyBadge?.();
-          // チャット名
-          LG?.updateListChatTitle?.();
-console.debug('＊＊＊[auto-sync5]location.pathname:',location.pathname);
-console.debug('＊＊＊[auto-sync6]LG?._lastRenderSig:', LG?._lastRenderSig, 'pins=', Object.keys(CGTN_SHARED.getCFG?.().pinsByChat||{}).length);
-
-        });
-      }
-    );
-*/
-
-
   }
 
   // 成功したら onReady、タイムアウトしたら onIdle を呼ぶ
@@ -751,24 +713,38 @@ console.debug('＊＊＊[auto-sync6]LG?._lastRenderSig:', LG?._lastRenderSig, 'p
   }
 
 
-  // ========= リスト表示中の「ターン追加」自動更新（MOは1本のみ） =========
-  function installAutoSyncForTurns(){
-console.log("installAutoSyncForTurns top");
-    if (document._cgtnAutoSyncBound) return;
-    document._cgtnAutoSyncBound = true;
+  let _turnObs = null;
+  let _observedRoot = null;
 
-console.log("installAutoSyncForTurns 1");
-  
+  CGTN_LOGIC.detachTurnObserver = function(){
+    try { _turnObs?.disconnect(); } catch {}
+    _turnObs = null;
+    _observedRoot = null;
+  };
+
+  // ========= リスト表示中の「ターン追加」自動更新（MOは1本のみ） =========
+  //  function installAutoSyncForTurns(){
+  CGTN_LOGIC.installAutoSyncForTurns = function installAutoSyncForTurns(){
+    const LG = CGTN_LOGIC, SH = CGTN_SHARED;
+console.log("installAutoSyncForTurns top");
+
     // 自作UI除外（無限ループ防止）
     const inOwnUI = (node) => {
       if (!node || node.nodeType !== 1) return false;
+console.log("installAutoSyncForTurns 1");
       return node.closest?.('[data-cgtn-ui]') ||
-             document.getElementById('cgpt-nav')?.contains(node) ||
-             document.getElementById('cgpt-list-panel')?.contains(node);
+         document.getElementById('cgpt-nav')?.contains(node) ||
+         document.getElementById('cgpt-list-panel')?.contains(node);
     };
 console.log("installAutoSyncForTurns 2");
-  
+
     const root = document.querySelector('main') || document.body;
+
+    if (_observedRoot === root && _turnObs) return; // 既に最新を監視中
+    // 旧rootを解除 → 新rootに張替え
+    CGTN_LOGIC.detachTurnObserver();
+
+
     let to = 0;
     const kick = () => {
       if (!SH.isListOpen?.()) return;        // 閉じている間は完全ノーオペ
@@ -783,22 +759,40 @@ console.log("installAutoSyncForTurns 2");
     };
 console.log("installAutoSyncForTurns 3");
 
-    const mo = new MutationObserver((muts)=>{
-      if (!SH.isListOpen?.()) return;        // リスト閉なら処理しない
+    _turnObs = new MutationObserver((muts)=>{
+      if (!SH.isListOpen?.()) return;
       for (const m of muts){
-        if (inOwnUI(m.target)) continue;     // 自作UIは無視
-        // 追加ノードに会話要素が含まれるか
-        const hit = [...m.addedNodes].some(n =>
-          n?.nodeType===1 && (
+        if (inOwnUI(m.target)) continue;
+
+        // childList 追加・削除で article / role を検知
+        if (m.type === 'childList'){
+          const arr = [...m.addedNodes, ...m.removedNodes];
+          const hit = arr.some(n => n?.nodeType===1 && (
             n.matches?.('article,[data-message-author-role]') ||
             n.querySelector?.('article,[data-message-author-role]')
-          )
-        );
-        if (hit){ kick(); break; }
+          ));
+          if (hit){ kick(); break; }
+        } else if (m.type === 'characterData' || m.type === 'attributes'){
+          // ストリーミングの文字更新や属性変更でも近傍が会話ならトリガ
+          const host = m.target?.nodeType===3 ? m.target.parentElement : m.target;
+          if (host?.closest?.('article,[data-message-author-role]')) { kick(); break; }
+        }
       }
     });
+
 console.log("installAutoSyncForTurns 4");
-    try{ mo.observe(root, { childList:true, subtree:true }); }catch(e){}
+    try {
+      _turnObs.observe(root, {
+        childList:true,
+        subtree:true,
+        characterData:true,   // 追加
+        attributes:true       // 追加
+      });
+      _observedRoot = root;
+      console.debug('[auto-sync] observe attached to', root.tagName);
+    } catch(e) {
+      console.warn('[auto-sync] observe failed', e);
+    }
   }
 
   // ========= 9) 初期セットアップ =========

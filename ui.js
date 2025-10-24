@@ -113,6 +113,10 @@ const LIST_CSS = `
   max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12);
   border-radius:16px; background:rgba(255,255,255,.98);
   box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden;
+  resize: horizontal;   /* つまみで横方向にリサイズ */
+  overflow: auto;       /* resize を効かせるため必要 */
+  min-width: 260px;
+  max-width: 720px;
 }
 
 /* =========================

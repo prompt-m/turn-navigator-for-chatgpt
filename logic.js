@@ -879,6 +879,9 @@ console.log("clearListPanelUI catch");
 
     document.body.appendChild(listBox);
 
+    // リスト幅 文字数から算出
+    CGTN_LOGIC.applyPanelWidthByChars(SH.getCFG()?.list?.maxChars || 52);
+
     // ツールチップ用titleを登録
     if (!listBox._tipsBound) {
       window.CGTN_SHARED?.applyTooltips?.({
@@ -1338,6 +1341,11 @@ console.log("clearListPanelUI catch");
     // 一覧ON時は必ず展開＆再構築→描画、付箋UIも有効化
     if (on) {
       ensurePinsCache();  // ← 追加
+      // リスト幅 文字数から算出
+      CGTN_LOGIC.applyPanelWidthByChars(SH.getCFG()?.list?.maxChars || 52);
+
+console.debug('[setListEnabled*0]再アタッチ ');
+      try { installAutoSyncForTurns(); } catch {}//再アタッチ
 
       // ①まず即時スキャン（ある程度は出る）★★★
 console.debug('[setListEnabled*1]LG.rebuild() ');
@@ -1467,6 +1475,20 @@ console.log("updatePinOnlyBadge count:",count);
       CGTN_LOGIC._lastRenderSig = '';       // ← 変化検知用のシグネチャ類
     } catch {}
   };
+
+  // logic.js（UI初期化後どこでも）
+  // charsPerLine は設定値（例: 48, 64 など）
+  CGTN_LOGIC.applyPanelWidthByChars = function(charsPerLine){
+    const panel = document.getElementById('cgpt-list-panel');
+    if (!panel) return;
+    const em = parseFloat(getComputedStyle(panel).fontSize) || 14; // px
+    const charW = 0.62 * em;   // だいたいの平均字幅
+    const padding = 24 + 32;   // 左右パディング + 内部アイコン余白の概算
+    const minW = 280, maxW = 680;
+    const width = Math.max(minW, Math.min(maxW, Math.round(charsPerLine * charW + padding)));
+    panel.style.width = width + 'px';
+  };
+
 
   // --- expose ---
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {

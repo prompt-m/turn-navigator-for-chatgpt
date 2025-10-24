@@ -121,57 +121,6 @@
     }
   };
 
-/*
-  NS.getChatTitle = function getChatTitle(){
-    try {
-      const isConcreteChat = /\/c\/[a-z0-9-]+/i.test(location.pathname);
-      const raw = (document.title || '').trim();
-
-console.log("getChatTitle raw:",raw);
-      // 形を分解（"＜名前＞ - ChatGPT" 想定）
-      const parts = raw.split(' - ').map(s => s.trim()).filter(Boolean);
-      const isSiteName = (s) => /^(ChatGPT|OpenAI)$/i.test(s);
-
-      // 1) 具体チャットなら、左側（サイト名以外）を優先採用
-      if (isConcreteChat) {
-        if (parts.length >= 2 && isSiteName(parts.at(-1))) {
-          // ex. "ChatGPT - ChatGPT" → "ChatGPT" をそのまま採用（ユーザー命名）
-          return parts.slice(0, -1).join(' - ').slice(0, 200);
-        }
-        // まれに単独名だけ入るケース
-        if (parts.length === 1 && !isSiteName(parts[0])) {
-          return parts[0].slice(0, 200);
-        }
-        // それでも決まらなければ DOM を当たる
-        const main = document.querySelector('main') || document.body;
-        const domName =
-          main.querySelector('[data-testid="conversation-name"]') ||
-          main.querySelector('[data-testid*="conversation"] :is(h1,h2)') ||
-          main.querySelector('header h1, h1, h2, [data-testid="title"]');
-        const txt = (domName?.textContent || '').trim();
-
-console.log("getChatTitle txt:",txt);
-
-        if (txt) return txt.slice(0, 200);
-
-        // まだ水和前で取れないときは「未決定」を返す（シェル扱い）
-        return '';
-      }
-
-      // 2) 具体チャットではない（ホーム/一覧/水和前など）
-      //    raw が "ChatGPT" だけならシェルなので弾く
-      if (/^ChatGPT$/i.test(raw)) return '';
-
-      // サイト名以外が含まれていれば、それを返す（保険）
-      if (parts.length && !isSiteName(parts[0])) return parts[0].slice(0, 200);
-      return '';
-    } catch (e) {
-      console.warn('[getChatTitle] error', e);
-      return '';
-    }
-  };
-*/
-
   function _ensurePinsByChat(cfg){
     cfg.pinsByChat = cfg.pinsByChat || {};
     return cfg.pinsByChat;
@@ -234,15 +183,6 @@ console.log("getChatTitle txt:",txt);
     }
 
     map[chatId] = { pins: rec.pins || {}, title: picked, updatedAt: Date.now() };
-
-    // 保存前の直前に入れる一行（両方共通）
-    //if (map[chatId]?.title) {
-    //  map[chatId] = {
-    //     ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now() 
-    //  }; 
-    //  return NS.saveSettingsPatch({ pinsByChat: map }); 
-    //}
-
 
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
