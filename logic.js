@@ -284,59 +284,6 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
 
 
-/*
-  // 仕様に合わせて「添付行」テキストを構築
-  function buildAttachmentLine(root, maxChars){
-    const el = root || document;
-
-    const role = getTurnRole?.(el) || 'unknown'; // ★役割はここでのみ使用
-
-    // 2) a[download] / data-testid="attachment" 等を検出
-    const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
-    if (names.length){
-      const pdfs   = pickPdfNames(names);
-      const nonPdf = names.filter(n => !pdfs.includes(n));
-
-      // ユーザー：PDFは「添付行」に 📄 で表示（ダウンロード矢印にしない）
-      if (role === 'user' && pdfs.length){
-        return `📄 ${pdfs.join(' ')}`;             // 例）📄 Spec.pdf [複数なら空白区切り]
-      }
-      // アシスタント：非PDFだけを「添付行」に列挙（PDFは本文側で扱う可能性）
-      if (role === 'assistant'){
-        if (nonPdf.length > 1) return `⭳（File）${nonPdf.join(' ')}`;
-        if (nonPdf.length === 1) return `⭳（${nonPdf[0]}）`;
-        return ''; // PDFのみ → 添付行は空（本文側で出す場合あり）
-      }
-
-      // それ以外の役割は従来挙動にフォールバック
-      if (nonPdf.length > 1) return `⭳（File）${nonPdf.join(' ')}`;
-      if (nonPdf.length === 1) return `⭳（${nonPdf[0]}）`;
-      return '';
-    }
-
-   // 3) メディアタグ検出（画像/動画 実体）
-   const hasImg = !!el.querySelector('img, picture img');
-   const hasVid = !!el.querySelector('video, source[type^="video/"]');
-   if (hasImg || hasVid){ 
-     const kind = hasImg && hasVid ? T('media') : hasImg ? T('image') : T('video');
-
-     // ユーザーのターンは常にアイコンだけ
-     if (role === 'user') {
-       return hasImg ? `🖼${T('image')}` : `🎞${T('video')}`;
-     }
-
-     // アシスタントのターンのみ「生成文」を検出して補足
-     const tail = hasImg ? getAttachmentTailMessage(el) : '';
-     const base = `⭳${kind}`;
-     return tail ? `${base} ${tail}` : base;
-
-   }
-
-    // 実体が無い場合は空（本文中の「ダウンロード」では反応しない）
-   return '';
-  }
-*/
-
   // --- logic.js: buildAttachmentLine 置き換え版 -------------------------------
   // 目的：
   // ・アシスタント：非PDFファイルを添付行に列挙（複数時は ⭳（<本文から抽出したFileラベル>）a b c）

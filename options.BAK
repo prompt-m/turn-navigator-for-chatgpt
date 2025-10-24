@@ -43,7 +43,7 @@
     }
     .pill-btn{
       all:unset; cursor:pointer; display:inline-grid; place-items:center;
-      padding:6px 14px; border:1px solid var(--bd); border-radius:10px; background:#f2f2f7;
+      padding:8px 14px; border:1px solid var(--bd); border-radius:5px	px; background:#f2f2f7;
       box-shadow:0 6px 24px rgba(0,0,0,.18);
     }
     .pill-btn:hover{ background:#fff; }
@@ -90,7 +90,7 @@
     }
     .btn{
       all:revert; font:inherit; cursor:pointer;
-      padding:6px 18px; border-radius:10px; border:1px solid var(--bd); background:var(--pill);
+      padding:8px 14px; border-radius:5px; border:1px solid var(--bd); background:var(--pill);
       box-shadow:0 2px 8px rgba(0,0,0,.12);
     }
     .btn:hover{ background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%); }
