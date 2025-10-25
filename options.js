@@ -242,69 +242,55 @@
     const html = [
       `<div class="pins-toolbar" style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin:8px 0;flex-wrap:wrap;">
          <div id="title-help" class="hint" style="opacity:.9;"></div>
-         <div style="display:flex; gap:8px;">
+         <div style="display:flex; gap:8px; align-items:center;">
            <button id="cgtn-refresh" class="btn" type="button">${T('options.refreshTitles')}</button>
+           <span id="cgtn-sync-usage" class="hint" style="opacity:.85;"></span>
          </div>
        </div>`,
       '<table class="cgtn-pins-table">',
 
       `<thead><tr>
-        <th>${T('options.thChat')}</th>
+        <th class="title">${T('options.thChat')}</th>
         <th>${T('options.thCount')}</th>
-        <th>${T('options.thTurns')}</th>
-        <th>${T('options.thUploads')}</th>
-        <th>${T('options.thDownloads')}</th>
         <th>${T('options.thUpdated')}</th>
+        <!-- 操作列は不要になったため非表示
         <th>${T('options.thOps')}</th>
+        -->
       </tr></thead>`,
       '<tbody>',
       ...rows.map(r => {
         const why = r.isNowOpen ? T('options.nowOpen')
                   : (r.existsInSidebar ? T('options.stillExists') : '');
-/*
-        const dis = r.canDelete ? '' : `disabled title="${titleEscape(why)}"`;
-        return `
-          <tr data-cid="${r.cid}" data-count="${r.count}">
-            <td class="title">${titleEscape(r.title)}</td>
-            <td class="count" style="text-align:right">${r.count}</td>
-            <td class="date">${r.date}</td>
-            <td class="ops">
-              <button type="button" class="del" data-cid="${r.cid}" ${dis}>${T('options.delBtn')}</button>
-            </td>
-          </tr>`;
-*/
-          const inlineDel = r.count > 0 ? ` <button class="btn del inline" data-cid="${r.cid}" title="削除 / Delete">🗑</button>` : '';
+          const inlineDel = r.count > 0
+            ? ` <button class="btn del inline" data-cid="${r.cid}" title="削除 / Delete">🗑</button>` : '';
           return `<tr data-cid="${r.cid}">
             <td class="title" title="${titleEscape(r.title)}">${titleEscape(r.title)}</td>
-            <td class="count">${r.count}${inlineDel}</td>
-            <td class="turns">-</td>
-            <td class="uploads">-</td>
-            <td class="downloads">-</td>
-            <td class="updated">${titleEscape(r.date)}</td>
-            <td class="ops">
-              <button class="btn del" data-cid="${r.cid}">${T('options.btnDelete')}</button>
-              ${why ? `<span class="why">${titleEscape(why)}</span>`:''}
-            </td>
+            <td class="count" style="text-align:right">${r.count}${inlineDel}</td>
+            <td class="updated">${titleEscape(r.date || '')}</td>
+            <!-- <td class="ops"></td> -->
           </tr>`;
+
 
       }),
       '</tbody></table>'
     ].join('');
     box.innerHTML = html;
 
-    // 削除ボタンの配線
-//    box.querySelectorAll('button.del').forEach(btn=>{
-//      btn.addEventListener('click', async ()=>{
+    // 削除ボタン（行内🗑）配線
     box.querySelectorAll('button.del').forEach(btn=>{
       btn.addEventListener('click', async (e)=>{
         e.stopPropagation?.(); // 行クリック誤発火防止
         const cid = btn.getAttribute('data-cid');
         if (!cid) return;
         await deletePinsFromOptions(cid);
+        /* ここから追加：削除後に使用量更新 */
+        try{ updateSyncUsage(); }catch{}
+        /* ここまで */
+
       });
     });
 
-    /* ここから追加：「最新にする」処理（タイトル/集計の反映） */
++    /* ここから追加：「最新にする」処理（現在タブのタイトル反映＋使用量更新） */
     const refreshBtn = box.querySelector('#cgtn-refresh');
     const helpNode   = box.querySelector('#title-help');
     let refreshInFlight = false;
@@ -320,21 +306,12 @@
           refreshBtn.textContent = old + '…';
           try{
             const meta  = await sendToActive({ type:'cgtn:get-chat-meta'  });
-            const stats = await sendToActive({ type:'cgtn:get-chat-stats' });
             if (meta?.ok){
               const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
               if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
             }
-            if (stats?.ok){
-              const tr = box.querySelector(`tr[data-cid="${stats.chatId}"]`);
-              if (tr){
-                tr.querySelector('.turns').textContent     = String(stats.turns ?? '-');
-                tr.querySelector('.uploads').textContent   = String(stats.uploads ?? '-');
-                tr.querySelector('.downloads').textContent = String(stats.downloads ?? '-');
-              }
-            } else {
-              if (helpNode) helpNode.textContent = T('options.openChatAndRefresh');
-            }
+            if (helpNode) helpNode.textContent = '';
+            try{ updateSyncUsage(); }catch{}
           } finally {
             refreshInFlight = false;
             refreshBtn.disabled = false;

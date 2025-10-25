@@ -112,6 +112,7 @@
     .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
     .cgtn-pins-table th, .cgtn-pins-table td{ padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.08); }
     .cgtn-pins-table thead th{ position:sticky; top:0; background:var(--pill); z-index:1; }
+    .cgtn-pins-table th.title, .cgtn-pins-table td.title { width:30%; word-break:break-word; white-space:normal; }
 
     /* responsive */
     @media (max-width:720px){
@@ -139,6 +140,7 @@
     <div class="section-block">
       <div class="section-inner">
         <div class="section-title" data-i18n="options.pinsTitle"></div>
+ 
         <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
         <div class="island">
           <div class="pins-wrap">

@@ -1369,7 +1369,19 @@ console.log("updatePinOnlyBadge count:",count);
     if (!info) return;
 
     const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
-//    const T   = (k)=> window.CGTN_I18N?.t?.(k) || k;
+
+    /* ここから追加：アップロード/ダウンロード件数の計測（1ターン1カウント） */
+    let uploads = 0, downloads = 0;
+    try {
+      const rows = Array.isArray(ST.all) ? ST.all : [];
+      rows.forEach(article => {
+        const up = article.querySelector('[data-filename], [data-testid*="attachment"], .text-token-file') ? 1 : 0;
+        const dl = article.querySelector('a[download], [data-testid*="download"]') ? 1 : 0;
+        uploads   += up;
+        downloads += dl;
+      });
+    } catch(e) { console.warn('[footer-stats]', e); }
+    /* ここまで */
 
     if (pinOnly) {
       // 付箋ターン数で数える
@@ -1378,10 +1390,15 @@ console.log("updatePinOnlyBadge count:",count);
       const pinnedCount = Array.isArray(pins)
         ? pins.filter(Boolean).length
         : Object.values(pins || {}).filter(Boolean).length;
-
-      info.textContent = fmt(T('list.footer.pinOnly'), { count: pinnedCount, total });
+      /* ここから追加：i18n 置換子に uploads / downloads を追加 */
+      info.textContent = fmt(T('list.footer.pinOnly'), {
+        count: pinnedCount, total, uploads, downloads
+      });
+      /* ここまで */
     } else {
-      info.textContent = fmt(T('list.footer.all'), { total });
+      info.textContent = fmt(T('list.footer.all'), {
+        total, uploads, downloads
+      });
     }
   }
 
