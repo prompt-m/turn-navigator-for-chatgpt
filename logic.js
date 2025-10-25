@@ -1391,6 +1391,16 @@ console.log("updatePinOnlyBadge count:",count);
     try { NS?.updateListChatTitle?.(); } catch {}
   });
 
+  /* ここから追加：③ 保存失敗時のロールバック（再読込→再描画） */
+  window.addEventListener('cgtn:save-error', (ev)=>{
+    try{
+      const cid = ev?.detail?.chatId || SH.getChatId?.();
+      if (cid) hydratePinsCache?.(cid);
+      if (SH.isListOpen?.()) renderList?.(true);
+      UI?.toast?.('保存に失敗しました（容量または通信エラー）', 'error');
+    }catch{}
+  });
+  /* ここまで */
 
   window.addEventListener('cgtn:pins-updated', (ev) => {
     const { chatId, count } = ev.detail || {};
@@ -1474,6 +1484,14 @@ console.log("updatePinOnlyBadge count:",count);
       console.debug('[nav-guard] ST.all empty → rebuild()');
       rebuild?.();
     }
+
+    /* ここから追加：⑤-A STが古ければ即再構築 */
+    try{
+      const cur = pickAllTurns().filter(isRealTurn).length;
+      if (cur !== (ST?.all?.length || 0)) rebuild?.();
+    }catch{}
+    /* ここまで */
+
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
     const sc = getTrueScroller();
@@ -1488,6 +1506,14 @@ console.log("updatePinOnlyBadge count:",count);
       console.debug('[nav-guard] ST.all empty → rebuild()');
       rebuild?.();
     }
+
+    /* ここから追加：⑤-A STが古ければ即再構築 */
+    try{
+      const cur = pickAllTurns().filter(isRealTurn).length;
+      if (cur !== (ST?.all?.length || 0)) rebuild?.();
+    }catch{}
+    /* ここまで */
+
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
     const sc = getTrueScroller();

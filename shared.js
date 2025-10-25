@@ -355,33 +355,40 @@
     const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
     const hasAny  = safeArr.some(Boolean);
 
-    const oldTitle = map[chatId]?.title || '';
-    const newTitle = NS.getChatTitle?.() || '';
-//    const title    = oldTitle || newTitle || '(No Title)';
-    const title    = newTitle || oldTitle || '(No Title)';
+    // タイトルは保存しない（strage.syncの容量節約のため）
+    //const oldTitle = map[chatId]?.title || '';
+    //const newTitle = NS.getChatTitle?.() || '';
+    //const title    = newTitle || oldTitle || '(No Title)';
 
     // ★計測ログ：ここが肝
 
     console.debug('[savePinsArr] about to save', {
       chatId,
       pinsCount: safeArr.filter(Boolean).length,
-      oldTitle,
-      newTitle,
-      pickedTitle: title,
       path: location.pathname,
       time: new Date().toISOString()
     }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
 
 
-    map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
+    //map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
+    map[chatId] = { pins: safeArr, updatedAt: Date.now() };
 
-    // 保存前の直前に入れる一行（両方共通）
-    //if (map[chatId]?.title) {
-    //  map[chatId] = { ...map[chatId], pins: (map[chatId].pins||safeArr), updatedAt: Date.now()};
-    //  return NS.saveSettingsPatch({ pinsByChat: map }); 
-    //}
+    //NS.saveSettingsPatch({ pinsByChat: map });
 
-    NS.saveSettingsPatch({ pinsByChat: map });
+     // 保存後の一致検証（③仕様：失敗ならロールバック用イベント通知）
+     /* ここから追加 */
+     NS.saveSettingsPatch({ pinsByChat: map }, (nextCfg) => {
+       try{
+         const saved = nextCfg?.pinsByChat?.[chatId]?.pins;
+         const ok = Array.isArray(saved) && JSON.stringify(saved) === JSON.stringify(safeArr);
+         if (!ok) {
+           window.dispatchEvent(new CustomEvent('cgtn:save-error', { detail:{ chatId } }));
+         }
+       }catch(e){
+         window.dispatchEvent(new CustomEvent('cgtn:save-error', { detail:{ chatId, error:String(e) } }));
+       }
+     });
+     /* ここまで */
   };
 
 

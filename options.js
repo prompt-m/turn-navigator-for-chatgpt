@@ -39,6 +39,22 @@
     return v;
   }
 
+  /* ここから追加：アクティブ ChatGPT タブへ送信 */
+  function sendToActive(payload){
+    return new Promise((resolve)=>{
+      const urls = ['*://chatgpt.com/*','*://chat.openai.com/*'];
+      chrome.tabs.query({ url: urls, active:true, lastFocusedWindow:true }, (tabs)=>{
+        const t = tabs?.[0];
+        if (!t?.id) return resolve({ ok:false, reason:'no-tab' });
+        chrome.tabs.sendMessage(t.id, payload, (res)=>{
+          if (chrome.runtime.lastError) return resolve({ ok:false, reason:'no-response' });
+          resolve(res || { ok:false, reason:'empty' });
+        });
+      });
+    });
+  }
+  /* ここまで */
+
   function applyToUI(cfg){
     const v = sanitize(cfg||{});
     try{
@@ -198,25 +214,21 @@
     const nowOpen  = cfg.currentChatId || null;
 
     const rows = Object.entries(pins).map(([cid, rec]) => {
-//      const title = String(rec?.title || '(No Title)').replace(/\s+/g,' ').slice(0,120);
+      // タイトルは保存しない方針：live（chatIndexや現在タブ）に無ければ chatId を表示
+      const liveTitle = (liveIdx[cid]?.title || '').trim();
+      const title = (liveTitle || cid).replace(/\s+/g,' ').slice(0,120);
 
-    // 1) live側にタイトルがあればそれを最優先
-    const liveTitle = (liveIdx[cid]?.title || '').trim();
-    const savedTitle = (rec?.title || '').trim();
-    const titlePicked = liveTitle || savedTitle || '(No Title)';
-    const title = titlePicked.replace(/\s+/g,' ').slice(0,120);
-
-      // pins はオブジェクト想定：true の数だけを数える
-      const pinsCount = Object.values(rec?.pins || {}).filter(Boolean).length;
+      // pins は配列想定（shared.js の方針に合わせる）：1 の数を数える
+      const pinsArr = Array.isArray(rec?.pins) ? rec.pins : [];
+      const pinsCount = pinsArr.filter(Boolean).length;
 
       const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
-//      const existsInSidebar = !!aliveMap[cid];
       const existsInSidebar = !!liveIdx[cid]; // ここも liveIdx に揃える
       const isNowOpen = (cid === nowOpen);
       const canDelete = true; // 仕様：常に削除可（必要なら条件に戻す）
 
       return { cid, title, count: pinsCount, date, canDelete, isNowOpen, existsInSidebar };
-    }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
+     }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
 
     if (!rows.length){
       box.innerHTML = `
@@ -228,10 +240,20 @@
     }
 
     const html = [
+      `<div class="pins-toolbar" style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin:8px 0;flex-wrap:wrap;">
+         <div id="title-help" class="hint" style="opacity:.9;"></div>
+         <div style="display:flex; gap:8px;">
+           <button id="cgtn-refresh" class="btn" type="button">${T('options.refreshTitles')}</button>
+         </div>
+       </div>`,
       '<table class="cgtn-pins-table">',
+
       `<thead><tr>
         <th>${T('options.thChat')}</th>
         <th>${T('options.thCount')}</th>
+        <th>${T('options.thTurns')}</th>
+        <th>${T('options.thUploads')}</th>
+        <th>${T('options.thDownloads')}</th>
         <th>${T('options.thUpdated')}</th>
         <th>${T('options.thOps')}</th>
       </tr></thead>`,
@@ -239,6 +261,7 @@
       ...rows.map(r => {
         const why = r.isNowOpen ? T('options.nowOpen')
                   : (r.existsInSidebar ? T('options.stillExists') : '');
+/*
         const dis = r.canDelete ? '' : `disabled title="${titleEscape(why)}"`;
         return `
           <tr data-cid="${r.cid}" data-count="${r.count}">
@@ -249,19 +272,78 @@
               <button type="button" class="del" data-cid="${r.cid}" ${dis}>${T('options.delBtn')}</button>
             </td>
           </tr>`;
+*/
+          const inlineDel = r.count > 0 ? ` <button class="btn del inline" data-cid="${r.cid}" title="削除 / Delete">🗑</button>` : '';
+          return `<tr data-cid="${r.cid}">
+            <td class="title" title="${titleEscape(r.title)}">${titleEscape(r.title)}</td>
+            <td class="count">${r.count}${inlineDel}</td>
+            <td class="turns">-</td>
+            <td class="uploads">-</td>
+            <td class="downloads">-</td>
+            <td class="updated">${titleEscape(r.date)}</td>
+            <td class="ops">
+              <button class="btn del" data-cid="${r.cid}">${T('options.btnDelete')}</button>
+              ${why ? `<span class="why">${titleEscape(why)}</span>`:''}
+            </td>
+          </tr>`;
+
       }),
       '</tbody></table>'
     ].join('');
     box.innerHTML = html;
 
     // 削除ボタンの配線
+//    box.querySelectorAll('button.del').forEach(btn=>{
+//      btn.addEventListener('click', async ()=>{
     box.querySelectorAll('button.del').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
+      btn.addEventListener('click', async (e)=>{
+        e.stopPropagation?.(); // 行クリック誤発火防止
         const cid = btn.getAttribute('data-cid');
         if (!cid) return;
         await deletePinsFromOptions(cid);
       });
     });
+
+    /* ここから追加：「最新にする」処理（タイトル/集計の反映） */
+    const refreshBtn = box.querySelector('#cgtn-refresh');
+    const helpNode   = box.querySelector('#title-help');
+    let refreshInFlight = false;
+    let refreshTO = null;
+    if (refreshBtn){
+      refreshBtn.addEventListener('click', ()=>{
+        if (refreshTO) clearTimeout(refreshTO);
+        refreshTO = setTimeout(async ()=>{
+          if (refreshInFlight) return;
+          refreshInFlight = true;
+          const old = refreshBtn.textContent;
+          refreshBtn.disabled = true;
+          refreshBtn.textContent = old + '…';
+          try{
+            const meta  = await sendToActive({ type:'cgtn:get-chat-meta'  });
+            const stats = await sendToActive({ type:'cgtn:get-chat-stats' });
+            if (meta?.ok){
+              const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
+              if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
+            }
+            if (stats?.ok){
+              const tr = box.querySelector(`tr[data-cid="${stats.chatId}"]`);
+              if (tr){
+                tr.querySelector('.turns').textContent     = String(stats.turns ?? '-');
+                tr.querySelector('.uploads').textContent   = String(stats.uploads ?? '-');
+                tr.querySelector('.downloads').textContent = String(stats.downloads ?? '-');
+              }
+            } else {
+              if (helpNode) helpNode.textContent = T('options.openChatAndRefresh');
+            }
+          } finally {
+            refreshInFlight = false;
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = old;
+          }
+        }, 400); // デバウンス
+      });
+    }
+    /* ここまで */
 
   }
 

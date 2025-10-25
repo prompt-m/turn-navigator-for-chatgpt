@@ -575,6 +575,42 @@ console.debug('[bindListRefreshButton]LG.rebuild() ');
   try{
     chrome.runtime.onMessage.addListener((msg)=>{
       if (!msg || !msg.type) return;
+
+      /* ここから追加：② タイトル問い合わせに応答（取得できなければ空文字） */
+      if (msg.type === 'cgtn:get-chat-meta') {
+        try {
+          const chatId = SH.getChatId?.() || '';
+          const title  = SH.getChatTitle?.() || '';  // document.title ベース
+          sendResponse({ ok:true, chatId, title });
+        } catch(e) {
+          sendResponse({ ok:false, error:String(e) });
+        }
+        return true; // async-friendly
+      }
+      /* ここまで */
+
+      /* ここから追加：② 現在チャットの集計：ターン数／アップありターン数／DLありターン数 */
+      if (msg.type === 'cgtn:get-chat-stats') {
+        try {
+          const ST = window.ST || {};
+          const rows = Array.isArray(ST.all) ? ST.all : [];
+          const chatId = SH.getChatId?.() || '';
+          const turns = rows.length;
+          let uploads = 0, downloads = 0;
+          rows.forEach(article=>{
+            const up = article.querySelector('[data-testid*="attachment"], .text-token-file, [data-filename]') ? 1 : 0;
+            const dl = article.querySelector('a[download], button[aria-label*="Download"], [data-testid*="download"]') ? 1 : 0;
+            uploads   += up;
+            downloads += dl;
+          });
+          sendResponse({ ok:true, chatId, turns, uploads, downloads });
+        } catch(e) {
+          sendResponse({ ok:false, error:String(e) });
+        }
+        return true;
+      }
+      /* ここまで */
+
       if (msg.type === 'cgtn:pins-deleted'){
         // 表示中のチャットなら一覧をリフレッシュ
         const cid = SH.getChatId?.();
