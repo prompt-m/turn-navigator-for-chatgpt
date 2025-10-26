@@ -867,7 +867,8 @@ console.log("installAutoSyncForTurns 4");
           handleUrlChangeMessage();
         });
       }
-      installAutoSyncForTurns(); // MOは1本のみ
+
+      LG?.installAutoSyncForTurns?.();// MOは1本のみ
 
       watchChatIdChange();
 

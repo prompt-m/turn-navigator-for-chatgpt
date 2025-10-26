@@ -112,7 +112,20 @@
     .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
     .cgtn-pins-table th, .cgtn-pins-table td{ padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.08); }
     .cgtn-pins-table thead th{ position:sticky; top:0; background:var(--pill); z-index:1; }
-    .cgtn-pins-table th.title, .cgtn-pins-table td.title { width:30%; word-break:break-word; white-space:normal; }
+    .cgtn-pins-table th:nth-child(1), .cgtn-pins-table td:nth-child(1){
+      width:50%;
+      word-break:break-word; white-space:normal;
+    }
+    .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){
+      width:20%;
+      text-align:right;           /* 付箋数を右寄せ */
+    }
+    .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){
+      width:30%;
+      text-align:center;          /* 左右中央 */
+      vertical-align:middle;      /* 上下中央 */
+    }
+  }
 
     /* responsive */
     @media (max-width:720px){
@@ -140,7 +153,7 @@
     <div class="section-block">
       <div class="section-inner">
         <div class="section-title" data-i18n="options.pinsTitle"></div>
- 
+
         <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
         <div class="island">
           <div class="pins-wrap">

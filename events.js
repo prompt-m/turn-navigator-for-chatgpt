@@ -82,7 +82,7 @@
         UI.toggleLang?.();
         return;
       }
-
+/*
       // --- 設定を開く ---
       if (el.closest('#cgtn-open-settings')) {
         // 1) 正規ルート：options_ui に従ってタブで開く
@@ -92,6 +92,37 @@
           // 2) 古い環境などのフォールバックは SW に委譲（window.open は使わない）
           chrome.runtime.sendMessage({ cmd: 'openOptions' });
         }
+        return;
+      }
+*/
+      // --- 設定を開く ---
+      if (el.closest('#cgtn-open-settings')) {
+        /* ここから追加：堅牢版 openOptions */
+        const openOptionsSafe = () => {
+          try {
+            if (chrome?.runtime?.openOptionsPage) {
+              chrome.runtime.openOptionsPage(() => {
+                // 稀に openOptionsPage 自体が lastError を返すことがある
+                if (chrome.runtime.lastError) {
+                  try { window.open(chrome.runtime.getURL('options.html'), '_blank'); } catch (_) {}
+                }
+              });
+              return;
+            }
+          } catch (_) {}
+          // SW 経由（MV3想定）。失敗しても最後に window.open へ
+          try {
+            chrome.runtime.sendMessage({ cmd: 'openOptions' }, () => {
+              if (chrome.runtime.lastError) {
+                try { window.open(chrome.runtime.getURL('options.html'), '_blank'); } catch (_) {}
+              }
+            });
+          } catch (_) {
+            try { window.open(chrome.runtime.getURL('options.html'), '_blank'); } catch (__){ }
+          }
+        };
+        openOptionsSafe();
+        /* ここまで追加 */
         return;
       }
 

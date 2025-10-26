@@ -15,6 +15,19 @@
     list:{ maxChars: 60, fontSize: 12, /* 他は不要 */ }
   };
 
+  /* ここから追加：sync 使用量表示 */
+  function updateSyncUsage(){
+    try{
+      const el = document.getElementById('cgtn-sync-usage');
+      if (!el || !chrome?.storage?.sync?.getBytesInUse) return;
+      chrome.storage.sync.getBytesInUse(null, (bytes)=>{
+        if (chrome.runtime.lastError) return;
+        el.textContent = `sync使用量: ${(bytes/1024).toFixed(1)}KB / 100KB`;
+      });
+    }catch{}
+  }
+  /* ここまで */
+
   function sanitize(raw){
     const base = JSON.parse(JSON.stringify(DEF));
     const v = {
@@ -243,8 +256,8 @@
       `<div class="pins-toolbar" style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin:8px 0;flex-wrap:wrap;">
          <div id="title-help" class="hint" style="opacity:.9;"></div>
          <div style="display:flex; gap:8px; align-items:center;">
-           <button id="cgtn-refresh" class="btn" type="button">${T('options.refreshTitles')}</button>
            <span id="cgtn-sync-usage" class="hint" style="opacity:.85;"></span>
+           <button id="cgtn-refresh" class="btn" type="button">${T('options.refreshTitles')}</button>
          </div>
        </div>`,
       '<table class="cgtn-pins-table">',
@@ -269,8 +282,6 @@
             <td class="updated">${titleEscape(r.date || '')}</td>
             <!-- <td class="ops"></td> -->
           </tr>`;
-
-
       }),
       '</tbody></table>'
     ].join('');
@@ -290,7 +301,7 @@
       });
     });
 
-+    /* ここから追加：「最新にする」処理（現在タブのタイトル反映＋使用量更新） */
+    /* ここから追加：「最新にする」処理（現在タブのタイトル反映＋使用量更新） */
     const refreshBtn = box.querySelector('#cgtn-refresh');
     const helpNode   = box.querySelector('#title-help');
     let refreshInFlight = false;
@@ -404,6 +415,9 @@
 
       // 付箋テーブル
       await renderPinsManager();
+
+      // sync 使用量表示
+      try{ updateSyncUsage(); }catch{}
 
       const form = $('cgtn-options');
       // 入力で即保存

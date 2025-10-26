@@ -8,6 +8,8 @@
   const SHOW_UNKNOWN_ATTACH = false; // trueにすると従来表示
 
   const titleEscape = SH.titleEscape;
+  let uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
+
 
 const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
@@ -851,7 +853,36 @@ console.log("clearListPanelUI catch");
       }, { passive: true });
     }
 
-    /*ｺｺｶﾗ*/
+
+    /* ここから追加：行番号（インデックス）をCSSカウンタで表示 */
+    (function ensureIndexCounterStyle(){
+      try{
+        if (document.getElementById('cgtn-idx-style')) return;
+        const st = document.createElement('style');
+        st.id = 'cgtn-idx-style';
+        st.textContent = `
+          /* リスト本体にカウンタを用意 */
+          #cgpt-list-body { counter-reset: cgtn_turn; }
+          /* 各行の先頭に連番を描画（枠は控えめ） */
+          #cgpt-list-body .row::before{
+            counter-increment: cgtn_turn;
+            content: counter(cgtn_turn);
+            display: inline-block;
+            min-width: 2.0em;
+            margin-right: 8px;
+            text-align: right;
+            opacity: .75;
+            font-size: 11px;
+            line-height: 1;
+          }
+          /* 行のテキスト塊が .txt などで始まる場合の余白調整（必要に応じて） */
+          #cgpt-list-body .row { display: flex; align-items: flex-start; gap: 6px; }
+        `;
+        document.head.appendChild(st);
+      }catch(_){}
+    })();
+    /* ここまで */
+
     // === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
     (function enforceNoFocusList(panel){
       if (!panel || panel._cgtnFocusGuard) return;
@@ -888,7 +919,7 @@ console.log("clearListPanelUI catch");
         } catch {}
       }, { capture:true });
     })(listBox);
-    /*ｺｺﾏﾃﾞ*/
+
     // === リスト側：マウス操作のフォーカス残りを抑止 ===
     (function suppressMouseFocusInList(){
       const root = listBox;
@@ -1097,6 +1128,9 @@ console.log("clearListPanelUI catch");
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
+
+    uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
+
     // === 行生成 ===
     for (const art of turns){
       // “元の全体順”の1始まり index を算出して、行に刻む
@@ -1105,10 +1139,6 @@ console.log("clearListPanelUI catch");
       const head        = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
       const attachLine  = buildAttachmentLine(art, maxChars); // 実体ありのときだけ非空
       const bodyLine    = extractBodySnippet(head, maxChars);
-
-      // 🔖をどちらに出すか：添付があれば添付行、無ければ本文行
-      //const showClipOnAttach = !!attachLine;
-      //const showClipOnBody   = !attachLine && !!bodyLine;
 
       // 🔖は「実体ありの添付行」か、なければ本文行に出す
       const hasRealAttach    = !!attachLine;  // ⭳/🖼/🎞 のいずれか
@@ -1137,6 +1167,7 @@ console.log("clearListPanelUI catch");
       // 添付行：実体があるときだけ出す
 //      if (attachLine){
       if (hasRealAttach){
+        isUser ? uploads ++ : downloads ++;　//アップロードターン数　ダウンロードターン数
         const row = document.createElement('div');
         row.className = 'row';
         row.style.fontSize = fontPx;
@@ -1198,22 +1229,16 @@ console.log("clearListPanelUI catch");
         `;
 
         row2.querySelector('.txt').textContent = bodyLine;
-        // ★ 添付ラベル（⭳（ファイル名）／⭳（画像）／（不明）／''）
-        //const attach = art?.dataset?.cgtnAttach || '';
-
-        // ★ 添付ラベル（“実体あり”のみ）
-//        let attach = attachLine || '';
-        // 必要なら、「アシスタントなのに実体が無い」場合だけ “（不明）” を右側に表示（行は増やさない）
-//        if (!attach && isAsst) attach = '（不明）';
-
         // ③ 本文行末の attach は「添付行が無い場合のみ」表示
         let attach = !hasRealAttach ? attachLine : '';
         // ④ アシスタント本文の（不明）はフラグで制御
         if (!attach && isAsst && SHOW_UNKNOWN_ATTACH) attach = '（不明）';
 
         const attachEl = row2.querySelector('.attach');
-        if (attach && attachEl) attachEl.textContent = ' ' + attach;
-
+        if (attach && attachEl) {
+          attachEl.textContent = ' ' + attach;
+          if(isAsst) downloads++; //←ダウンロードターン数
+        }
 
 //         row2.addEventListener('click', () => scrollToHead(art));
         row2.addEventListener('click', (ev) =>{
@@ -1371,12 +1396,14 @@ console.log("updatePinOnlyBadge count:",count);
     const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
 
     /* ここから追加：アップロード/ダウンロード件数の計測（1ターン1カウント） */
-    let uploads = 0, downloads = 0;
+    //let uploads = 0, downloads = 0;
+/*
     try {
       const rows = Array.isArray(ST.all) ? ST.all : [];
-      rows.forEach(article => {
-        const up = article.querySelector('[data-filename], [data-testid*="attachment"], .text-token-file') ? 1 : 0;
-        const dl = article.querySelector('a[download], [data-testid*="download"]') ? 1 : 0;
+      rows.forEach(rows => {
+console.log("updateListFooterInfo rows:",rows);
+        const up = rows.querySelector('[data-filename], [data-testid*="attachment"], .text-token-file') ? 1 : 0;
+        const dl = rows.querySelector('a[download], [data-testid*="download"]') ? 1 : 0;
         uploads   += up;
         downloads += dl;
       });
