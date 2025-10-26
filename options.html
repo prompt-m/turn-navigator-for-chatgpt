@@ -112,19 +112,12 @@
     .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
     .cgtn-pins-table th, .cgtn-pins-table td{ padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.08); }
     .cgtn-pins-table thead th{ position:sticky; top:0; background:var(--pill); z-index:1; }
-    .cgtn-pins-table th:nth-child(1), .cgtn-pins-table td:nth-child(1){
-      width:50%;
-      word-break:break-word; white-space:normal;
-    }
-    .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){
-      width:20%;
-      text-align:right;           /* 付箋数を右寄せ */
-    }
-    .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){
-      width:30%;
-      text-align:center;          /* 左右中央 */
-      vertical-align:middle;      /* 上下中央 */
-    }
+    /* ここから追加：No. / チャット / 付箋数 / 更新 = 8% / 42% / 20% / 30% */
+    .cgtn-pins-table th:nth-child(1), .cgtn-pins-table td:nth-child(1){ width:8%;  text-align:right; padding-right:10px; }
+    .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){ width:42%; word-break:break-word; white-space:normal; }
+    .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){ width:20%; text-align:right; }
+    .cgtn-pins-table th:nth-child(4), .cgtn-pins-table td:nth-child(4){ width:30%; text-align:center; vertical-align:middle; }
+    /* ここまで */
   }
 
     /* responsive */

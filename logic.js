@@ -861,22 +861,26 @@ console.log("clearListPanelUI catch");
         const st = document.createElement('style');
         st.id = 'cgtn-idx-style';
         st.textContent = `
-          /* リスト本体にカウンタを用意 */
           #cgpt-list-body { counter-reset: cgtn_turn; }
-          /* 各行の先頭に連番を描画（枠は控えめ） */
+
+          /* 全行：左側に固定幅のダミーを置いて揃える */
+          #cgpt-list-body .row { display:flex; align-items:flex-start; gap:6px; }
           #cgpt-list-body .row::before{
-            counter-increment: cgtn_turn;
-            content: counter(cgtn_turn);
+            content: "";                      /* デフォは空 */
             display: inline-block;
-            min-width: 2.0em;
-            margin-right: 8px;
+            min-width: 2.0em;                 /* 番号の幅 */
+            margin-right: 8px;                /* 余白は今の見た目に合わせて */
             text-align: right;
-            opacity: .75;
+            opacity: 0;                       /* 見えないだけで場所は確保 */
             font-size: 11px;
             line-height: 1;
           }
-          /* 行のテキスト塊が .txt などで始まる場合の余白調整（必要に応じて） */
-          #cgpt-list-body .row { display: flex; align-items: flex-start; gap: 6px; }
+          /* アンカー行：カウンタを進め、数字を描画 */
+          #cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
+          #cgpt-list-body .turn-idx-anchor::before{
+            content: counter(cgtn_turn);
+            opacity: .75;
+          }
         `;
         document.head.appendChild(st);
       }catch(_){}
@@ -1131,6 +1135,7 @@ console.log("clearListPanelUI catch");
 
     uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
 
+
     // === 行生成 ===
     for (const art of turns){
       // “元の全体順”の1始まり index を算出して、行に刻む
@@ -1164,15 +1169,21 @@ console.log("clearListPanelUI catch");
         ? roleHint === 'assistant'
         : art.matches('[data-message-author-role="assistant"], div [data-message-author-role="assistant"]');
 
+      let anchored = false;
       // 添付行：実体があるときだけ出す
-//      if (attachLine){
       if (hasRealAttach){
+
         isUser ? uploads ++ : downloads ++;　//アップロードターン数　ダウンロードターン数
         const row = document.createElement('div');
+        // 連番アンカー
         row.className = 'row';
         row.style.fontSize = fontPx;
         row.dataset.idx  = String(index1);
         row.dataset.kind = 'attach';
+        if (!anchored){
+          row.classList.add('turn-idx-anchor');
+          anchored = true;
+        }
 
         // 背景色はCSSクラスで定義（JS側はclassListで付与）
         if (isUser) row.classList.add('user-turn');
@@ -1207,14 +1218,19 @@ console.log("clearListPanelUI catch");
         body.appendChild(row);
       }
 
+
       // 本文行
-      if (bodyLine){  
+      if (bodyLine){
         const row2 = document.createElement('div');
         row2.className = 'row';
         row2.style.fontSize = fontPx;
         row2.dataset.idx  = String(index1);
         row2.dataset.kind = 'body';
-
+        // 連番アンカー
+        if (!anchored){
+          row2.classList.add('turn-idx-anchor'); // 添付が無いときだけ本文に番号
+          anchored = true;
+        }
         // 背景色はCSSクラスで定義（JS側はclassListで付与）
         if (isUser) row2.classList.add('user-turn');
         if (isAsst) row2.classList.add('asst-turn');
@@ -1259,6 +1275,20 @@ console.log("clearListPanelUI catch");
         if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
 
         body.appendChild(row2);
+
+      /* ここから追加：このターンの「付箋ボタンのある要素」に連番アンカーを付与 */
+//      try{
+//        const preferAttach = !!hasRealAttach;  // 本文+添付なら添付側を優先
+//        const pickPinCell = (root) => root?.querySelector?.('.pin-col,.pincell,.pin,[data-role="pin-col"]');
+//        const pinCellAttach = preferAttach ? pickPinCell(row2) : null;
+//        const pinCellBody   = pickPinCell(row);
+//        const anchorEl      = pinCellAttach || pinCellBody;
+//        if (anchorEl) anchorEl.classList.add('turn-idx-anchor');
+//     }catch(_){
+//
+//      }
+      /* ここまで */
+
       }
     }
 

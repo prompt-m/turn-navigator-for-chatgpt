@@ -125,7 +125,7 @@
       text-align:center;          /* 左右中央 */
       vertical-align:middle;      /* 上下中央 */
     }
- }
+  }
 
     /* responsive */
     @media (max-width:720px){

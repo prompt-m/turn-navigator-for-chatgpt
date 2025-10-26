@@ -261,27 +261,23 @@
          </div>
        </div>`,
       '<table class="cgtn-pins-table">',
-
       `<thead><tr>
+        <th>No.</th>
         <th class="title">${T('options.thChat')}</th>
         <th>${T('options.thCount')}</th>
         <th>${T('options.thUpdated')}</th>
-        <!-- 操作列は不要になったため非表示
-        <th>${T('options.thOps')}</th>
-        -->
       </tr></thead>`,
+
       '<tbody>',
-      ...rows.map(r => {
-        const why = r.isNowOpen ? T('options.nowOpen')
-                  : (r.existsInSidebar ? T('options.stillExists') : '');
-          const inlineDel = r.count > 0
-            ? ` <button class="btn del inline" data-cid="${r.cid}" title="削除 / Delete">🗑</button>` : '';
-          return `<tr data-cid="${r.cid}">
-            <td class="title" title="${titleEscape(r.title)}">${titleEscape(r.title)}</td>
+        ...rows.map((r, i) => {
+           const inlineDel = r.count > 0
+             ? ` <button class="btn del inline" data-cid="\${r.cid}" title="${T('options.delBtn')}">🗑</button>` : '';
+          return `<tr data-cid="\${r.cid}">
+            <td class="no">${i+1}</td>
+            <td class="title" title="\${titleEscape(r.title)}">${titleEscape(r.title)}</td>
             <td class="count" style="text-align:right">${r.count}${inlineDel}</td>
             <td class="updated">${titleEscape(r.date || '')}</td>
-            <!-- <td class="ops"></td> -->
-          </tr>`;
+           </tr>`;
       }),
       '</tbody></table>'
     ].join('');
