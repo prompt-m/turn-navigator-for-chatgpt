@@ -76,7 +76,7 @@
       'opts.pins.col.action': '操作',
       'opts.pins.btn.delete': '削除',
       'opts.pins.note': '各チャットの付箋を一覧。不要になった付箋データは削除できます。',
-      'options.refreshTitles': '最新にする',
+      'options.refreshTitles': '最新にしますよ',
       'options.openChatAndRefresh': 'チャット名を表示するには、ChatGPT画面を開いて［最新にする］を押してください。',
       'options.thTurns': 'ターン数',
       'options.thUploads': 'アップあり',

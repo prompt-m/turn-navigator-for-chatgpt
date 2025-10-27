@@ -78,7 +78,24 @@
       opacity:.9;
     }
     /* ここまで */
-    .hint{ color:var(--muted); font-size:14px; margin-bottom:1px}
+    .hint {
+      opacity: 1;
+      color: var(--muted);
+      font-size: 14px;
+      transition: opacity 0.25s;
+      margin: 4px 0 8px;
+    }
+    .hint.show {
+      opacity: 1;
+    }
+    .flash-msg {
+      color: var(--fg);
+      font-weight: 500;
+      opacity: 0;
+    }
+    .flash-msg.show {
+      opacity: 1;
+    }
 
     /* 設定行：ラベル左固定／入力右フレキシブル */
     .settings{
@@ -116,6 +133,26 @@
       user-select:none;
       /* ここまで */
     }
+
+    /* ここから追加：ボタンスピナー */
+    .btn.is-busy{
+      position: relative;
+      pointer-events: none;
+      opacity: .85;
+    }
+    .btn.is-busy::after{
+      content: "";
+      position: absolute;
+      right: 10px; top: 50%;
+      width: 16px; height: 16px;
+      margin-top: -8px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      animation: cgtn-spin 1s linear infinite;
+    }
+    @keyframes cgtn-spin { to { transform: rotate(360deg); } }
+    /* ここまで */
 
     .btn:hover{ background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%); }
     .msg-inline{
@@ -185,7 +222,10 @@
             <button id="cgtn-refresh" class="btn" type="button" data-i18n="options.refreshTitles"></button>
           </div>
         </div>
-        <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
+        <div class="hint-row">
+          <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
+          <p class="hint flash-msg" id="pins-msg"></p>
+        </div>
         <div class="island">
           <div class="pins-wrap">
             <!-- テーブルは options.js が #pins-table に描画 -->

@@ -192,6 +192,7 @@
 
 
   function flashMsgInline(id, key='options.saved'){
+console.log("flashMsgInline id:",id);
     const T = window.CGTN_I18N?.t || (s=>s);
     const el = document.getElementById(id);
     if (!el) return;
@@ -286,36 +287,6 @@
         </div>`;
       return;
     }
-/*
-    const html = [
-      `<div class="pins-toolbar" style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin:8px 0;flex-wrap:wrap;">
-         <div id="title-help" class="hint" style="opacity:.9;"></div>
-       </div>`,
-      '<table class="cgtn-pins-table">',
-      `<thead>
-       <tr><span id="cgtn-sync-usage" class="hint" style="opacity:.85;"></span></tr>
-       <tr>
-        <th>No.</th>
-        <th class="title">${T('options.thChat')}</th>
-        <th>${T('options.thCount')}</th>
-        <th>${T('options.thUpdated')}</th>
-      </tr></thead>`,
-
-      '<tbody><div class="cgtn-pins-scroll">',
-        ...rows.map((r, i) => {
-           const inlineDel = r.count > 0
-             ? ` <button class="btn del inline" data-cid="\${r.cid}" title="${T('options.delBtn')}">🗑</button>` : '';
-          return `<tr data-cid="\${r.cid}">
-            <td class="no">${i+1}</td>
-            <td class="title" title="\${titleEscape(r.title)}">${titleEscape(r.title)}</td>
-            <td class="count" style="text-align:right">${r.count}${inlineDel}</td>
-            <td class="updated">${titleEscape(r.date || '')}</td>
-           </tr>`;
-      }),
-      '</div></tbody></table>'
-    ].join('');
-    box.innerHTML = html;
-*/
 
     const html = [
       /* ここから追加：正しいテーブル構造に刷新 */
@@ -366,28 +337,36 @@
       /* ここから追加：スピナー版 */
       refreshBtn.onclick = async () => {
         if (refreshBtn.classList.contains('is-busy')) return;
-        setBusy(refreshBtn, true, {
-          onTimeout: () => {
+        setBusy(refreshBtn, true, { onTimeout: () => {
             // タイムアウト通知（既存のインラインメッセージ機構があれば使う）
             try{
-              (window.flashMsgInline
-                ? flashMsgInline('pins-hint', 'options.refreshTimeout')
-                : console.warn('Refresh timeout'));
-            }catch(_){}
+             (flashMsgInline
+               ? flashMsgInline('pins-msg', 'options.refreshTimeout')
+               : console.warn('Refresh timeout'));
+            }catch(_){
+            }
           }
         });
         try{
           const meta = await sendToActive({ type:'cgtn:get-chat-meta' });
+
           if (meta?.ok){
             const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
             if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
           }
-          try{ updateSyncUsageLabel(); }catch(_){}
+          try{ 
+            updateSyncUsageLabel();
+          }catch(_){
+          }
+
           // 成功時の軽い通知（任意）
-          try{ window.flashMsgInline?.('pins-hint','options.refreshed'); }catch(_){}
+          try{
+            flashMsgInline('pins-msg','options.refreshed'); 
+          }catch(_){
+          }
         }catch(e){
           console.warn(e);
-          try{ window.flashMsgInline?.('pins-hint','options.refreshFailed'); }catch(_){}
+          try{ window.flashMsgInline?.('pins-msg','options.refreshFailed'); }catch(_){}
         }finally{
           setBusy(refreshBtn, false);
         }
@@ -405,7 +384,6 @@
           refreshInFlight = true;
           const old = refreshBtn.textContent;
           refreshBtn.disabled = true;
-          refreshBtn.textContent = old + '…';
           try{
             const meta  = await sendToActive({ type:'cgtn:get-chat-meta'  });
             if (meta?.ok){
@@ -415,7 +393,6 @@
           } finally {
             refreshInFlight = false;
             refreshBtn.disabled = false;
-            refreshBtn.textContent = old;
           }
         }, 400); // デバウンス
       // 使用量ラベル更新
@@ -436,10 +413,6 @@
     applyToUI();
     renderPinsManager();
     try{ updateSyncUsageLabel(); }catch(_){}
-    /* ここから追加：busy解除＆ラベルベース更新 */
-    clearBusy(document.getElementById('cgtn-refresh'));
-    const _rb = document.getElementById('cgtn-refresh'); if (_rb) _rb.dataset.base = (_rb.textContent||'').trim();
-    /* ここまで */
 
   });
   document.getElementById('lang-en')?.addEventListener('click', ()=>{
@@ -448,10 +421,6 @@
     applyToUI();
     renderPinsManager();
     try{ updateSyncUsageLabel(); }catch(_){} 
-    /* ここから追加：busy解除＆ラベルベース更新 */
-    clearBusy(document.getElementById('cgtn-refresh'));
-    const _rb = document.getElementById('cgtn-refresh'); if (_rb) _rb.dataset.base = (_rb.textContent||'').trim();
-    /* ここまで */
   });
 
   document.getElementById('showViz')?.addEventListener('change', (ev)=>{
