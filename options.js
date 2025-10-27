@@ -15,16 +15,21 @@
     list:{ maxChars: 60, fontSize: 12, /* 他は不要 */ }
   };
 
-  /* ここから追加：sync 使用量表示 */
-  function updateSyncUsage(){
+  /* ここから追加：sync 使用量ラベルを更新（常時表示＋i18n対応） */
+  async function updateSyncUsageLabel(){
     try{
-      const el = document.getElementById('cgtn-sync-usage');
+      const el = document.getElementById('sync-usage');
       if (!el || !chrome?.storage?.sync?.getBytesInUse) return;
       chrome.storage.sync.getBytesInUse(null, (bytes)=>{
-        if (chrome.runtime.lastError) return;
-        el.textContent = `sync使用量: ${(bytes/1024).toFixed(1)}KB / 100KB`;
+        // ※ 100KB は Chrome Sync の合計上限
+        const used = (bytes || 0);
+        const usedKB = (Math.round(used/102.4)/10).toFixed(1); // 8.0KB など
+        const totalKB = 100;
+        // i18n：「options.syncUsage」が無ければフォールバック
+        const label = (typeof T === 'function' ? T('options.syncUsage') : 'sync usage:');
+        el.textContent = `${label} ${usedKB}KB / ${totalKB}KB`;
       });
-    }catch{}
+    }catch(e){ /* no-op */ }
   }
   /* ここまで */
 
@@ -51,6 +56,36 @@
     };
     return v;
   }
+
+  /* ボタンbusy制御（スピナー+タイムアウト） */
+  function setBusy(btn, on, {timeoutMs=12000, onTimeout} = {}){
+    if (!btn) return;
+    if (on){
+      if (btn.classList.contains('is-busy')) return;
+      btn.dataset.base = (btn.textContent || '').trim();
+      btn.classList.add('is-busy');
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      // タイムアウト保険
+      const id = setTimeout(()=>{
+        clearBusy(btn);
+        try{ onTimeout?.(); }catch(_){}
+      }, timeoutMs);
+      btn.dataset.busyTimer = String(id);
+    }else{
+      clearBusy(btn);
+    }
+  }
+  function clearBusy(btn){
+    if (!btn) return;
+    btn.classList.remove('is-busy');
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    const t = btn.dataset.busyTimer;
+    if (t){ clearTimeout(Number(t)); delete btn.dataset.busyTimer; }
+    if (btn.dataset.base) btn.textContent = btn.dataset.base;
+  }
+
 
   /* ここから追加：アクティブ ChatGPT タブへ送信 */
   function sendToActive(payload){
@@ -251,24 +286,22 @@
         </div>`;
       return;
     }
-
+/*
     const html = [
       `<div class="pins-toolbar" style="display:flex;gap:12px;justify-content:space-between;align-items:center;margin:8px 0;flex-wrap:wrap;">
          <div id="title-help" class="hint" style="opacity:.9;"></div>
-         <div style="display:flex; gap:8px; align-items:center;">
-           <span id="cgtn-sync-usage" class="hint" style="opacity:.85;"></span>
-           <button id="cgtn-refresh" class="btn" type="button">${T('options.refreshTitles')}</button>
-         </div>
        </div>`,
       '<table class="cgtn-pins-table">',
-      `<thead><tr>
+      `<thead>
+       <tr><span id="cgtn-sync-usage" class="hint" style="opacity:.85;"></span></tr>
+       <tr>
         <th>No.</th>
         <th class="title">${T('options.thChat')}</th>
         <th>${T('options.thCount')}</th>
         <th>${T('options.thUpdated')}</th>
       </tr></thead>`,
 
-      '<tbody>',
+      '<tbody><div class="cgtn-pins-scroll">',
         ...rows.map((r, i) => {
            const inlineDel = r.count > 0
              ? ` <button class="btn del inline" data-cid="\${r.cid}" title="${T('options.delBtn')}">🗑</button>` : '';
@@ -279,9 +312,42 @@
             <td class="updated">${titleEscape(r.date || '')}</td>
            </tr>`;
       }),
-      '</tbody></table>'
+      '</div></tbody></table>'
     ].join('');
     box.innerHTML = html;
+*/
+
+    const html = [
+      /* ここから追加：正しいテーブル構造に刷新 */
+      '<table class="cgtn-pins-table">',
+      `<thead>
+         <tr>
+           <th>No.</th>
+           <th class="title">${T('options.thChat')}</th>
+           <th>${T('options.thCount')}</th>
+           <th>${T('options.thUpdated')}</th>
+         </tr>
+       </thead>`,
+      '<tbody>',
+        ...rows.map((r, i) => {
+          const inlineDel = r.count > 0
+            ? ` <button class="btn del inline" data-cid="${r.cid}" title="${T('options.delBtn')}">🗑</button>` : '';
+          return `<tr data-cid="${r.cid}">
+            <td class="no">${i+1}</td>
+            <td class="title" title="${titleEscape(r.title)}">${titleEscape(r.title)}</td>
+            <td class="count" style="text-align:right">${r.count}${inlineDel}</td>
+            <td class="updated">${titleEscape(r.date || '')}</td>
+          </tr>`;
+        }),
+      '</tbody></table>'
+      /* ここまで */
+    ].join('');
+    box.innerHTML = html;
+
+    /* ここから追加：ラッパにスクロールを付与（options.html 側の .pins-wrap を再利用） */
+    const wrap = box.parentElement;           // <div class="pins-wrap">
+    if (wrap) wrap.classList.add('cgtn-pins-scroll');
+    /* ここまで */
 
     // 削除ボタン（行内🗑）配線
     box.querySelectorAll('button.del').forEach(btn=>{
@@ -290,16 +356,45 @@
         const cid = btn.getAttribute('data-cid');
         if (!cid) return;
         await deletePinsFromOptions(cid);
-        /* ここから追加：削除後に使用量更新 */
-        try{ updateSyncUsage(); }catch{}
-        /* ここまで */
+        try{ updateSyncUsageLabel(); }catch(_){}
 
       });
     });
 
-    /* ここから追加：「最新にする」処理（現在タブのタイトル反映＋使用量更新） */
-    const refreshBtn = box.querySelector('#cgtn-refresh');
-    const helpNode   = box.querySelector('#title-help');
+    const refreshBtn = document.getElementById('cgtn-refresh');
+    if (refreshBtn){
+      /* ここから追加：スピナー版 */
+      refreshBtn.onclick = async () => {
+        if (refreshBtn.classList.contains('is-busy')) return;
+        setBusy(refreshBtn, true, {
+          onTimeout: () => {
+            // タイムアウト通知（既存のインラインメッセージ機構があれば使う）
+            try{
+              (window.flashMsgInline
+                ? flashMsgInline('pins-hint', 'options.refreshTimeout')
+                : console.warn('Refresh timeout'));
+            }catch(_){}
+          }
+        });
+        try{
+          const meta = await sendToActive({ type:'cgtn:get-chat-meta' });
+          if (meta?.ok){
+            const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
+            if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
+          }
+          try{ updateSyncUsageLabel(); }catch(_){}
+          // 成功時の軽い通知（任意）
+          try{ window.flashMsgInline?.('pins-hint','options.refreshed'); }catch(_){}
+        }catch(e){
+          console.warn(e);
+          try{ window.flashMsgInline?.('pins-hint','options.refreshFailed'); }catch(_){}
+        }finally{
+          setBusy(refreshBtn, false);
+        }
+      };
+      /* ここまで */
+    }
+
     let refreshInFlight = false;
     let refreshTO = null;
     if (refreshBtn){
@@ -317,18 +412,17 @@
               const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
               if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
             }
-            if (helpNode) helpNode.textContent = '';
-            try{ updateSyncUsage(); }catch{}
           } finally {
             refreshInFlight = false;
             refreshBtn.disabled = false;
             refreshBtn.textContent = old;
           }
         }, 400); // デバウンス
+      // 使用量ラベル更新
+      try{ updateSyncUsageLabel(); }catch(_){}
       });
     }
     /* ここまで */
-
   }
 
 
@@ -341,12 +435,23 @@
     applyI18N();
     applyToUI();
     renderPinsManager();
+    try{ updateSyncUsageLabel(); }catch(_){}
+    /* ここから追加：busy解除＆ラベルベース更新 */
+    clearBusy(document.getElementById('cgtn-refresh'));
+    const _rb = document.getElementById('cgtn-refresh'); if (_rb) _rb.dataset.base = (_rb.textContent||'').trim();
+    /* ここまで */
+
   });
   document.getElementById('lang-en')?.addEventListener('click', ()=>{
     SH.setLang?.('en');
     applyI18N();
     applyToUI();
     renderPinsManager();
+    try{ updateSyncUsageLabel(); }catch(_){} 
+    /* ここから追加：busy解除＆ラベルベース更新 */
+    clearBusy(document.getElementById('cgtn-refresh'));
+    const _rb = document.getElementById('cgtn-refresh'); if (_rb) _rb.dataset.base = (_rb.textContent||'').trim();
+    /* ここまで */
   });
 
   document.getElementById('showViz')?.addEventListener('change', (ev)=>{
@@ -413,7 +518,18 @@
       await renderPinsManager();
 
       // sync 使用量表示
-      try{ updateSyncUsage(); }catch{}
+      //try{ updateSyncUsage(); }catch{}
+
+      /* ここから追加：初期描画時に使用量ラベルを反映 */
+      try{ updateSyncUsageLabel(); }catch(_){}
+      /* 言語切替で再描画（両対応） */
+      if (window.CGTN_SHARED?.onLangChange) {
+        window.CGTN_SHARED.onLangChange(updateSyncUsageLabel);
+      } else {
+        window.addEventListener('cgtn:lang-changed', updateSyncUsageLabel, { passive:true });
+      }
+      /* ここまで */
+
 
       const form = $('cgtn-options');
       // 入力で即保存
@@ -485,11 +601,6 @@
         });
       });
 
-      // リセット時も同様に
-      document.getElementById('resetList')?.addEventListener('click', ()=>{
-        // 値戻し→保存…
-        flashMsgInline('msg-list','options.reset');
-      });
       document.getElementById('resetAdv')?.addEventListener('click', ()=>{
         // 値戻し→保存…
         flashMsgInline('msg-adv','options.reset');

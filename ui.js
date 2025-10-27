@@ -171,9 +171,29 @@ const LIST_CSS = `
 /* 本文は可変。ここだけスクロールさせる（再定義） */
 #cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }
 
-#cgpt-list-body .row{
-  display:flex; gap:8px; align-items:center;
-  padding:8px 6px; border-bottom:1px dashed rgba(0,0,0,.08);
+#cgpt-list-body .row { 
+  display:flex; 
+  align-items:flex-start; 
+  gap:6px; 
+  line-height:1.4;         /* 本文のline-heightと合わせる */
+}
+#cgpt-list-body .row::before{
+  content: "";
+  display:inline-block;
+  min-width:2.0em;
+  margin-right:8px;
+  text-align:right;
+  opacity:0;
+  font-size:11px;
+  line-height:inherit;      /* 本文行に合わせる */
+  vertical-align:middle;    /* ベースラインずれ対策 */
+}
+#cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
+#cgpt-list-body .turn-idx-anchor::before{
+  content: counter(cgtn_turn);
+  opacity:.75;
+  color:#333;
+  vertical-align:middle;
 }
 
 #cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }

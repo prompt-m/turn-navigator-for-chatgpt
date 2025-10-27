@@ -24,7 +24,7 @@
       line-height: 1.0;
     }
     h1{ font-size:28px; margin:0 0 6px; }
-    .desc{ color:var(--muted); margin:0 0 1px; }
+    .desc{ color:var(--muted); margin:0 0 5px; }
 
     /* card */
     .card{
@@ -60,7 +60,24 @@
       background:color-mix(in srgb, var(--fg) 30%, transparent);
     }
     .section-inner{ display:flex; flex-direction:column; gap:5px; }/*gap:12px*/
+
     .section-title{ font-size:18px; font-weight:700; margin-top:10px; margin-bottom:4px; }
+
+    /* ここから追加：セクション右肩のツールバー（使用量＋最新にする） */
+    .section-head{
+      display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;
+      justify-content:space-between;
+    }
+    .section-tools{
+      display:flex; align-items:center; gap:10px; margin-left:auto;
+      white-space:nowrap;
+    }
+    .usage-label{
+      padding:6px 10px; border:1px solid var(--bd); border-radius:8px; background:var(--bg);
+      font:14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      opacity:.9;
+    }
+    /* ここまで */
     .hint{ color:var(--muted); font-size:14px; margin-bottom:1px}
 
     /* 設定行：ラベル左固定／入力右フレキシブル */
@@ -88,11 +105,38 @@
       padding-top:8px;
       background:linear-gradient(to top, var(--pill) 70%, transparent);
     }
+
     .btn{
-      all:revert; font:inherit; cursor:pointer;
+      /* 旧: all:revert だと状況によって横幅が伸びることがある */
+      /* ここから追加 */
+      all:unset;
+      display:inline-flex; align-items:center; justify-content:center;
       padding:8px 14px; border-radius:5px; border:1px solid var(--bd); background:var(--pill);
-      box-shadow:0 2px 8px rgba(0,0,0,.12);
+      font:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.12);
+      user-select:none;
+      /* ここまで */
     }
+
+    /* ここから追加：ボタンスピナー */
+    .btn.is-busy{
+      position: relative;
+      pointer-events: none;
+      opacity: .85;
+    }
+    .btn.is-busy::after{
+      content: "";
+      position: absolute;
+      right: 8px; top: 50%;
+      width: 14px; height: 14px;
+      margin-top: -7px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      animation: cgtn-spin 1s linear infinite;
+    }
+    @keyframes cgtn-spin { to { transform: rotate(360deg); } }
+    /* ここまで */
+
     .btn:hover{ background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%); }
     .msg-inline{
       margin-left:6px; font-size:14px; color:var(--muted);
@@ -104,11 +148,12 @@
     .island{
       background:var(--bg); border:1px solid var(--bd); border-radius:10px; padding:12px;
     }
-    .pins-wrap{
+
+    /* ここから追加：テーブルだけスクロール */
+    .pins-wrap{ /* ラッパ：高さの上限は維持（カード内での視覚的まとまり） */
       max-height:var(--pins-h);
-      overflow:auto;
-      scrollbar-gutter:stable; 
     }
+
     .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
     .cgtn-pins-table th, .cgtn-pins-table td{ padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.08); }
     .cgtn-pins-table thead th{ position:sticky; top:0; background:var(--pill); z-index:1; }
@@ -117,7 +162,15 @@
     .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){ width:42%; word-break:break-word; white-space:normal; }
     .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){ width:20%; text-align:right; }
     .cgtn-pins-table th:nth-child(4), .cgtn-pins-table td:nth-child(4){ width:30%; text-align:center; vertical-align:middle; }
+    .cgtn-pins-scroll{
+      overflow-y:auto;
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:6px;
+      max-height:280px;          /* 表だけスクロール */
+      background:var(--bg);
+    }
     /* ここまで */
+
   }
 
     /* responsive */
@@ -145,8 +198,13 @@
     <!-- ===== 付箋データ管理 ===== -->
     <div class="section-block">
       <div class="section-inner">
-        <div class="section-title" data-i18n="options.pinsTitle"></div>
-
+        <div class="section-head">
+          <div class="section-title" data-i18n="options.pinsTitle"></div>
+          <div class="section-tools">
+            <span id="sync-usage" class="usage-label" title="chrome.storage.sync usage">sync...</span>
+            <button id="cgtn-refresh" class="btn" type="button" data-i18n="options.refreshTitles"></button>
+          </div>
+        </div>
         <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
         <div class="island">
           <div class="pins-wrap">

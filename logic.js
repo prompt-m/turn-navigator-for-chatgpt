@@ -860,20 +860,27 @@ console.log("clearListPanelUI catch");
         if (document.getElementById('cgtn-idx-style')) return;
         const st = document.createElement('style');
         st.id = 'cgtn-idx-style';
+        // 旧: align-items:flex-start だと本文と微ズレが出ることがある
+        /* ここから追加 */
         st.textContent = `
           #cgpt-list-body { counter-reset: cgtn_turn; }
 
-          /* 全行：左側に固定幅のダミーを置いて揃える */
-          #cgpt-list-body .row { display:flex; align-items:flex-start; gap:6px; }
+          /* 全行：左側に固定幅のダミーを置いて揃える（ベースライン揃え） */
+          #cgpt-list-body .row{
+            display:flex;
+            align-items: baseline;   /* ←本文の1行目と番号のベースラインを揃える */
+            gap:6px;
+          }
           #cgpt-list-body .row::before{
-            content: "";                      /* デフォは空 */
-            display: inline-block;
-            min-width: 2.0em;                 /* 番号の幅 */
-            margin-right: 8px;                /* 余白は今の見た目に合わせて */
+            content: "";                      /* デフォは空（スペーサ） */
+            display:inline-block;
+            min-width: 2.2em;                 /* 2桁～3桁を見越してやや広めに */
+            margin-right: 8px;
             text-align: right;
             opacity: 0;                       /* 見えないだけで場所は確保 */
-            font-size: 11px;
-            line-height: 1;
+            font-size: inherit;               /* 行の文字サイズに追従 */
+            line-height: 1.2;                 /* 微妙な上ズレを抑える */
+            //transform: translateY(1px);       /* さらに1pxだけ下げて視覚調整 */
           }
           /* アンカー行：カウンタを進め、数字を描画 */
           #cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
@@ -882,6 +889,7 @@ console.log("clearListPanelUI catch");
             opacity: .75;
           }
         `;
+        /* ここまで */
         document.head.appendChild(st);
       }catch(_){}
     })();
