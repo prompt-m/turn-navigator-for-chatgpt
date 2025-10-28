@@ -8,7 +8,6 @@
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
 
-
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
   const AUTO_SYNC_OPEN_LIST = true;
@@ -749,10 +748,13 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
   }
 
 
+//  let _turnObs = null;
+//  let _observedRoot = null;
+
+//  CGTN_LOGIC.detachTurnObserver = function(){
   let _turnObs = null;
   let _observedRoot = null;
-
-  CGTN_LOGIC.detachTurnObserver = function(){
+  LG.detachTurnObserver = function(){
     try { _turnObs?.disconnect(); } catch {}
     _turnObs = null;
     _observedRoot = null;

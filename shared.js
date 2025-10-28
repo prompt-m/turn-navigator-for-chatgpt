@@ -4,6 +4,7 @@
 
   const t = (key) => window.CGTN_I18N?.t?.(key) || key;
   window.CGTN_SHARED = Object.assign(window.CGTN_SHARED || {}, { t });
+  const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
 
   // === 既定値（options / content と完全一致） ===
   const DEFAULTS = Object.freeze({
@@ -27,6 +28,36 @@
     },
     pins: {}// ← 付箋（key: true）
   });
+
+  // === storage.sync.set の Promise ラッパ（lastError 検知） ===
+  // === 投げない版 syncSetAsync: 常に resolve({ok, err}) を返す ===
+  function syncSetAsync(obj){
+    return new Promise((resolve) => {
+      // 拡張が直後に再起動/無効化されたケース
+      if (!chrome?.runtime?.id || !chrome?.storage?.sync) {
+        return resolve({ ok:false, err: new Error('ext-dead') });
+      }
+      try{
+        chrome.storage.sync.set(obj, () => {
+          const err = chrome.runtime?.lastError;
+          if (err) return resolve({ ok:false, err });
+          resolve({ ok:true });
+        });
+      }catch(e){
+        resolve({ ok:false, err: e });
+      }
+    });
+  }
+  SH.syncSetAsync = syncSetAsync; // 既存の名前空間にあわせて
+
+  // === sync から最新を強制ロードしてメモリCFGに反映 ===
+  NS.reloadFromSync = async function(){
+    if (!chrome?.storage?.sync) return NS.getCFG?.() || {};
+    const all = await new Promise(res => chrome.storage.sync.get(null, res));
+    const cfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
+    try { NS.setCFG?.(cfg); } catch {}
+    return cfg;
+  };
 
   // いまのタブのチャットIDとタイトルを保存（pinsByChat / chatIndex を同時に更新）
   NS.setChatTitleForId = function(chatId, title){
@@ -187,6 +218,52 @@
     NS.saveSettingsPatch?.({ pinsByChat: map });
   };
 
+  /* sync.set の Promise ラッパ（lastError を確実に捕捉） */
+  (function(){
+    const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
+    SH.syncSetAsync = function(obj){
+      return new Promise((resolve, reject)=>{
+        chrome.storage.sync.set(obj, ()=>{
+          const err = chrome.runtime?.lastError;
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    };
+  })();
+
+  /* 保存失敗時にロールバックする安全版 */
+  (function(){
+    const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
+    SH.deletePinsForChat = async function(chatId){
+      const cfg = SH.getCFG?.() || {};
+      const before = JSON.parse(JSON.stringify(cfg)); // ロールバック用スナップショット
+
+      try{
+        cfg.pinsByChat = cfg.pinsByChat || {};
+        // 0件なら完全削除（ミキさん方針どおり）
+        if (cfg.pinsByChat[chatId]) delete cfg.pinsByChat[chatId];
+         // ★ 保存（lastError を確実に検出する Promise 版）
+        await new Promise((resolve, reject) => {
+          chrome.storage.sync.set({ cgNavSettings: cfg }, () => {
+            const err = chrome.runtime?.lastError;
+            if (err) return reject(err);
+            resolve(true);
+          });
+        });
+
+        return true;
+
+      }catch(err){
+        // 失敗→ロールバック
+        try{ Object.assign(cfg, before); }catch(_){}
+        console.warn('deletePinsForChat failed:', err);
+        return false;
+      }
+    };
+  })();
+
+/*
   // チャット別の付箋データを削除（ストレージ直叩き／競合に強い）
   NS.deletePinsForChat = function deletePinsForChat(chatId){
     return new Promise((resolve) => {
@@ -220,7 +297,7 @@
       }
     });
   };
-
+*/
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   NS.setLangResolver = (fn) => { langResolver = fn; };
@@ -423,34 +500,55 @@
     }catch{ return 0; }
   };
 
-  NS.saveSettingsPatch = function saveSettingsPatch(patch, cb){
-    return new Promise((resolve) => {
-      try {
-        // 1) まずメモリCFGをベースに安全マージ
-        const base = NS.getCFG?.() || structuredClone(DEFAULTS);
-        const next = structuredClone(base);
-        deepMerge(next, patch);
+  // 旧: NS.saveSettingsPatch = function(patch, cb){ ... chrome.storage.sync.set(...); cb?.(); }
+  // 新: Promise を返す／lastError時はロールバックして {ok:false, err, before} を返す
+  NS.saveSettingsPatch = async function(patch, cb){
+    try{
+      const base = SH.getCFG?.() || {};
+      const before = structuredClone(base);// ← ロールバック用スナップショット
 
-        // 2) メモリを先に更新（ここがキモ）
-        CFG = next; // または NS.setCFG?.(next);
+      // deepMerge(base, patch) 相当（既存の deepMerge があればそれを使用）
+      const merged = structuredClone(before);
+      (function deepMerge(dst, src){
+        for (const k in src){
+          if (src[k] && typeof src[k]==='object' && !Array.isArray(src[k])){
+            dst[k] = deepMerge(dst[k]||{}, src[k]);
+          }else if (src[k] !== undefined){
+            dst[k] = src[k];
+          }
+        }
+        return dst;
+      })(merged, patch);
 
-        // 3) 非同期でストレージへ反映
-        chrome.storage.sync.set({ cgNavSettings: next }, () => {
-          try { cb && cb(next); } catch {}
-          resolve(true);
-        });
-      } catch(e) {
-        // storage API が失敗しても、最低限メモリ反映だけは行う
-        try {
-          const base = NS.getCFG?.() || structuredClone(DEFAULTS);
-          const fallback = structuredClone(base);
-          deepMerge(fallback, patch);
-          CFG = fallback; // または NS.setCFG?.(fallback);
-          try { cb && cb(fallback); } catch {}
-        } catch {}
-        resolve(false);
+      // ★ 拡張のコンテキストが死んでいる（直後の set で "Extension context invalidated."）ケースを回避
+      // ★ 拡張の生存チェック（早期スキップ）
+     if (!chrome?.runtime?.id || !chrome?.storage?.sync) {
+       // ここは「よくある状態」なので warn は出さない（ノイズ抑制）
+       //console.warn('[saveSettingsPatch] skipped: extension context invalidated');
+       // メモリCFGは「楽観反映前」なのでロールバック不要。呼び元で {ok:false} 判定み。
+       return { ok:false, err:{ message:'ext-dead' }, before };
+     }
+
+      // 先にローカルCFGへ反映（楽観）— 失敗時は below で before に戻す
+      NS.setCFG?.(merged);
+
+      //await syncSetAsync({ cgNavSettings: merged });
+      const res = await syncSetAsync({ cgNavSettings: merged });
+      if (!res.ok){
+        // 失敗 → メモリCFGをロールバック
+        try{ NS.setCFG?.(before); }catch{}
+        return { ok:false, err: res.err, before };
       }
-    });
+      try{ cb && cb(merged); }catch{}
+      return { ok:true, cfg: merged };
+
+    }catch(err){
+      // ここに来るのは想定外の例外だけ。ログは message を優先
+      console.warn('[saveSettingsPatch] failed:', err?.message || err);
+      // try ブロック先頭で保存した before を使ってロールバック
+      try{ NS.setCFG?.(before); }catch{}
+      return { ok:false, err, before };
+    }
   };
 
   function computeAnchor(cfg){
@@ -512,8 +610,6 @@
     renderViz(CFG, _visible);
   }
 
-  // --- HTMLエスケープ（タイトルやツールチップ用） ---
-  window.CGTN_SHARED = window.CGTN_SHARED || {};
   (function(NS){
     NS.titleEscape = function(s){
       return String(s || '').replace(/[&<>"']/g, c => ({

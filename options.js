@@ -15,23 +15,63 @@
     list:{ maxChars: 60, fontSize: 12, /* 他は不要 */ }
   };
 
-  /* ここから追加：sync 使用量ラベルを更新（常時表示＋i18n対応） */
+  /* sync.set の Promise ラッパ（lastError を reject） */
+  function syncSetAsync(obj){
+    return new Promise((resolve, reject)=>{
+      chrome.storage.sync.set(obj, ()=>{
+        const err = chrome.runtime?.lastError;
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  /* 使用量（KB）＋アイテム数 を同時表示。i18n対応 */
   async function updateSyncUsageLabel(){
     try{
       const el = document.getElementById('sync-usage');
-      if (!el || !chrome?.storage?.sync?.getBytesInUse) return;
-      chrome.storage.sync.getBytesInUse(null, (bytes)=>{
-        // ※ 100KB は Chrome Sync の合計上限
-        const used = (bytes || 0);
-        const usedKB = (Math.round(used/102.4)/10).toFixed(1); // 8.0KB など
-        const totalKB = 100;
-        // i18n：「options.syncUsage」が無ければフォールバック
-        const label = (typeof T === 'function' ? T('options.syncUsage') : 'sync usage:');
-        el.textContent = `${label} ${usedKB}KB / ${totalKB}KB`;
-      });
-    }catch(e){ /* no-op */ }
+      if (!el) return;
+  
+      // Promise化ヘルパ
+      const getBytes = () => new Promise(res => chrome.storage.sync.getBytesInUse(null, b => res(b||0)));
+      const getAll   = () => new Promise(res => chrome.storage.sync.get(null, obj => res(obj||{})));
+  
+      const [bytesInUse, allItems] = await Promise.all([ getBytes(), getAll() ]);
+  
+      const usedKB  = (bytesInUse/1024).toFixed(1);
+      const totalKB = 100;       // sync 全体上限=約100KB
+      const items   = Object.keys(allItems).length;
+      const itemsMax = 512;      // sync のキー上限
+  
+      // i18n（無ければフォールバック）
+      const t = window.CGTN_I18N?.t || (s=>s);
+      const usageLabel = t('options.syncUsage');   // 例: "sync使用量"
+      const itemsLabel = t('options.itemsLabel');  // 例: "アイテム数"
+  
+      // 表示テキストは 例) "sync使用量 8.0KB / 100KB ・ アイテム数 23 / 512"
+      el.textContent = `${usageLabel} ${usedKB}KB / ${totalKB}KB ・ ${itemsLabel} ${items} / ${itemsMax}`;
+    }catch(e){
+      // 取れない場合は静かにスキップ
+      console.warn('updateSyncUsageLabel failed', e);
+    }
   }
-  /* ここまで */
+  /* sync 使用量ラベルを更新（常時表示＋i18n対応） */
+
+//  async function updateSyncUsageLabel(){
+//    try{
+//      const el = document.getElementById('sync-usage');
+//      if (!el || !chrome?.storage?.sync?.getBytesInUse) return;
+//      chrome.storage.sync.getBytesInUse(null, (bytes)=>{
+//        // ※ 100KB は Chrome Sync の合計上限
+//        const used = (bytes || 0);
+//        const usedKB = (Math.round(used/102.4)/10).toFixed(1); // 8.0KB など
+//        const totalKB = 100;
+//        // i18n：「options.syncUsage」が無ければフォールバック
+//        const label = (typeof T === 'function' ? T('options.syncUsage') : 'sync usage:');
+//        el.textContent = `${label} ${usedKB}KB / ${totalKB}KB`;
+//      });
+//    }catch(e){ /* no-op */ }
+//  }
 
   function sanitize(raw){
     const base = JSON.parse(JSON.stringify(DEF));
@@ -369,6 +409,9 @@ console.log("flashMsgInline id:",id);
           try{ window.flashMsgInline?.('pins-msg','options.refreshFailed'); }catch(_){}
         }finally{
           setBusy(refreshBtn, false);
+          //「最新にする」スピナー／… 残存対策（後片付け保証）
+          refreshBtn.classList.remove('is-busy');
+          refreshBtn.removeAttribute('aria-busy');
         }
       };
       /* ここまで */
@@ -441,20 +484,20 @@ console.log("flashMsgInline id:",id);
     });
   });
 
+  // 付箋データ削除
   async function deletePinsFromOptions(chatId){
     const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
-
+  
+    // const ok = await SH.deletePinsForChat(chatId); // ←現状のままでOK
+    /* 成功/失敗の分岐でUI処理を強化 */
     const ok = await SH.deletePinsForChat(chatId);
-
+  
     if (ok){
       // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）
       try {
-       const targets = [
-         '*://chatgpt.com/*',
-         '*://chat.openai.com/*'
-       ];
-       chrome.tabs.query({ url: targets }, tabs=>{
+        const targets = ['*://chatgpt.com/*', '*://chat.openai.com/*'];
+        chrome.tabs.query({ url: targets }, tabs=>{
           tabs.forEach(tab=>{
             chrome.tabs.sendMessage(tab.id, { type:'cgtn:pins-deleted', chatId });
           });
@@ -462,10 +505,19 @@ console.log("flashMsgInline id:",id);
       } catch {}
 
       await renderPinsManager();
+
+      // 使用量の再描画（KB/アイテム数）
+      try{ updateSyncUsageLabel?.(); }catch(_){}
+
       // 近くにポワン
       toastNearPointer(T('options.deleted') || 'Deleted');
-    }
 
+    } else {
+      // 保存失敗（lastError など）→ UI でアラート/トースト
+      try{
+        toastNearPointer(T('options.saveFailed') || 'Failed to save');
+      }catch(_){}
+    }
   }
 
   // 初期化
@@ -477,7 +529,14 @@ console.log("flashMsgInline id:",id);
       if (vizBox) vizBox.checked = false;
 
       // 設定ロード→UI反映
-      await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
+//      await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
+      // 設定ロード→UI反映（★まず sync から強制取得）
+      if (SH.reloadFromSync) {
+        await SH.reloadFromSync();
+      } else {
+        await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
+      }
+
       const cfg = (SH.getCFG && SH.getCFG()) || DEF;
       applyToUI(cfg);
       applyI18N();
@@ -486,10 +545,25 @@ console.log("flashMsgInline id:",id);
       // 付箋テーブル
       await renderPinsManager();
 
-      // sync 使用量表示
-      //try{ updateSyncUsage(); }catch{}
+      // 他タブ（content）からの更新通知を受けたら最新化
+      if (chrome?.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener((msg) => {
+          if (!msg || typeof msg.type !== 'string') return;
+          if (msg.type === 'cgtn:pins-deleted' || msg.type === 'cgtn:pins-updated') {
+            (async () => {
+              try {
+                await SH.reloadFromSync?.();
+                await renderPinsManager();
+                await updateSyncUsageLabel?.();
+              } catch {}
+            })();
+          }
+        });
+      }
 
-      /* ここから追加：初期描画時に使用量ラベルを反映 */
+      try { await updateSyncUsageLabel(); } catch {}
+
+      /* 初期描画時に使用量ラベルを反映 */
       try{ updateSyncUsageLabel(); }catch(_){}
       /* 言語切替で再描画（両対応） */
       if (window.CGTN_SHARED?.onLangChange) {
@@ -497,8 +571,6 @@ console.log("flashMsgInline id:",id);
       } else {
         window.addEventListener('cgtn:lang-changed', updateSyncUsageLabel, { passive:true });
       }
-      /* ここまで */
-
 
       const form = $('cgtn-options');
       // 入力で即保存

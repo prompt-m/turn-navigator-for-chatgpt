@@ -32,17 +32,65 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
   function isPinnedByKey(turnId){
     return !!(_pinsCache && _pinsCache[String(turnId)]);
   }
+
   NS.isPinnedByKey = isPinnedByKey;
 
-  // ピンの ON/OFF（呼び元は既存 bindClipPin / togglePin からそのまま呼べる）
-  NS.togglePin = function(turnId){
-    const on = NS.togglePinByIndex(turnId, SH.getChatId());
-    // ローカルキャッシュも合わせる
-    if (!_pinsCache) _pinsCache = {};
-    if (on) _pinsCache[String(turnId)] = true;
-    else delete _pinsCache[String(turnId)];
-    return on;
-  };
+  // 追加: ピン配列を chatId ごとに保存する非同期関数
+  async function persistPinsOrRollback(chatId, pinsArr, rollback) {
+    // pins を稠密配列で保持
+    const patch = { pinsByChat: { [chatId]: { pins: pinsArr, updatedAt: Date.now() } } };
+    const result = await SH.saveSettingsPatch(patch);
+    if (result?.ok) return true;
+    // 失敗 → UI ロールバック + 通知
+    try { rollback && rollback(); } catch {}
+    const t = window.CGTN_I18N?.t || (s=>s);
+    const title = t('storage.saveFailed.title') || '保存に失敗しました';
+    const body  = t('storage.saveFailed.body')  || 'ストレージ上限に達しています。設定 → 付箋データ管理で不要な付箋を削除してください。';
+    alert(`${title}\n\n${body}`);
+    return false;
+  }
+
+  function togglePin(artOrKey){
+    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
+    const ks = String(k);
+    const chatId = SH.getChatId?.();
+    if (!chatId) return false;
+
+    // 現在の集合 → 次状態を楽観反映
+    const s = new Set(PINS);
+    const next = !s.has(ks);
+    if (next) s.add(ks); else s.delete(ks);
+
+    // UI 反映（楽観）
+    _applyPinsToUI(s);   // ← 既存の描画同期があればそれを呼ぶ（例: rows のクラス付け等）
+    updateListFooterInfo?.();
+    updatePinOnlyBadge?.();
+
+    // 永続化：'turn:n' を 0/1 配列へ（密配列）
+    const arr = [];
+    for (const key of s) {
+      const n = Number(String(key).replace('turn:',''));
+      if (Number.isFinite(n) && n > 0) arr[n-1] = 1;
+    }
+
+    // 失敗時は、ここで即ロールバック
+    const rollback = () => {
+      const r = new Set(PINS); // 直前の正しい状態（PINS は失敗時まで書き換えない設計ならここで保持）
+      if (next) r.delete(ks); else r.add(ks);
+      _applyPinsToUI(r);
+      updateListFooterInfo?.();
+      updatePinOnlyBadge?.();
+    };
+
+    // メモ: PINS に確定反映するタイミングは成功後
+    return persistPinsOrRollback(chatId, arr, rollback).then(ok => {
+      if (ok){
+        // 成功で PINS を確定同期
+        PINS = Array.from(s);
+      }
+      return ok ? next : !next; // 呼出し互換（次状態 or 元の状態）
+    });
+  }
 
   // 互換：従来の _savePinsSet 等を使っていた呼び出しを内部移譲
   NS.isPinned = function(art){ return isPinnedByKey(NS.getTurnKey?.(art)); };
@@ -454,6 +502,11 @@ console.debug('getTurnKey len:', rows.length, 'idx:', idx);
   function getIndex1FromRow(row){
     const v = Number(row?.dataset?.idx);
     return Number.isFinite(v) && v > 0 ? v : null;
+  }
+
+  function getIndex1FromTurnKey(turnKey){
+    const m = /^turn:(\d+)$/.exec(String(turnKey) || '');
+    return m ? Number(m[1]) : null;
   }
 
   // === PINS: sync cache ===
@@ -1079,6 +1132,34 @@ console.log("clearListPanelUI catch");
     btn.style.cursor = 'pointer';
     btn.style.padding = '2px 6px';     // ヒットボックス拡大
     const handler = (ev) => {
+      // storage仕様変更により置換
+      ev.stopPropagation();
+
+      // 1) ターンキー → 1始まり index へ
+      const k = getTurnKey(art);
+      if (!k) return;
+      const idx1 = Number(String(k).replace('turn:', ''));
+      if (!Number.isFinite(idx1) || idx1 < 1) return;
+
+      // 2) 事前状態（pinOnlyでの削除判定用）
+      const cfg = SH.getCFG?.() || {};
+      const pinOnly = !!cfg.list?.pinOnly;
+
+      // 3) トグル（保存は SH.togglePinByIndex → pinsByChat 配列に確定）
+      const chatId = SH.getChatId?.();
+      const nextOn = !!SH.togglePinByIndex?.(idx1, chatId); // true: ON後 / false: OFF後
+
+      // 4) pinOnly のとき、OFF になったターン行は即削除
+      if (pinOnly && !nextOn) {
+        rowsByTurn(k).forEach(n => n.remove());
+        NS.updateListFooterInfo?.();
+        return;
+      }
+
+      // 5) 同ターンの相方行を含め UI 同期（強制状態で反映）
+      refreshPinUIForTurn(k, nextOn);
+      NS.updateListFooterInfo?.();
+/*
       ev.stopPropagation();
       const k = getTurnKey(art);
       const before = isPinned(art);
@@ -1091,6 +1172,7 @@ console.log("clearListPanelUI catch");
         return;
       }
       refreshPinUIForTurn(k);                   // 同ターン2行を部分更新
+*/
     };
     btn.addEventListener('pointerdown', handler, {passive:true});
     btn.addEventListener('click',        handler, {passive:true});
