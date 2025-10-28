@@ -261,7 +261,7 @@ console.log("flashMsgInline id:",id);
     //const norm = SH.normalizePinsByChat?.(raw, { dropZero: true, preferNewTitle: true }) || raw;
 
     const payload = { pinsByChat: pins };
-    const blob = new Blob([ JSON.stringify({ pinsByChat: norm }, null, 2) ], { type: 'application/json' });
+    const blob = new Blob([ JSON.stringify({ pinsByChat: pins }, null, 2) ], { type: 'application/json' });
     // 既存のダウンロード処理へ
     triggerDownload(blob, 'pins_backup.json');
   }
