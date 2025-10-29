@@ -48,6 +48,65 @@
     pins: {}// ← 付箋（key: true）
   });
 
+  // === storage keys ===
+  const KEY_CFG  = 'cgNavSettings';
+  const KEY_PINS = (id) => `cgtn:pins:${id}`;
+
+  // === chrome.storage.sync Promise ラッパ ===
+  async function syncGetAsync(keys) {
+    return await new Promise(res => chrome.storage.sync.get(keys, obj => res(obj||{})));
+  }
+  async function syncSetAsync(obj) {
+    return await new Promise((res, rej) => {
+      chrome.storage.sync.set(obj, ()=> {
+        const err = chrome.runtime?.lastError;
+        if (err) return rej(err);
+        res();
+      });
+    });
+  }
+  async function syncRemoveAsync(keys) {
+    return await new Promise((res, rej) => {
+      chrome.storage.sync.remove(keys, () => {
+        const err = chrome.runtime?.lastError;
+        if (err) return rej(err);
+        res();
+      });
+    });
+  }
+
+  // ===== Pins split storage (schema v2) =====
+  const PINS_KEY_PREFIX = 'cgtnPins::';
+  const pinKeyOf = (chatId) => `${PINS_KEY_PREFIX}${chatId}`;
+
+  // storage.sync.set/get を Promise 化（lastError 準拠）
+  async function syncGet(keys){
+    return await new Promise((resolve, reject)=>{
+      chrome.storage.sync.get(keys, (obj)=>{
+        const err = chrome.runtime?.lastError;
+        if (err) return reject(err);
+        resolve(obj || {});
+      });
+    });
+  }
+  async function syncSet(obj){
+    return await new Promise((resolve, reject)=>{
+      chrome.storage.sync.set(obj, ()=>{
+        const err = chrome.runtime?.lastError;
+        if (err) return reject(err);
+        resolve(true);
+      });
+    });
+  }
+  async function syncRemove(keys){
+    return await new Promise((resolve, reject)=>{
+      chrome.storage.sync.remove(keys, ()=>{
+        const err = chrome.runtime?.lastError;
+        if (err) return reject(err);
+        resolve(true);
+      });
+    });
+  }
 
   // === storage.sync.set の Promise ラッパ（lastError 検知） ===
   // === 投げない版 syncSetAsync: 常に resolve({ok, err}) を返す ===
@@ -242,33 +301,6 @@
   /* 保存失敗時にロールバックする安全版 */
   (function(){
     const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
-    SH.deletePinsForChat = async function(chatId){
-      const cfg = SH.getCFG?.() || {};
-      const before = JSON.parse(JSON.stringify(cfg)); // ロールバック用スナップショット
-
-      try{
-        cfg.pinsByChat = cfg.pinsByChat || {};
-        // 0件なら完全削除（ミキさん方針どおり）
-        if (cfg.pinsByChat[chatId]) delete cfg.pinsByChat[chatId];
-         // ★ 保存（lastError を確実に検出する Promise 版）
-        await new Promise((resolve, reject) => {
-          chrome.storage.sync.set({ cgNavSettings: cfg }, () => {
-            const err = chrome.runtime?.lastError;
-            if (err) return reject(err);
-            resolve(true);
-          });
-        });
-
-        return true;
-
-      }catch(err){
-        // 失敗→ロールバック
-        try{ Object.assign(cfg, before); }catch(_){}
-        console.warn('deletePinsForChat failed:', err);
-        return false;
-      }
-    };
-  })();
 
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
@@ -357,6 +389,7 @@
   let _loaded = false, _resolves = [];
   SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _resolves.push(r));
 
+/*
   function loadSettings(cb){
     try{
       chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings })=>{
@@ -374,6 +407,65 @@
       cb?.();
     }
   }
+*/
+
+  // v1→v2 の移行（SH.loadSettings 成功後に一度だけ）
+  function loadSettings(cb){
+    chrome.storage.sync.get(null, (all) => {
+      try{
+        const cfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
+        CFG = Object.assign(structuredClone(DEFAULTS), cfg);
+        // --- migrate pinsByChat -> cgtnPins::<id> (schema v2) ---
+        (async()=>{
+          try{
+            if (CFG?.pinsByChat && Object.keys(CFG.pinsByChat).length){
+              const byChat = CFG.pinsByChat;
+              for (const [cid, rec] of Object.entries(byChat)){
+                const arr = (rec?.pins || []).slice();
+                await syncSet({ [pinKeyOf(cid)] : { pins: arr } });
+              }
+              // インデックス更新（件数だけ反映）
+              const map = CFG.chatIndex?.map || {};
+              for (const cid of Object.keys(byChat)){
+                const cnt = (byChat[cid]?.pins || []).filter(Boolean).length;
+                map[cid] = { ...(map[cid]||{}), pinCount: cnt, updated: Date.now() };
+              }
+              CFG.chatIndex = { ...(CFG.chatIndex||{}), map };
+              delete CFG.pinsByChat;
+              CFG.schemaVersion = 2;
+              await syncSet({ cgNavSettings: CFG });
+            } else if (!CFG?.schemaVersion){
+              CFG.schemaVersion = 2;
+              await syncSet({ cgNavSettings: CFG });
+            }
+          }catch(_){ /* 移行失敗は致命でないので無視 */ }
+        })();
+      }catch(_){
+        CFG = structuredClone(DEFAULTS);
+      }
+      try{ cb && cb(); }catch(_){}
+    });
+  }
+
+  // 旧 pinsByChat → 分割キーへ一度だけ移行(content.js initialize)
+  SH.migratePinsStorageOnce = async function(){
+    const cfg = SH.getCFG?.() || {};
+    if (!cfg.pinsByChat) return;             // 既に移行済み
+
+    const map = cfg.pinsByChat || {};
+    const idx = cfg.pinsIndex = (cfg.pinsIndex || {});
+    for (const [cid, rec] of Object.entries(map)){
+      const arr = Array.isArray(rec?.pins) ? rec.pins : [];
+      const pins = arr.map(v=>!!v ? 1 : 0);
+      const k = KEY_PINS(cid);
+      await syncSetAsync({ [k]: pins });
+      idx[cid] = { count: pins.filter(Boolean).length, updatedAt: Date.now() };
+    }
+    // 旧データを設定から削除
+    delete cfg.pinsByChat;
+    SH.setCFG?.(cfg);
+    await syncSetAsync({ [KEY_CFG]: cfg });
+  };
 
   SH.cleanupZeroPinRecords = function () {
     const cfg = SH.getCFG() || {};
@@ -386,15 +478,24 @@
     if (changed) SH.saveSettingsPatch({ pinsByChat: map });
   };
 
+  // 読み出しは同期しても良いけど、呼び元の都合上 sync版も提供
   SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
-    const cfg  = SH.getCFG() || {};
-    const rec  = (cfg.pinsByChat || {})[chatId] || {};
-    const raw  = Array.isArray(rec.pins) ? rec.pins : [];
-    // 0/1 の稠密配列に正規化（"1"やtrue等は 1 に揃える）
-    return raw.map(v => (v ? 1 : 0));
+    // 非同期を使えない箇所のためのフォールバック（空配列）
+    console.warn('[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync');
+    return [];
   };
 
+  SH.getPinsArrAsync = async function(chatId = SH.getChatId?.()){
+    if (!chatId) return [];
+    try{
+      const obj = await syncGet(pinKeyOf(chatId));
+      const rec = obj?.[pinKeyOf(chatId)];
+      const arr = Array.isArray(rec?.pins) ? rec.pins : [];
+      return arr.slice();
+    }catch(_){ return []; }
+  };
 
+/*
   SH.savePinsArr = function savePinsArr(arr, chatId = SH.getChatId?.()) {
     const cfg = SH.getCFG() || {};
     const map = { ...(cfg.pinsByChat || {}) };
@@ -403,13 +504,8 @@
     const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
     const hasAny  = safeArr.some(Boolean);
 
-    // タイトルは保存しない（strage.syncの容量節約のため）
-    //const oldTitle = map[chatId]?.title || '';
-    //const newTitle = SH.getChatTitle?.() || '';
-    //const title    = newTitle || oldTitle || '(No Title)';
 
     // ★計測ログ：ここが肝
-
     console.debug('[savePinsArr] about to save', {
       chatId,
       pinsCount: safeArr.filter(Boolean).length,
@@ -417,14 +513,12 @@
       time: new Date().toISOString()
     }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
 
-
     //map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
     map[chatId] = { pins: safeArr, updatedAt: Date.now() };
 
     //SH.saveSettingsPatch({ pinsByChat: map });
 
      // 保存後の一致検証（③仕様：失敗ならロールバック用イベント通知）
-     /* ここから追加 */
      SH.saveSettingsPatch({ pinsByChat: map }, (nextCfg) => {
        try{
          const saved = nextCfg?.pinsByChat?.[chatId]?.pins;
@@ -436,10 +530,80 @@
          window.dispatchEvent(new CustomEvent('cgtn:save-error', { detail:{ chatId, error:String(e) } }));
        }
      });
-     /* ここまで */
+  };
+*/
+
+  SH.savePinsArr = async function savePinsArr(arr, chatId = SH.getChatId?.()) {
+    if (!chatId) return { ok:false, err:'no-chat-id' };
+    const pins = Array.isArray(arr) ? arr.slice() : [];
+    try{
+      await syncSet({ [pinKeyOf(chatId)] : { pins } });
+      // インデックスの pinCount だけ更新
+      const cfg = SH.getCFG() || {};
+      const cnt = pins.filter(Boolean).length;
+      const idx = cfg.chatIndex?.map || (cfg.chatIndex = { ids:[], map:{} }).map;
+      idx[chatId] = { ...(idx[chatId]||{}), pinCount: cnt, updated: Date.now() };
+      await syncSet({ cgNavSettings: cfg });
+
+      // ★計測ログ
+      console.debug('[savePinsArr] about to save', {
+        chatId,
+        pinsCount: cnt,
+        path: location.pathname,
+        time: new Date().toISOString()
+      }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
+
+      return { ok:true };
+    }catch(err){
+      console.warn('[savePinsArr] failed:', err);
+      return { ok:false, err };
+    }
   };
 
+/*
+    SH.deletePinsForChat = async function(chatId){
+      const cfg = SH.getCFG?.() || {};
+      const before = JSON.parse(JSON.stringify(cfg)); // ロールバック用スナップショット
 
+      try{
+        cfg.pinsByChat = cfg.pinsByChat || {};
+        // 0件なら完全削除（ミキさん方針どおり）
+        if (cfg.pinsByChat[chatId]) delete cfg.pinsByChat[chatId];
+         // ★ 保存（lastError を確実に検出する Promise 版）
+        await new Promise((resolve, reject) => {
+          chrome.storage.sync.set({ cgNavSettings: cfg }, () => {
+            const err = chrome.runtime?.lastError;
+            if (err) return reject(err);
+            resolve(true);
+          });
+        });
+
+        return true;
+
+      }catch(err){
+        // 失敗→ロールバック
+        try{ Object.assign(cfg, before); }catch(_){}
+        console.warn('deletePinsForChat failed:', err);
+        return false;
+      }
+    };
+  })();
+*/
+
+  SH.deletePinsForChat = async function(chatId){
+    try{
+      await syncRemove(pinKeyOf(chatId));
+      // インデックスを 0 件に
+      const cfg = SH.getCFG() || {};
+      const idx = cfg.chatIndex?.map || (cfg.chatIndex = { ids:[], map:{} }).map;
+      if (idx[chatId]) idx[chatId] = { ...idx[chatId], pinCount: 0, updated: Date.now() };
+      await syncSet({ cgNavSettings: cfg });
+      return true;
+    }catch(err){
+      console.warn('[deletePinsForChat] failed:', err);
+      return false;
+    }
+  };
 
   // トグル（1始まり）←この実装でOK
   SH.togglePinByIndex = function togglePinByIndex(index1, chatId = SH.getChatId?.()) {

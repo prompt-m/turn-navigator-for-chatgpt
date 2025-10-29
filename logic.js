@@ -1212,7 +1212,8 @@ console.log("clearListPanelUI catch");
     applyPinTheme?.();
 
     const chatId  = SH.getChatId?.();
-    const pinsArr = SH.getPinsArr?.(chatId) || [];
+    //const pinsArr = SH.getPinsArr?.(chatId) || [];
+    const pinsArr = await SH.getPinsArrAsync(chatId) || [];//←★★★★
     let turns     = ST.all.slice();
 
     // pinOnly のときは「配列」でフィルタ
@@ -1416,7 +1417,8 @@ console.log("clearListPanelUI catch");
     // チャット名
     NS.updateListChatTitle?.();
     //注目ターンのキー行へスクロール
-//    scrollListToTurn(NS._currentTurnKey);
+    scrollListToTurn(NS._currentTurnKey);
+
 //console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 

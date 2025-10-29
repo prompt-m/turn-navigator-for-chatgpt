@@ -8,6 +8,34 @@
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
 
+  // --- 受信口は一度だけ早めにバインド（inject初回POSTを取りこぼさない） ---
+  (function bindCgtnMessageOnce(){
+    if (window.__CGTN_MSG_BOUND__) return;
+    window.__CGTN_MSG_BOUND__ = true;
+    window.addEventListener('message', (ev) => {
+      const d = ev && ev.data;
+      if (!d || d.source !== 'cgtn') return;
+      if (d.type === 'url-change') {
+        try { window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+        if (SH?.isListOpen?.()) {
+          const cid = SH?.getChatId?.();
+          LG?.rebuild?.(cid);
+          LG?.renderList?.(true);
+          if (SH?.debug) console.debug('[cgtn] url-change → rebuild+render');
+        }
+        return;
+      }
+      if (d.type === 'turn-added') {
+        if (SH?.isListOpen?.()) {
+          LG?.rebuild?.();
+          LG?.renderList?.(true);
+          if (SH?.debug) console.debug('[cgtn] turn-added → rebuild+render');
+        }
+        return;
+      }
+    }, true);
+  })();
+
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
   const AUTO_SYNC_OPEN_LIST = true;
@@ -823,8 +851,8 @@ console.log("installAutoSyncForTurns 4");
       _turnObs.observe(root, {
         childList:true,
         subtree:true,
-        characterData:true,   // 追加
-        attributes:true       // 追加
+        characterData:false,
+        attributes:false
       });
       _observedRoot = root;
       console.debug('[auto-sync] observe attached to', root.tagName);
@@ -836,6 +864,7 @@ console.log("installAutoSyncForTurns 4");
   // ========= 9) 初期セットアップ =========
   function initialize(){
     SH.loadSettings(() => {
+      await SH.migratePinsStorageOnce?.();//←★★★★★
       UI.installUI();
       ensureFocusPark();
       installFocusStealGuard();
@@ -848,31 +877,20 @@ console.log("installAutoSyncForTurns 4");
         SH?.renderViz?.(cfg, !!cfg?.showViz);
       } catch {}
 
-//console.log("initialize bindEvents");
       EV.bindEvents();
       bindPreviewDockOnce();
       bindBaselineAutoFollow();
-//★★★もしかしたら不要？★★★
-//      observeAndRebuild();
-//console.log("initialize closeDockOnUrlChange");
-      closeDockOnUrlChange();
+//      closeDockOnUrlChange();
       bindListRefreshButton();
       forceListPanelOffOnBoot();
 
       if (USE_INJECT_URL_HOOK){
         injectUrlChangeHook();
-        window.addEventListener('message', (e)=>{
-          const d = e && e.data;
-          console.debug('[cgtn:url-msg*1] recv', d.href, performance.now().toFixed(1));
-          if (!d || d.source !== 'cgtn' || d.type !== 'url-change') return;
-          console.debug('[cgtn:url-msg*2] recv', d.href, performance.now().toFixed(1));
-          handleUrlChangeMessage();
-        });
       }
 
-      LG?.installAutoSyncForTurns?.();// MOは1本のみ
+//      LG?.installAutoSyncForTurns?.();// MOは1本のみ
 
-      watchChatIdChange();
+//      watchChatIdChange();
 
       // ★ここで一発クリーンアップ！
       SH.cleanupZeroPinRecords();
@@ -887,6 +905,7 @@ console.log("installAutoSyncForTurns 4");
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
     window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
 
+/*
     // タイトル変更を監視→保存（1回だけバインド）
     (function watchDocTitle(){
       if (document._cgtnTitleWatch) return;
@@ -902,7 +921,7 @@ console.log("installAutoSyncForTurns 4");
       });
       mo.observe(document.querySelector('title') || document.head, { subtree:true, characterData:true, childList:true });
     })();
-
+*/
     
   }
   // ========= 10) DOM Ready =========
