@@ -862,39 +862,39 @@ console.log("installAutoSyncForTurns 4");
   }
 
   // ========= 9) 初期セットアップ =========
-  function initialize(){
-    SH.loadSettings(() => {
-      await SH.migratePinsStorageOnce?.();//←★★★★★
-      UI.installUI();
-      ensureFocusPark();
-      installFocusStealGuard();
-      UI.applyLang();
-      UI.clampPanelWithinViewport();
+  async function initialize(){
+    await SH.loadSettings;
+    await SH.migratePinsStorageOnce?.();//←★★★★★
+    UI.installUI();
+    ensureFocusPark();
+    installFocusStealGuard();
+    UI.applyLang();
+    UI.clampPanelWithinViewport();
 
-      // 基準線の初期表示（保存 showViz を尊重）
-      try {
-        const cfg = SH?.getCFG?.();
-        SH?.renderViz?.(cfg, !!cfg?.showViz);
-      } catch {}
+    // 基準線の初期表示（保存 showViz を尊重）
+    try {
+      const cfg = SH?.getCFG?.();
+      SH?.renderViz?.(cfg, !!cfg?.showViz);
+    } catch {}
 
-      EV.bindEvents();
-      bindPreviewDockOnce();
-      bindBaselineAutoFollow();
+    EV.bindEvents();
+    bindPreviewDockOnce();
+    bindBaselineAutoFollow();
 //      closeDockOnUrlChange();
-      bindListRefreshButton();
-      forceListPanelOffOnBoot();
+    bindListRefreshButton();
+    forceListPanelOffOnBoot();
 
-      if (USE_INJECT_URL_HOOK){
-        injectUrlChangeHook();
-      }
+    if (USE_INJECT_URL_HOOK){
+      injectUrlChangeHook();
+    }
 
 //      LG?.installAutoSyncForTurns?.();// MOは1本のみ
 
 //      watchChatIdChange();
 
       // ★ここで一発クリーンアップ！
-      SH.cleanupZeroPinRecords();
-    });
+    SH.cleanupZeroPinRecords();
+
     // ナビが動かなくなったので、入れてみる
     LG.rebuild?.();
 

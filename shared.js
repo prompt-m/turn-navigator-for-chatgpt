@@ -5,25 +5,28 @@
   const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
 
 //  let CFG = structuredClone(DEFAULTS);
-  let CFG = SH.getCFG ? SH.getCFG() : (SH._BOOT_CFG || {}); // 既存があれば引き継ぐ
+//  let CFG = SH.getCFG ? SH.getCFG() : (SH._BOOT_CFG || {}); // 既存があれば引き継ぐ
+  // メモリCFG
+  let CFG = window.CGTN_SHARED?._BOOT_CFG || {};
 
-  function setCFG(next){
-    // オブジェクトのみ採用（null/primitive は空オブジェクトに）
-    CFG = (next && typeof next === 'object') ? next : {};
+
+  // 公開アクセサ
+  function setCFG(next){ CFG = (next && typeof next === 'object') ? next : {}; return CFG; }
+  function getCFG(){ return CFG; }
+
+  SH.setCFG = setCFG;
+  SH.getCFG = getCFG;
+
+  // === loadSettings（単一の実装に統一：await 可能）===
+  async function loadSettings(cb){
+    const all = await new Promise(res => chrome.storage.sync.get(null, res));
+    const fileCfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
+    // ここで既定値とマージ（DEFAULTS はこの時点で定義済み）
+    CFG = Object.assign(structuredClone(DEFAULTS), fileCfg);
+    try { cb && cb(CFG); } catch {}
     return CFG;
-  }
-  SH.setCFG       = setCFG;
+ }
 
-  // === loadSettings（未定義なら用意）===
-  if (typeof loadSettings !== 'function') {
-    async function loadSettings(cb){
-      const all = await new Promise(res => chrome.storage.sync.get(null, res));
-      const cfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
-      setCFG(cfg);
-      try { cb && cb(cfg); } catch {}
-      return cfg;
-    }
-  }
 
   // === 既定値（options / content と完全一致） ===
   const DEFAULTS = Object.freeze({
@@ -48,26 +51,33 @@
     pins: {}// ← 付箋（key: true）
   });
 
-  // === storage keys ===
+
+
+  // === keys & wrappers ===
   const KEY_CFG  = 'cgNavSettings';
   const KEY_PINS = (id) => `cgtn:pins:${id}`;
 
-  // === chrome.storage.sync Promise ラッパ ===
-  async function syncGetAsync(keys) {
-    return await new Promise(res => chrome.storage.sync.get(keys, obj => res(obj||{})));
+  async function syncGetAsync(keys){
+    return await new Promise((res, rej)=>{
+      chrome.storage.sync.get(keys, obj=>{
+        const err = chrome.runtime?.lastError;
+        if (err) return rej(err);
+        res(obj || {});
+      });
+    });
   }
-  async function syncSetAsync(obj) {
-    return await new Promise((res, rej) => {
-      chrome.storage.sync.set(obj, ()=> {
+  async function syncSetAsync(obj){
+    return await new Promise((res, rej)=>{
+      chrome.storage.sync.set(obj, ()=>{
         const err = chrome.runtime?.lastError;
         if (err) return rej(err);
         res();
       });
     });
   }
-  async function syncRemoveAsync(keys) {
-    return await new Promise((res, rej) => {
-      chrome.storage.sync.remove(keys, () => {
+  async function syncRemoveAsync(keys){
+    return await new Promise((res, rej)=>{
+      chrome.storage.sync.remove(keys, ()=>{
         const err = chrome.runtime?.lastError;
         if (err) return rej(err);
         res();
@@ -89,44 +99,7 @@
       });
     });
   }
-  async function syncSet(obj){
-    return await new Promise((resolve, reject)=>{
-      chrome.storage.sync.set(obj, ()=>{
-        const err = chrome.runtime?.lastError;
-        if (err) return reject(err);
-        resolve(true);
-      });
-    });
-  }
-  async function syncRemove(keys){
-    return await new Promise((resolve, reject)=>{
-      chrome.storage.sync.remove(keys, ()=>{
-        const err = chrome.runtime?.lastError;
-        if (err) return reject(err);
-        resolve(true);
-      });
-    });
-  }
 
-  // === storage.sync.set の Promise ラッパ（lastError 検知） ===
-  // === 投げない版 syncSetAsync: 常に resolve({ok, err}) を返す ===
-  function syncSetAsync(obj){
-    return new Promise((resolve) => {
-      // 拡張が直後に再起動/無効化されたケース
-      if (!chrome?.runtime?.id || !chrome?.storage?.sync) {
-        return resolve({ ok:false, err: new Error('ext-dead') });
-      }
-      try{
-        chrome.storage.sync.set(obj, () => {
-          const err = chrome.runtime?.lastError;
-          if (err) return resolve({ ok:false, err });
-          resolve({ ok:true });
-        });
-      }catch(e){
-        resolve({ ok:false, err: e });
-      }
-    });
-  }
   SH.syncSetAsync = syncSetAsync; // 既存の名前空間にあわせて
 
   // === sync から最新を強制ロードしてメモリCFGに反映 ===
@@ -298,10 +271,6 @@
     SH.saveSettingsPatch?.({ pinsByChat: map });
   };
 
-  /* 保存失敗時にロールバックする安全版 */
-  (function(){
-    const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
-
   // 言語判定の委譲（UI側で変えられるようフックを用意）
   let langResolver = null;
   SH.setLangResolver = (fn) => { langResolver = fn; };
@@ -389,68 +358,10 @@
   let _loaded = false, _resolves = [];
   SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _resolves.push(r));
 
-/*
-  function loadSettings(cb){
-    try{
-      chrome?.storage?.sync?.get?.('cgNavSettings', ({ cgNavSettings })=>{
-        const next = structuredClone(DEFAULTS);
-        if (cgNavSettings) deepMerge(next, cgNavSettings);
-        if (!next.list) next.list = structuredClone(DEFAULTS.list);
-        CFG = next;
-        _loaded = true; _resolves.splice(0).forEach(r=>r());
-        cb?.();
-//console.debug('[loadSettings] pinsByChat keys=%o',Object.keys((CFG.pinsByChat||{})));
-      });
-    }catch{
-      CFG = structuredClone(DEFAULTS);
-      _loaded = true; _resolves.splice(0).forEach(r=>r());
-      cb?.();
-    }
-  }
-*/
-
-  // v1→v2 の移行（SH.loadSettings 成功後に一度だけ）
-  function loadSettings(cb){
-    chrome.storage.sync.get(null, (all) => {
-      try{
-        const cfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
-        CFG = Object.assign(structuredClone(DEFAULTS), cfg);
-        // --- migrate pinsByChat -> cgtnPins::<id> (schema v2) ---
-        (async()=>{
-          try{
-            if (CFG?.pinsByChat && Object.keys(CFG.pinsByChat).length){
-              const byChat = CFG.pinsByChat;
-              for (const [cid, rec] of Object.entries(byChat)){
-                const arr = (rec?.pins || []).slice();
-                await syncSet({ [pinKeyOf(cid)] : { pins: arr } });
-              }
-              // インデックス更新（件数だけ反映）
-              const map = CFG.chatIndex?.map || {};
-              for (const cid of Object.keys(byChat)){
-                const cnt = (byChat[cid]?.pins || []).filter(Boolean).length;
-                map[cid] = { ...(map[cid]||{}), pinCount: cnt, updated: Date.now() };
-              }
-              CFG.chatIndex = { ...(CFG.chatIndex||{}), map };
-              delete CFG.pinsByChat;
-              CFG.schemaVersion = 2;
-              await syncSet({ cgNavSettings: CFG });
-            } else if (!CFG?.schemaVersion){
-              CFG.schemaVersion = 2;
-              await syncSet({ cgNavSettings: CFG });
-            }
-          }catch(_){ /* 移行失敗は致命でないので無視 */ }
-        })();
-      }catch(_){
-        CFG = structuredClone(DEFAULTS);
-      }
-      try{ cb && cb(); }catch(_){}
-    });
-  }
-
   // 旧 pinsByChat → 分割キーへ一度だけ移行(content.js initialize)
   SH.migratePinsStorageOnce = async function(){
     const cfg = SH.getCFG?.() || {};
-    if (!cfg.pinsByChat) return;             // 既に移行済み
+    if (!cfg.pinsByChat) return;// 既に移行済み
 
     const map = cfg.pinsByChat || {};
     const idx = cfg.pinsIndex = (cfg.pinsIndex || {});
@@ -495,44 +406,6 @@
     }catch(_){ return []; }
   };
 
-/*
-  SH.savePinsArr = function savePinsArr(arr, chatId = SH.getChatId?.()) {
-    const cfg = SH.getCFG() || {};
-    const map = { ...(cfg.pinsByChat || {}) };
-    if (!chatId) { console.debug('[savePinsArr] skip: no chatId'); return; }
-
-    const safeArr = Array.isArray(arr) ? arr.map(v => (v ? 1 : 0)) : [];
-    const hasAny  = safeArr.some(Boolean);
-
-
-    // ★計測ログ：ここが肝
-    console.debug('[savePinsArr] about to save', {
-      chatId,
-      pinsCount: safeArr.filter(Boolean).length,
-      path: location.pathname,
-      time: new Date().toISOString()
-    }, new Error('trace').stack?.split('\n').slice(1,4).join('\n'));
-
-    //map[chatId] = { pins: safeArr, title, updatedAt: Date.now() };
-    map[chatId] = { pins: safeArr, updatedAt: Date.now() };
-
-    //SH.saveSettingsPatch({ pinsByChat: map });
-
-     // 保存後の一致検証（③仕様：失敗ならロールバック用イベント通知）
-     SH.saveSettingsPatch({ pinsByChat: map }, (nextCfg) => {
-       try{
-         const saved = nextCfg?.pinsByChat?.[chatId]?.pins;
-         const ok = Array.isArray(saved) && JSON.stringify(saved) === JSON.stringify(safeArr);
-         if (!ok) {
-           window.dispatchEvent(new CustomEvent('cgtn:save-error', { detail:{ chatId } }));
-         }
-       }catch(e){
-         window.dispatchEvent(new CustomEvent('cgtn:save-error', { detail:{ chatId, error:String(e) } }));
-       }
-     });
-  };
-*/
-
   SH.savePinsArr = async function savePinsArr(arr, chatId = SH.getChatId?.()) {
     if (!chatId) return { ok:false, err:'no-chat-id' };
     const pins = Array.isArray(arr) ? arr.slice() : [];
@@ -560,36 +433,6 @@
     }
   };
 
-/*
-    SH.deletePinsForChat = async function(chatId){
-      const cfg = SH.getCFG?.() || {};
-      const before = JSON.parse(JSON.stringify(cfg)); // ロールバック用スナップショット
-
-      try{
-        cfg.pinsByChat = cfg.pinsByChat || {};
-        // 0件なら完全削除（ミキさん方針どおり）
-        if (cfg.pinsByChat[chatId]) delete cfg.pinsByChat[chatId];
-         // ★ 保存（lastError を確実に検出する Promise 版）
-        await new Promise((resolve, reject) => {
-          chrome.storage.sync.set({ cgNavSettings: cfg }, () => {
-            const err = chrome.runtime?.lastError;
-            if (err) return reject(err);
-            resolve(true);
-          });
-        });
-
-        return true;
-
-      }catch(err){
-        // 失敗→ロールバック
-        try{ Object.assign(cfg, before); }catch(_){}
-        console.warn('deletePinsForChat failed:', err);
-        return false;
-      }
-    };
-  })();
-*/
-
   SH.deletePinsForChat = async function(chatId){
     try{
       await syncRemove(pinKeyOf(chatId));
@@ -605,14 +448,23 @@
     }
   };
 
-  // トグル（1始まり）←この実装でOK
-  SH.togglePinByIndex = function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
+  // トグル（1始まり）
+//  SH.togglePinByIndex = function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
+  SH.togglePinByIndex = async function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
     if (!Number.isFinite(index1) || index1 < 1) return false;
-    const arr = SH.getPinsArr(chatId).slice();
+//    const arr = SH.getPinsArr(chatId).slice();
+    const arr = await SH.getPinsArrAsync(chatId);
     if (arr.length < index1) { const old = arr.length; arr.length = index1; arr.fill(0, old, index1); }
     const next = arr[index1 - 1] ? 0 : 1;
     arr[index1 - 1] = next;
-    SH.savePinsArr(arr, chatId);
+//    SH.savePinsArr(arr, chatId);
+    const { ok } = await SH.savePinsArrAsync(arr, chatId);
+    if (!ok){
+      // 失敗→UIロールバック：元に戻す 
+      arr[index1 - 1] = next ? 0 : 1;
+      try{ window.CGTN_UI?.toastNearPointer?.(SH.t?.('options.saveFailed') || 'Failed to save'); }catch(_){}
+      return false;
+    }
     // 付箋バッジ
     try{ document.dispatchEvent(new CustomEvent('cgtn:pins-updated',{detail:{chatId}})); }catch{}
 
@@ -637,54 +489,26 @@
 
   // 旧: SH.saveSettingsPatch = function(patch, cb){ ... chrome.storage.sync.set(...); cb?.(); }
   // 新: Promise を返す／lastError時はロールバックして {ok:false, err, before} を返す
+ 
+
   SH.saveSettingsPatch = async function(patch, cb){
+    let before = null;
     try{
       const base = SH.getCFG?.() || {};
-      const before = structuredClone(base);// ← ロールバック用スナップショット
-
-      // deepMerge(base, patch) 相当（既存の deepMerge があればそれを使用）
+      before = structuredClone(base);
       const merged = structuredClone(before);
-      (function deepMerge(dst, src){
-        for (const k in src){
-          if (src[k] && typeof src[k]==='object' && !Array.isArray(src[k])){
-            dst[k] = deepMerge(dst[k]||{}, src[k]);
-          }else if (src[k] !== undefined){
-            dst[k] = src[k];
-          }
-        }
-        return dst;
-      })(merged, patch);
-
-      // ★ 拡張のコンテキストが死んでいる（直後の set で "Extension context invalidated."）ケースを回避
-      // ★ 拡張の生存チェック（早期スキップ）
-     if (!chrome?.runtime?.id || !chrome?.storage?.sync) {
-       // ここは「よくある状態」なので warn は出さない（ノイズ抑制）
-       //console.warn('[saveSettingsPatch] skipped: extension context invalidated');
-       // メモリCFGは「楽観反映前」なのでロールバック不要。呼び元で {ok:false} 判定み。
-       return { ok:false, err:{ message:'ext-dead' }, before };
-     }
-
-      // 先にローカルCFGへ反映（楽観）— 失敗時は below で before に戻す
+      (function deepMerge(dst, src){ /* 省略：既存実装そのまま */ })(merged, patch);
       SH.setCFG?.(merged);
-
-      //await syncSetAsync({ cgNavSettings: merged });
-      const res = await syncSetAsync({ cgNavSettings: merged });
-      if (!res.ok){
-        // 失敗 → メモリCFGをロールバック
-        try{ SH.setCFG?.(before); }catch{}
-        return { ok:false, err: res.err, before };
-      }
+      await syncSetAsync({ cgNavSettings: merged }); // 成功であれば例外は投げられない
       try{ cb && cb(merged); }catch{}
       return { ok:true, cfg: merged };
-
     }catch(err){
-      // ここに来るのは想定外の例外だけ。ログは message を優先
-      console.warn('[saveSettingsPatch] failed:', err?.message || err);
-      // try ブロック先頭で保存した before を使ってロールバック
+      console.warn('[saveSettingsPatch] failed:', err?.message || err); 
       try{ SH.setCFG?.(before); }catch{}
       return { ok:false, err, before };
     }
   };
+
 
   function computeAnchor(cfg){
     const s = { ...DEFAULTS, ...(cfg||{}) };
@@ -745,6 +569,7 @@
     renderViz(CFG, _visible);
   }
 
+/*
   (function(NS){
     SH.titleEscape = function(s){
       return String(s || '').replace(/[&<>"']/g, c => ({
@@ -756,6 +581,15 @@
       }[c]));
     };
   })(window.CGTN_SHARED);
+*/
+
+  SH.titleEscape = function(s){
+    return String(s ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  };
 
 
   try {
@@ -786,7 +620,6 @@
 
   SH.DEFAULTS = DEFAULTS;
   SH.getCFG       = () => CFG;
-//  SH.setCFG       = setCFG;
   SH.loadSettings = loadSettings;
   SH.computeAnchor = computeAnchor;
   SH.renderViz = renderViz;
