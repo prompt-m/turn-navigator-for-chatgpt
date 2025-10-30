@@ -863,8 +863,9 @@ console.log("installAutoSyncForTurns 4");
 
   // ========= 9) 初期セットアップ =========
   async function initialize(){
-    await SH.loadSettings;
-    await SH.migratePinsStorageOnce?.();//←★★★★★
+    await SH.loadSettings();
+    // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
+    try { await SH.migratePinsStorageOnce?.(); } catch {}
     UI.installUI();
     ensureFocusPark();
     installFocusStealGuard();
@@ -880,49 +881,24 @@ console.log("installAutoSyncForTurns 4");
     EV.bindEvents();
     bindPreviewDockOnce();
     bindBaselineAutoFollow();
-//      closeDockOnUrlChange();
-    bindListRefreshButton();
-    forceListPanelOffOnBoot();
+//    bindListRefreshButton();
+//    forceListPanelOffOnBoot();
 
     if (USE_INJECT_URL_HOOK){
       injectUrlChangeHook();
     }
 
-//      LG?.installAutoSyncForTurns?.();// MOは1本のみ
+   try { SH.cleanupZeroPinRecords?.(); } catch {}
 
-//      watchChatIdChange();
-
-      // ★ここで一発クリーンアップ！
-    SH.cleanupZeroPinRecords();
-
-    // ナビが動かなくなったので、入れてみる
     LG.rebuild?.();
-
-    // リスト自動更新処理
-    //installAutoSyncForTurns();
+//    if (SH.isListOpen?.()) {
+//      LG.renderList?.(true);
+//    }
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
     window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
 
-/*
-    // タイトル変更を監視→保存（1回だけバインド）
-    (function watchDocTitle(){
-      if (document._cgtnTitleWatch) return;
-      document._cgtnTitleWatch = true;
-      let last = (document.title || '');
-      const mo = new MutationObserver(()=>{
-        const cur = (document.title || '');
-        if (cur !== last) {
-          last = cur;
-          // ここで最新タイトルを保存（pinsByChat / chatIndex 同期）
-          try { window.CGTN_SHARED?.refreshCurrentChatTitle?.(); } catch {}
-        }
-      });
-      mo.observe(document.querySelector('title') || document.head, { subtree:true, characterData:true, childList:true });
-    })();
-*/
-    
   }
   // ========= 10) DOM Ready =========
   if (document.readyState === 'loading') {

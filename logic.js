@@ -1181,11 +1181,13 @@ console.log("clearListPanelUI catch");
 
 
   NS.renderList = async function renderList(forceOn=false, opts={}){
-//console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
+console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
     await SH.whenLoaded?.();
+console.log('[renderList] 1');
 
     const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!cfg.list?.enabled;
+console.log('[renderList] 2');
 
     if (!enabled) return;
 
@@ -1198,14 +1200,15 @@ console.log("clearListPanelUI catch");
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
-  
+console.log('[renderList] 3');
+ 
 
     //pinOnly のときのフィルタは 最新の PINS セットで判定
     // pinOnly 判定（オーバーライド優先）
     const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
-//console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
+console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
 
     const pinBtn = panel.querySelector('#cgpt-pin-filter');
     if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
@@ -1219,7 +1222,7 @@ console.log("clearListPanelUI catch");
     // pinOnly のときは「配列」でフィルタ
     if (pinOnly) turns = turns.filter((_, i) => !!pinsArr[i]);
 
-//console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object.keys(_pinsCache||{}).length);
+console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object.keys(_pinsCache||{}).length);
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
@@ -1423,6 +1426,7 @@ console.log("clearListPanelUI catch");
   }
 
   function setListEnabled(on){
+console.log('[****setListEnabled***] on:',on);
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
 

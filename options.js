@@ -17,6 +17,7 @@
 
   /* sync.set の Promise ラッパ（lastError を reject） */
   function syncSetAsync(obj){
+console.log("syncSetAsync",obj);
     return new Promise((resolve, reject)=>{
       chrome.storage.sync.set(obj, ()=>{
         const err = chrome.runtime?.lastError;

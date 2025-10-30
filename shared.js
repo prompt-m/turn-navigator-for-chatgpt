@@ -14,8 +14,8 @@
   function setCFG(next){ CFG = (next && typeof next === 'object') ? next : {}; return CFG; }
   function getCFG(){ return CFG; }
 
-  SH.setCFG = setCFG;
   SH.getCFG = getCFG;
+  SH.setCFG = setCFG;
 
   // === loadSettings（単一の実装に統一：await 可能）===
   async function loadSettings(cb){
@@ -23,9 +23,38 @@
     const fileCfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
     // ここで既定値とマージ（DEFAULTS はこの時点で定義済み）
     CFG = Object.assign(structuredClone(DEFAULTS), fileCfg);
-    try { cb && cb(CFG); } catch {}
+    try { cb && cb(cfg); } catch {}
+    try { SH.markLoaded?.(); } catch {}
     return CFG;
  }
+
+  // --- boot loaded gate ---
+  let _loaded = false;
+//  const _onLoadedResolvers = [];
+// 読み込み完了を待つ（完了済みなら即解決）
+//  SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _onLoadedResolvers.push(r));
+  // ---- load 完了の通知仕組み ----
+  const _resolves = [];
+  SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _resolves.push(r));
+
+
+
+  // 読み込み完了を宣言（1回だけ）
+  SH.markLoaded = () => {
+    if (_loaded) return;
+    _loaded = true;
+    const list = _onLoadedResolvers.splice(0);
+    for (const fn of list) { try{ fn(); }catch{} }
+  };
+
+  // ======= 「死に際」フラグ（storage書き込み抑止） =======
+  let _dying = false;
+  addEventListener('pagehide', () => { _dying = true; }, { once:true });
+  addEventListener('unload',   () => { _dying = true; }, { once:true });
+
+  const canUseStorage = () =>
+    !!(chrome?.runtime?.id && chrome?.storage?.sync) && !_dying;
+
 
 
   // === 既定値（options / content と完全一致） ===
@@ -51,7 +80,19 @@
     pins: {}// ← 付箋（key: true）
   });
 
-
+  // ---- storage util（拡張リロード中ガード）----
+  async function syncGet(keys) {
+    if (!chrome?.runtime?.id || !chrome?.storage?.sync) throw new Error('ext-context-lost');
+    return await new Promise((res, rej) => chrome.storage.sync.get(keys ?? null, v => {
+      const e = chrome.runtime.lastError; if (e) rej(e); else res(v);
+    }));
+  }
+  async function syncSet(obj) {
+    if (!chrome?.runtime?.id || !chrome?.storage?.sync) throw new Error('ext-context-lost');
+    return await new Promise((res, rej) => chrome.storage.sync.set(obj, () => {
+      const e = chrome.runtime.lastError; if (e) rej(e); else res();
+    }));
+  }
 
   // === keys & wrappers ===
   const KEY_CFG  = 'cgNavSettings';
@@ -355,9 +396,6 @@
     return dst;
   }
 
-  let _loaded = false, _resolves = [];
-  SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _resolves.push(r));
-
   // 旧 pinsByChat → 分割キーへ一度だけ移行(content.js initialize)
   SH.migratePinsStorageOnce = async function(){
     const cfg = SH.getCFG?.() || {};
@@ -378,7 +416,7 @@
     await syncSetAsync({ [KEY_CFG]: cfg });
   };
 
-  SH.cleanupZeroPinRecords = function () {
+ function cleanupZeroPinRecords() {
     const cfg = SH.getCFG() || {};
     const map = { ...(cfg.pinsByChat || {}) };
     let changed = false;
@@ -430,6 +468,25 @@
     }catch(err){
       console.warn('[savePinsArr] failed:', err);
       return { ok:false, err };
+    }
+  };
+
+  SH.savePinsArrAsync = async (arr, chatId = SH.getChatId?.()) => {
+    if (!chatId) return { ok:false };
+    const key = pinKeyOf(chatId);
+    try{
+      await syncSet({ [key]: { pins: arr } });
+      // インデックスの件数も更新
+      const cfg = SH.getCFG() || {};
+      const map = { ...(cfg.chatIndex?.map || {}) };
+      const cnt = (arr || []).filter(Boolean).length;
+      map[chatId] = { ...(map[chatId] || {}), pinCount: cnt, updated: Date.now() };
+      await SH.saveSettingsPatch?.({ chatIndex: { ...(cfg.chatIndex||{}), map } });
+      return { ok:true };
+    }catch(e){
+      // 拡張リロード中などは失敗しても致命ではない
+      console.warn('[savePinsArrAsync] failed:', e?.message || e);
+      return { ok:false, err:e };
     }
   };
 
@@ -487,23 +544,26 @@
     }catch{ return 0; }
   };
 
-  // 旧: SH.saveSettingsPatch = function(patch, cb){ ... chrome.storage.sync.set(...); cb?.(); }
-  // 新: Promise を返す／lastError時はロールバックして {ok:false, err, before} を返す
- 
 
-  SH.saveSettingsPatch = async function(patch, cb){
-    let before = null;
+  // ========= saveSettingsPatch（書き込みガード付き）=========
+  SH.saveSettingsPatch = async function saveSettingsPatch(patch = {}, cb){
+    const before = SH.getCFG?.() || {};
+//console.log("saveSettingsPatch");
+    const merged = deepMerge(structuredClone(before), patch);
+//console.log("saveSettingsPatch merged:",merged);
+    SH.setCFG?.(merged);
     try{
-      const base = SH.getCFG?.() || {};
-      before = structuredClone(base);
-      const merged = structuredClone(before);
-      (function deepMerge(dst, src){ /* 省略：既存実装そのまま */ })(merged, patch);
-      SH.setCFG?.(merged);
-      await syncSetAsync({ cgNavSettings: merged }); // 成功であれば例外は投げられない
+      if (canUseStorage()){
+//console.log("saveSettingsPatch canUseStorage true");
+        await syncSetAsync({ [KEY_CFG]: merged });
+      } else {
+        // 破棄中はメモリ反映のみで良し（警告は残さない）
+        return { ok:true, cfg:merged, warn:'memory-only' };
+      }
       try{ cb && cb(merged); }catch{}
-      return { ok:true, cfg: merged };
+      return { ok:true, cfg:merged };
     }catch(err){
-      console.warn('[saveSettingsPatch] failed:', err?.message || err); 
+      console.warn('[saveSettingsPatch] failed:', err?.message || err);
       try{ SH.setCFG?.(before); }catch{}
       return { ok:false, err, before };
     }
@@ -619,11 +679,14 @@
   };
 
   SH.DEFAULTS = DEFAULTS;
-  SH.getCFG       = () => CFG;
+//  SH.getCFG       = () => CFG;
+//  SH.setCFG       = setCFG;
   SH.loadSettings = loadSettings;
   SH.computeAnchor = computeAnchor;
   SH.renderViz = renderViz;
   SH.redrawBaseline = redrawBaseline;
   SH.toggleViz = toggleViz;
   SH.renderViz  = renderViz;
+  SH.cleanupZeroPinRecords = cleanupZeroPinRecords;
+
 })();
