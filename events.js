@@ -55,7 +55,7 @@
       // --- 一覧トグル ---
       if (el.closest('#cgpt-list-toggle')) {
         const on = el.closest('#cgpt-list-toggle').checked;
-//console.debug('bindEvents 一覧トグル [forceListPanelOffOnBoot] LG?.setListEnabled on: ',on);
+console.debug('bindEvents 一覧トグル [forceListPanelOffOnBoot] LG?.setListEnabled on: ',on);
         LG.setListEnabled?.(on);
 
         // 一覧OFFなら付箋もOFF & 無効化

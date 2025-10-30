@@ -1179,7 +1179,7 @@ console.log("clearListPanelUI catch");
   }
 
 
-
+  let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
 console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
     await SH.whenLoaded?.();
@@ -1191,12 +1191,11 @@ console.log('[renderList] 2');
 
     if (!enabled) return;
 
-//    const T = (k)=> window.CGTN_I18N?.t?.(k) || k;
-
+    const my = ++_renderTicket;        // ← この呼び出しの券
     const panel = ensureListBox();
     const body  = panel.querySelector('#cgpt-list-body');
     const foot  = panel.querySelector('#cgpt-list-foot');
-    panel.style.display = 'flex';
+//    panel.style.display = 'flex';
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
@@ -1422,16 +1421,18 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey);
 
-//console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
+    if (my === _renderTicket && NS._panelOpen) {
+      panel.style.display = 'flex';
+    }
+console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
+
   function setListEnabled(on){
-console.log('[****setListEnabled***] on:',on);
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
 
     const panel = ensureListBox();
-    panel.style.display = on ? 'flex' : 'none';
 
     // リストが開いているかどうか
     NS._panelOpen = !!on;
@@ -1446,26 +1447,36 @@ console.debug('[setListEnabled*0]再アタッチ ');
       try { installAutoSyncForTurns(); } catch {}//再アタッチ
 
       // ①まず即時スキャン（ある程度は出る）★★★
-console.debug('[setListEnabled*1]LG.rebuild() ');
+/*
+console.debug('[setListEnabled*1]rebuild ');
       rebuild();
       panel.classList.remove('collapsed');
       const btn = panel.querySelector('#cgpt-list-collapse');
       if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
   
       NS.renderList(true);
+*/
       // ②遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
       //    rAF×2 でペイント後、さらに少し待ってから確定
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
-console.debug('[setListEnabled*2]LG.rebuild() ');
-        setTimeout(()=>{ rebuild(); NS.renderList(true); }, 180);
+console.debug('[setListEnabled*2]rebuild/renderList ');
+        setTimeout(()=>{
+          rebuild();
+          NS.renderList(true);
+//          panel.style.display = 'flex';
+        }, 180);
       }));
     } else {
-console.debug('[setListEnabled*3]一覧OFF');
+      //付箋バッジ・チャット名(onはrenderlistでやってる)
+      //OFFのとき必要？
+      NS.updatePinOnlyBadge?.();
+      NS.updateListChatTitle?.();
+      panel.style.display = 'none';
+console.debug('[setListEnabled*4]一覧OFF');
     }
-    //付箋バッジ・チャット名
-    NS.updatePinOnlyBadge?.();
-    NS.updateListChatTitle?.();
   }
+
+
 
   function updatePinOnlyBadge(){
     try {

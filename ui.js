@@ -119,6 +119,10 @@ const LIST_CSS = `
   max-width: 720px;
 }
 
+#cgpt-list-panel.no-anim * {
+  transition: none !important;
+}
+
 /* =========================
    3) LIST: ヘッダ/本文/フッタ
 ========================= */
