@@ -142,24 +142,34 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
   //行へスクロールする関数
   function scrollListToTurn(turnKey){
+console.log("scrollListToTurn*1");
     const sc = document.getElementById('cgpt-list-body');
     if (!sc) return;
 
+    // 未描画/未計測なら次フレームで再試行
+//    if ((sc.scrollHeight === 0) || (sc.clientHeight === 0)) {
+//      requestAnimationFrame(() => scrollListToTurn(turnKey));
+//      return;
+//    }
+
     // ★ 改修: turnKey が未指定なら末尾にスクロール
     if (!turnKey) {
-      sc.scrollTop = sc.scrollHeight;
+      const last = sc.querySelector('.row:last-of-type');
+      if (last) last.scrollIntoView({ block:'end', inline:'nearest' });
+      else sc.scrollTop = sc.scrollHeight;
       console.debug('[scrollListToTurn] turnKey undefined → scroll to bottom');
       return;
     }
 
-    const list = document.getElementById('cgpt-list-body');
-    if (!list) return;
-    const row = list.querySelector(`.row[data-turn="${CSS.escape(turnKey)}"]`);
+    const row = sc.querySelector(`.row[data-turn="${CSS.escape(turnKey)}"]`);
+console.log("scrollListToTurn*5 row",row);
     if (!row) return;
 
     // 行をパネル中央付近に出す
-    const top = row.offsetTop - (list.clientHeight/2 - row.clientHeight/2);
-    list.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+    const top = row.offsetTop - (sc.clientHeight/2 - row.clientHeight/2);
+console.log("scrollListToTurn*6 top",top);
+
+    sc.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
   }
 
   // === List Panel 専用（ゆるめ） ===
@@ -474,27 +484,20 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
   // 互換の薄ラッパー（他所で使っていても安心・未使用なら残すだけ）
   // --- 互換の薄ラッパー（index方式 → 'turn:n' 文字列）---
   function getTurnKey(article){
-/*
-    const rows = (window.ST?.all || []);
-    const idx  = rows.indexOf(article);
-console.log("getTurnKey rows:",rows," idx:",idx);　　
-    return idx >= 0 ? ('turn:' + (idx + 1)) : '';
-*/
-  const rows = (ST?.all || NS?.ST?.all || []);
-  let target = article;
-  // 引数が article 直下の子要素のことがあるので、closest で補正
-  if (target && !target.matches?.('article')) {
-    target = target.closest?.('article,[data-testid^="conversation-turn-"]') || target;
-  }
-  let idx = rows.indexOf(target);
-  if (idx < 0 && target?.dataset?.turnId){
-    // もし内部で turnId を振っているなら、そのIDで探索（任意）
-    idx = rows.findIndex(n => n?.dataset?.turnId === target.dataset.turnId);
-  }
-  // デバッグ
+    const rows = (ST?.all || NS?.ST?.all || []);
+    let target = article;
+    // 引数が article 直下の子要素のことがあるので、closest で補正
+    if (target && !target.matches?.('article')) {
+      target = target.closest?.('article,[data-testid^="conversation-turn-"]') || target;
+    }
+    let idx = rows.indexOf(target);
+    if (idx < 0 && target?.dataset?.turnId){
+      // もし内部で turnId を振っているなら、そのIDで探索（任意）
+      idx = rows.findIndex(n => n?.dataset?.turnId === target.dataset.turnId);
+    }
+    // デバッグ
 console.debug('getTurnKey len:', rows.length, 'idx:', idx);
-  return idx >= 0 ? ('turn:' + (idx + 1)) : '';
-
+    return idx >= 0 ? ('turn:' + (idx + 1)) : '';
 
   }
 
@@ -1291,8 +1294,9 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           </div>
         `;
         row.querySelector('.txt').textContent = attachLine;
-//        row.addEventListener('click', () => scrollToHead(art));
+        row.addEventListener('click', () => scrollToHead(art));
         row.addEventListener('click', (ev) =>{
+          scrollToHead(art);
            // 他のUIパーツやリンクはスルー
           if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
           const txt = ev.target.closest('.txt');
@@ -1418,13 +1422,22 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     NS.updatePinOnlyBadge?.();
     // チャット名
     NS.updateListChatTitle?.();
-    //注目ターンのキー行へスクロール
-    scrollListToTurn(NS._currentTurnKey);
 
     if (my === _renderTicket && NS._panelOpen) {
       panel.style.display = 'flex';
     }
-console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
+
+    if (my === _renderTicket && NS._panelOpen) {
+      panel.style.display = 'flex';      // 計測可能に
+      panel.style.visibility = 'hidden'; // まだ見せない（任意）
+    }
+    //注目ターンのキー行へスクロール
+    scrollListToTurn(NS._currentTurnKey); // 高さが取れるので末尾へ確実にスクロール
+    if (my === _renderTicket && NS._panelOpen) {
+      panel.style.visibility = 'visible'; // 最後に見せる（任意）
+    }
+
+    console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
 

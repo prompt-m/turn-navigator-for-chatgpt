@@ -11,6 +11,7 @@
 
   // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
   (function bindCgtnMessageOnce(){
+console.log("bindCgtnMessageOnce*1");
     if (window.__CGTN_MSG_BOUND__) return;
     window.__CGTN_MSG_BOUND__ = true;
     let __lastCid = null;        // 直近のchatId
@@ -19,15 +20,18 @@
 
     window.addEventListener('message', (ev) => {
       const d = ev && ev.data;
+console.log("bindCgtnMessageOnce*2 message d.type:",d.type);
       if (!d || d.source !== 'cgtn') return;
       const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
       const cid  = d.cid || SH?.getChatId?.(); // 受信時点のIDを優先
       const kind = d.kind || 'other';
 
+console.log("bindCgtnMessageOnce*3 message kind:",kind);
+
       if (kind !== 'chat' || !cid) {
         // ← 新しいチャット編集前やホーム/プロジェクト先頭ページなど
-console.log("bindCgtnMessageOnce*5 新しいチャット");
+console.log("bindCgtnMessageOnce*4 新しいチャット");
         LG?.clearListPanelUI?.();         // ヘッダ残して本文＆バッジを空に
         __lastCid = null;                 // 不定状態へ
         __gen++;                          // 以降の保留処理を無効化
@@ -47,16 +51,20 @@ console.log("bindCgtnMessageOnce*5 新しいチャット");
         if (myGen !== __gen) return;
         if (!SH?.isListOpen?.()) return;
         try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-  
+
+
         if (changed) {
           // ← チャット切替
           LG?.hydratePinsCache?.(cid);
           LG?.rebuild?.('chat-switch');    // ★ cid を渡さない！
+console.log("bindCgtnMessageOnce*5 chat-switch rebuild cid:",cid);
         } else {
           // ← 同一チャットへの turn 追加
           LG?.rebuild?.('turn-added');
+console.log("bindCgtnMessageOnce*6 turn-added rebuild cid:",cid);
         }
         LG?.renderList?.(true);
+console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render`);
         if (SH?.debug) console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render`);
       }, 120);
     }, true);
@@ -793,7 +801,9 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
       // （任意の追加）“一覧チェックはONのまま”なら、描画準備完了後に自動再オープン★★★★
       // ※ 自動再構築はここではせず、setListEnabled(true) に任せる
       const wantReopen = !!(SH.getCFG?.().list?.enabled);
+
       if (wantReopen){
+console.warn('[handleUrlChangeMessage] wantReopen', wantReopen);
         waitForChatMain(()=>{ if (mySeq===_navSeq) LG?.setListEnabled?.(true); });
       }
 
