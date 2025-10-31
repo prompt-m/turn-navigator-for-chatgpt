@@ -8,34 +8,97 @@
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
 
-  // --- 受信口は一度だけ早めにバインド（inject初回POSTを取りこぼさない） ---
+
+  // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
   (function bindCgtnMessageOnce(){
     if (window.__CGTN_MSG_BOUND__) return;
     window.__CGTN_MSG_BOUND__ = true;
+    let __lastCid = null;        // 直近のchatId
+    let __debTo   = 0;           // デバウンス用タイマ
+    let __gen     = 0;           // 世代トークン（逆戻り防止）
+
     window.addEventListener('message', (ev) => {
       const d = ev && ev.data;
       if (!d || d.source !== 'cgtn') return;
-      if (d.type === 'url-change') {
-        try { window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-        if (SH?.isListOpen?.()) {
-          const cid = SH?.getChatId?.();
-          LG?.rebuild?.(cid);
-          LG?.renderList?.(true);
-          if (SH?.debug) console.debug('[cgtn] url-change → rebuild+render');
-        }
+      const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
+
+      const cid  = d.cid || SH?.getChatId?.(); // 受信時点のIDを優先
+      const kind = d.kind || 'other';
+
+      if (kind !== 'chat' || !cid) {
+        // ← 新しいチャット編集前やホーム/プロジェクト先頭ページなど
+console.log("bindCgtnMessageOnce*5 新しいチャット");
+        LG?.clearListPanelUI?.();         // ヘッダ残して本文＆バッジを空に
+        __lastCid = null;                 // 不定状態へ
+        __gen++;                          // 以降の保留処理を無効化
         return;
       }
-      if (d.type === 'turn-added') {
-        if (SH?.isListOpen?.()) {
-          LG?.rebuild?.();
-          LG?.renderList?.(true);
-          if (SH?.debug) console.debug('[cgtn] turn-added → rebuild+render');
+
+      // --- ここからは url-change / turn-added を同一フローで処理 ---
+      // 1) 受信“直後”に現在の chatId を確定（これが重要）
+      const prev = __lastCid;
+      __lastCid  = cid;
+      const changed = (prev !== null && cid !== prev);  // 切替判定
+      const myGen   = ++__gen;                          // このイベントの世代
+  
+      clearTimeout(__debTo);
+      __debTo = setTimeout(() => {
+        // 途中で更に切替が来ていたら無効化
+        if (myGen !== __gen) return;
+        if (!SH?.isListOpen?.()) return;
+        try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+  
+        if (changed) {
+          // ← チャット切替
+          LG?.hydratePinsCache?.(cid);
+          LG?.rebuild?.('chat-switch');    // ★ cid を渡さない！
+        } else {
+          // ← 同一チャットへの turn 追加
+          LG?.rebuild?.('turn-added');
         }
-        return;
-      }
+        LG?.renderList?.(true);
+        if (SH?.debug) console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render`);
+      }, 120);
     }, true);
   })();
 
+
+/*
+  // --- 受信口は一度だけ早めにバインド（inject初回POSTを取りこぼさない） ---
+  (function bindCgtnMessageOnce(){
+
+    window.addEventListener('message', (ev) => {
+
+    if (!SH.isListOpen?.()){
+console.log("bindCgtnMessageOnce*1 top return");
+      return;
+    }
+
+      const d = ev && ev.data;
+console.log("bindCgtnMessageOnce*2 SH.getChatId?.():",SH.getChatId?.());
+//      const cid  = d.cid  || SH.getChatId?.();
+      const cid  = d.cid;
+      const kind = d.kind || 'other';
+console.log("bindCgtnMessageOnce*3 ev.type:",ev.type," d.kind:",d.kind," d.cid:",d.cid);
+      if (kind !== 'chat' || !cid) {
+        // ← 新しいチャット編集前やホーム/プロジェクト先頭ページなど
+console.log("bindCgtnMessageOnce*5 新しいチャット");
+        LG?.clearListPanelUI?.();         // ヘッダ残して本文＆バッジを空に
+        return;
+      }
+
+      if (d.type === 'url-change' || d.type === 'turn-added') {
+        try { window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+          window.__CGTN_LAST_CID = cid;
+          LG?.rebuild?.(cid);
+          LG?.renderList?.(true);
+console.debug('[cgtn] url-change → rebuild+render');
+        return;
+      }
+
+    }, true);
+  })();
+*/
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
   const AUTO_SYNC_OPEN_LIST = true;
