@@ -703,6 +703,7 @@ console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
     return (hasText || hasMedia) && !busy;
   }
 
+
   // ST: 現在ページ（チャット）内のターン情報を保持する状態オブジェクト。
   //   - all        : ページ中の全ターン（<article>）要素を上から順に格納
   //   - user       : ユーザーの発話ターンだけを抽出した配列
@@ -716,46 +717,84 @@ console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
   //   LG.rebuild() → ST.all / user / assistant を更新
   //   ナビボタン(goTop/goNext/...) → ST 参照してスクロール位置を決定
   //   リスト描画(renderList) → ST.all を元に各行を生成
-  // 要するにST は 「ターン一覧のキャッシュ」 です。
-  const ST = { all: [], user: [], assistant: [], page:1 };
+  // 要するに ST は 「ターン一覧のキャッシュ」 です。
+  //
+  // ─ 2025年11月 改修ポイント ─
+  //   ● rebuild() に “チケット制（_rebuildTicket）” を導入。
+  //       → 複数の再構築処理が並走しても、最後に実行されたものだけが ST に反映される。
+  //   ● “チャットIDスナップショット（_rebuildCid / cidFromMsg）” を導入。
+  //       → rebuild 開始時点で対象チャットを確定し、
+  //         処理完了直前に現在の getChatId() と照合して異なれば破棄する。
+  //         （チャット切替時に「1つ前のチャットが表示される」問題を防止）
+  //   ● rebuild 内で一時オブジェクト nextST を構築し、完了後に ST に上書きコミット。
+  //       → 部分的に破棄された構築途中データが ST に混入しないようにする。
+  //   ● <article> が 0 件のときは clearListPanelUI() を呼び、リストを完全リセット。
+  //
+  //   これらの改修により、チャット切替・リロード・ON/OFF操作の並行タイミングでも
+  //   一貫して「最新チャットの確定データだけが ST に反映」されるようになった。
+  const ST = { all: [], user: [], assistant: [], page: 1 };
 
-  function rebuild(){
+  let _rebuildTicket = 0, _rebuildCid = null;
+  function rebuild(cidFromMsg){
+    const my = ++_rebuildTicket;
+
+    // この実行の “対象チャットID” を確定（以降はこれで評価）
+    const startCid = cidFromMsg || SH.getChatId?.();
+    _rebuildCid = startCid || _rebuildCid;
+  
     NS._scroller = getTrueScroller();
+
+    // ===== 材料スナップショットを nextST に作る =====
+    const nextST = { all: [], user: [], assistant: [], page: 1 };
 
     const t0 = performance.now();
     const allRaw = pickAllTurns().filter(isRealTurn);
+    nextST.all = sortByY(allRaw);
+    console.debug('[cgtn:rebuild] turns=', nextST.all.length, 'in', (performance.now()-t0).toFixed(1), 'ms');
 
-    ST.all = sortByY(allRaw);
-console.debug('[cgtn:rebuild] turns=', ST.all.length, 'in', (performance.now()-t0).toFixed(1), 'ms');
-
-    // ★ 追加: <article>ゼロ件時は完全リセットモード
-    if (ST.all.length === 0) {
+    // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
+    if (nextST.all.length === 0) {
       console.debug('[rebuild] no <article> found → reset list panel');
-      // UIリセット
       CGTN_LOGIC.clearListPanelUI?.();
-      return;
+      // ↓ この後の確定ブロックで my/cid の照合を通す
+    } else {
+      const isRole = (el, role) => {
+        const dt = el?.dataset?.turn;
+        if (dt) return dt === role;
+        return el.matches?.(
+          `[data-message-author-role="${role}"], div [data-message-author-role="${role}"]`
+        );
+      };
+      const roleOf = (a) => getTurnRole(a); // 既存ヘルパに委譲
+  
+      nextST.user      = nextST.all.filter(a => roleOf(a) === 'user');
+      nextST.assistant = nextST.all.filter(a => roleOf(a) === 'assistant');
+
+      // 可能なら Set も用意（描画側が速くなる）
+      nextST._userSet = new Set(nextST.user);
+      nextST._asstSet = new Set(nextST.assistant);
     }
 
-    const isRole = (el, role) => {
-      // ★改修：data-turn を優先、なければ従来セレクタで補完
-      const dt = el?.dataset?.turn;
-      if (dt) return dt === role;
-      return el.matches?.(
-        `[data-message-author-role="${role}"], div [data-message-author-role="${role}"]`
-      );
-    };
+    // ===== ここが“最後の3行”の意味：確定直前ガード & コミット =====
+    // 1) 自分の実行が最新か（古い並走は破棄）
+    if (my !== _rebuildTicket) return;
 
-    ST.user      = ST.all.filter(a => getTurnRole(a) === 'user');
-    ST.assistant = ST.all.filter(a => getTurnRole(a) === 'assistant');
+    // 2) チャットIDが途中で変わっていないか（別チャットに切り替わっていたら破棄）
+    const curCid = SH.getChatId?.();
+    if (startCid && curCid && startCid !== curCid) return;
 
+    // 3) ここで初めて ST に反映（再代入ではなく各フィールドを上書き）
+    ST.all        = nextST.all;
+    ST.user       = nextST.user;
+    ST.assistant  = nextST.assistant;
+    ST._userSet   = nextST._userSet || new Set(ST.user);
+    ST._asstSet   = nextST._asstSet || new Set(ST.assistant);
 
-    // 可能なら Set も用意（描画側が速くなる）
-    ST._userSet = new Set(ST.user);
-    ST._asstSet = new Set(ST.assistant);
-    NS.ST = ST; // ← デバッグ用に公開（本番運用でも副作用なし）
-console.debug('[rebuild] turns:', ST.all.length, 'user:', ST.user.length, 'asst:', ST.assistant.length);
-
+    // デバッグ公開（任意）
+    NS.ST = ST;
+    console.debug('[rebuild] turns:', ST.all.length, 'user:', ST.user.length, 'asst:', ST.assistant.length);
   }
+
 
   //ダウンロード文抽出ヘルパ（本文・画像・不明の3分岐）
   //これで PDF 例は ⭳（ChatGPT_Turn_Navigator_Promo.pdf）
@@ -1184,7 +1223,10 @@ console.log("clearListPanelUI catch");
 
   let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
-console.debug('[renderList 冒頭] chat=', SH.getChatId?.(), 'turns(before)=', ST.all.length);
+    const cidAtStart = SH.getChatId?.();
+
+console.debug('[renderList 冒頭] cidAtStart=', cidAtStart," my;".my);
+
     await SH.whenLoaded?.();
 console.log('[renderList] 1');
 
@@ -1203,7 +1245,6 @@ console.log('[renderList] 2');
     body.style.overflowY = 'auto';
     body.innerHTML = '';
 console.log('[renderList] 3');
- 
 
     //pinOnly のときのフィルタは 最新の PINS セットで判定
     // pinOnly 判定（オーバーライド優先）
@@ -1312,9 +1353,12 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         paintPinRow(row, on);
         if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.cgtn-clip-pin'), row, chatId);
 
+        // 直前ガード（非同期処理のため）
+        if (my !== _renderTicket) return;
+        if (cidAtStart !== SH.getChatId?.()) return;
+
         body.appendChild(row);
       }
-
 
       // 本文行
       if (bodyLine){
@@ -1353,7 +1397,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           if(isAsst) downloads++; //←ダウンロードターン数
         }
 
-//         row2.addEventListener('click', () => scrollToHead(art));
+        row2.addEventListener('click', () => scrollToHead(art));
         row2.addEventListener('click', (ev) =>{
            // 他のUIパーツやリンクはスルー
           if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
@@ -1371,20 +1415,11 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
         if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
 
-        body.appendChild(row2);
+        // 直前ガード（非同期処理のため）
+        if (my !== _renderTicket) return;
+        if (cidAtStart !== SH.getChatId?.()) return;
 
-      /* ここから追加：このターンの「付箋ボタンのある要素」に連番アンカーを付与 */
-//      try{
-//        const preferAttach = !!hasRealAttach;  // 本文+添付なら添付側を優先
-//        const pickPinCell = (root) => root?.querySelector?.('.pin-col,.pincell,.pin,[data-role="pin-col"]');
-//        const pinCellAttach = preferAttach ? pickPinCell(row2) : null;
-//        const pinCellBody   = pickPinCell(row);
-//        const anchorEl      = pinCellAttach || pinCellBody;
-//        if (anchorEl) anchorEl.classList.add('turn-idx-anchor');
-//     }catch(_){
-//
-//      }
-      /* ここまで */
+        body.appendChild(row2);
 
       }
     }
@@ -1423,10 +1458,12 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     // チャット名
     NS.updateListChatTitle?.();
 
-    if (my === _renderTicket && NS._panelOpen) {
-      panel.style.display = 'flex';
-    }
 
+    // 直前ガード（非同期処理のため）
+    if (my !== _renderTicket) return;
+    if (cidAtStart !== SH.getChatId?.()) return;
+
+    // スクロールを設定するための処置
     if (my === _renderTicket && NS._panelOpen) {
       panel.style.display = 'flex';      // 計測可能に
       panel.style.visibility = 'hidden'; // まだ見せない（任意）

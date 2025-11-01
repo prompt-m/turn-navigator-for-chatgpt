@@ -14,6 +14,7 @@
 console.log("bindCgtnMessageOnce*1");
     if (window.__CGTN_MSG_BOUND__) return;
     window.__CGTN_MSG_BOUND__ = true;
+
     let __lastCid = null;        // 直近のchatId
     let __debTo   = 0;           // デバウンス用タイマ
     let __gen     = 0;           // 世代トークン（逆戻り防止）
@@ -24,89 +25,54 @@ console.log("bindCgtnMessageOnce*2 message d.type:",d.type);
       if (!d || d.source !== 'cgtn') return;
       const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
-      const cid  = d.cid || SH?.getChatId?.(); // 受信時点のIDを優先
-      const kind = d.kind || 'other';
+      const cidNow  = d.cid || SH?.getChatId?.();   // 受信時点の ID を優先
+      const kind    = d.kind || 'chat';
 
+console.log("bindCgtnMessageOnce*3 d.cid:", d.cid);
+console.log("bindCgtnMessageOnce*3 SH.getChatId?:", SH?.getChatId?.());
 console.log("bindCgtnMessageOnce*3 message kind:",kind);
 
-      if (kind !== 'chat' || !cid) {
+      if (kind !== 'chat' || !cidNow) {
         // ← 新しいチャット編集前やホーム/プロジェクト先頭ページなど
 console.log("bindCgtnMessageOnce*4 新しいチャット");
         LG?.clearListPanelUI?.();         // ヘッダ残して本文＆バッジを空に
-        __lastCid = null;                 // 不定状態へ
-        __gen++;                          // 以降の保留処理を無効化
+        __lastCid = null;
+        __gen++;                           // 以降の保留処理を無効化
         return;
       }
 
-      // --- ここからは url-change / turn-added を同一フローで処理 ---
-      // 1) 受信“直後”に現在の chatId を確定（これが重要）
-      const prev = __lastCid;
-      __lastCid  = cid;
-      const changed = (prev !== null && cid !== prev);  // 切替判定
-      const myGen   = ++__gen;                          // このイベントの世代
-  
-      clearTimeout(__debTo);
-      __debTo = setTimeout(() => {
-        // 途中で更に切替が来ていたら無効化
-        if (myGen !== __gen) return;
-        if (!SH?.isListOpen?.()) return;
-        try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-
-
-        if (changed) {
-          // ← チャット切替
-          LG?.hydratePinsCache?.(cid);
-          LG?.rebuild?.('chat-switch');    // ★ cid を渡さない！
-console.log("bindCgtnMessageOnce*5 chat-switch rebuild cid:",cid);
-        } else {
-          // ← 同一チャットへの turn 追加
-          LG?.rebuild?.('turn-added');
-console.log("bindCgtnMessageOnce*6 turn-added rebuild cid:",cid);
-        }
-        LG?.renderList?.(true);
-console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render`);
-        if (SH?.debug) console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render`);
-      }, 120);
-    }, true);
-  })();
-
-
-/*
-  // --- 受信口は一度だけ早めにバインド（inject初回POSTを取りこぼさない） ---
-  (function bindCgtnMessageOnce(){
-
-    window.addEventListener('message', (ev) => {
-
-    if (!SH.isListOpen?.()){
-console.log("bindCgtnMessageOnce*1 top return");
-      return;
-    }
-
-      const d = ev && ev.data;
-console.log("bindCgtnMessageOnce*2 SH.getChatId?.():",SH.getChatId?.());
-//      const cid  = d.cid  || SH.getChatId?.();
-      const cid  = d.cid;
-      const kind = d.kind || 'other';
-console.log("bindCgtnMessageOnce*3 ev.type:",ev.type," d.kind:",d.kind," d.cid:",d.cid);
-      if (kind !== 'chat' || !cid) {
-        // ← 新しいチャット編集前やホーム/プロジェクト先頭ページなど
-console.log("bindCgtnMessageOnce*5 新しいチャット");
-        LG?.clearListPanelUI?.();         // ヘッダ残して本文＆バッジを空に
-        return;
-      }
-
+      // ここから下は “chat ページ & cid 確定済み”
       if (d.type === 'url-change' || d.type === 'turn-added') {
-        try { window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-          window.__CGTN_LAST_CID = cid;
-          LG?.rebuild?.(cid);
-          LG?.renderList?.(true);
-console.debug('[cgtn] url-change → rebuild+render');
-        return;
-      }
+        if (!SH?.isListOpen?.()) return;
 
+        // 切替判定は受信直後に確定
+        const prev = __lastCid;
+        __lastCid  = cidNow;
+        const changed = (prev !== null && cidNow !== prev);
+        const myGen   = ++__gen;        // このイベントの世代
+
+        // 軽いデバウンス（重複イベントの圧縮）
+        clearTimeout(__debTo);
+        __debTo = setTimeout(() => {
+          // “ON時と同じ見え方”：rAF×2 の後に短い待ち
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            setTimeout(() => {
+              // 途中で別イベントに追い越されたら無効化
+              if (myGen !== __gen) return;
+              // 念のため、描画直前にも chatId を照合
+              if (cidNow !== (SH?.getChatId?.())) return;
+              try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+              // ★ cid を手渡して再構築（内部でも世代/IDガードあり）
+              LG?.rebuild?.(cidNow);
+              LG?.renderList?.(true);
+console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render (synced delay)`);
+            }, 180);  // ← ON時と合わせる待ち（目安 160〜180ms）
+          }));
+        }, 0);
+      }
     }, true);
   })();
-*/
+
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
   const AUTO_SYNC_OPEN_LIST = true;
@@ -855,6 +821,7 @@ console.warn('[handleUrlChangeMessage] wantReopen', wantReopen);
 //  CGTN_LOGIC.detachTurnObserver = function(){
   let _turnObs = null;
   let _observedRoot = null;
+
   LG.detachTurnObserver = function(){
     try { _turnObs?.disconnect(); } catch {}
     _turnObs = null;
