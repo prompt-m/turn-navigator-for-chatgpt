@@ -8,6 +8,38 @@
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
 
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // --- 1) 軽量ポーリング: ページが「落ち着く」まで待つ ---
+  //  - pollMs ごとに main の scrollHeight と article数を観測
+  //  - 値が quietMs 連続で変わらなければ「読み込み完了」扱い
+  //  - maxMs 経過でタイムアウト
+  async function waitForChatSettled({quietMs=300, maxMs=8000, pollMs=120} = {}){
+    const root = document.querySelector('main') || document.body;
+    if (!root) { await new Promise(r=>setTimeout(r, quietMs)); return { ok:false, reason:'no-root'}; }
+    const getState = () => ({
+      h: root.scrollHeight,
+      a: document.querySelectorAll('article,[data-message-author-role]').length
+    });
+    let st        = getState();
+    let stableAt  = performance.now();  // 値が最後に変わってからの時刻
+    const startAt = performance.now();
+    while ((performance.now() - startAt) < maxMs){
+      await new Promise(r=>setTimeout(r, pollMs));
+      const cur = getState();
+      if (cur.h === st.h && cur.a === st.a) {
+        if ((performance.now() - stableAt) >= quietMs) {
+          return { ok:true, ...cur, waited: performance.now() - startAt };
+        }
+      } else {
+        st = cur;                  // 値が変わった→安定計測をリセット
+        stableAt = performance.now();
+      }
+    }
+    return { ok:false, ...st, waited: performance.now() - startAt, reason:'timeout' };
+  }
 
   // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
   (function bindCgtnMessageOnce(){
@@ -20,6 +52,74 @@ console.log("bindCgtnMessageOnce*1");
     let __gen     = 0;           // 世代トークン（逆戻り防止）
 
     window.addEventListener('message', (ev) => {
+      (async () => {  // ← async ラッパーで await が使えるように
+        const d = ev && ev.data;
+        if (!d || d.source !== 'cgtn') return;
+        const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
+
+        const cidNow  = d.cid || SH?.getChatId?.();   // 受信時点の ID を優先
+        const kind    = d.kind || 'chat';
+
+        if (kind !== 'chat' || !cidNow) {
+          LG?.clearListPanelUI?.();
+          __lastCid = null;
+          __gen++;
+          return;
+        }
+
+        // ---- チャットページでイベントが来た場合 ----
+        if (d.type === 'url-change' || d.type === 'turn-added') {
+          if (!SH?.isListOpen?.()) return;
+
+          const prev = __lastCid;
+          __lastCid  = cidNow;
+          const changed = (prev !== null && cidNow !== prev);
+          const myGen   = ++__gen;
+
+          clearTimeout(__debTo);
+          __debTo = setTimeout(async () => {
+            requestAnimationFrame(() => requestAnimationFrame(async () => {
+              // ★ URL切替のときだけ「落ち着くまで待つ」
+              if (d.type === 'url-change') {
+                const res = await waitForChatSettled({ quietMs:300, maxMs:8000, pollMs:120 });
+                console.debug('[cgtn] settle result:', res);
+              }
+
+              // 念のため世代とchatId照合（待機中に別イベントが来たら抜ける）
+              if (myGen !== __gen) return;
+              if (cidNow !== (SH?.getChatId?.())) return;
+
+              try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+              LG?.rebuild?.(cidNow);
+              LG?.renderList?.(true);
+              console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render (settle)`);
+            }));
+/*
+            requestAnimationFrame(() => requestAnimationFrame(async () => {
+              // ★ 実験用：ページ切替後に任意時間待つ
+              if (d.type === 'url-change') {
+                console.debug('[cgtn] url-change detected → waiting...');
+                await sleep(5000);  // ← ★ここを変えて実験（例: 2000→5000）
+              }
+
+              // 念のため世代とchatId照合
+              if (myGen !== __gen) return;
+              if (cidNow !== (SH?.getChatId?.())) return;
+
+              try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+              LG?.rebuild?.(cidNow);
+              LG?.renderList?.(true);
+              console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render (post-sleep)`);
+            }));
+*/
+
+          }, 0);
+        }
+      })();
+    }, true);
+  })();
+
+/*
       const d = ev && ev.data;
 console.log("bindCgtnMessageOnce*2 message d.type:",d.type);
       if (!d || d.source !== 'cgtn') return;
@@ -72,7 +172,7 @@ console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render (
       }
     }, true);
   })();
-
+*/
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
   const AUTO_SYNC_OPEN_LIST = true;
