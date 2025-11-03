@@ -1228,11 +1228,9 @@ console.log("clearListPanelUI catch");
 console.debug('[renderList 冒頭] cidAtStart=', cidAtStart," my;".my);
 
     await SH.whenLoaded?.();
-console.log('[renderList] 1');
 
     const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!cfg.list?.enabled;
-console.log('[renderList] 2');
 
     if (!enabled) return;
 
@@ -1244,7 +1242,6 @@ console.log('[renderList] 2');
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
-console.log('[renderList] 3');
 
     //pinOnly のときのフィルタは 最新の PINS セットで判定
     // pinOnly 判定（オーバーライド優先）

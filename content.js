@@ -12,6 +12,17 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  // 既存の waitForChatSettled を開いて中を少しだけ強化（ログと0↔N検出）
+  // 補助：現在のターン数とスクロール情報
+  function _cgtnCountTurns() {
+    return document.querySelectorAll('article,[data-testid^="conversation-turn"]').length;
+  }
+
+  function cgtnScrollStats(){
+    const el = document.scrollingElement || document.documentElement || document.body;
+    return { h: el?.scrollHeight|0, y: el?.scrollTop|0, vh: window.innerHeight|0 };
+  }
+
   // === wait helpers (lightweight) ==========================
   function cgtnCountTurns(){
     return document.querySelectorAll('article,[data-testid^="conversation-turn"]').length;
@@ -26,10 +37,13 @@
 
     // 監視対象（childList + attributes で十分に軽い）
     let lastCnt = cgtnCountTurns();
-    let lastH   = document.scrollingElement?.scrollHeight || 0;
+    let lastH   = cgtnScrollStats().h;
     let lastAt  = performance.now();
     let sawZero = (lastCnt === 0);     // すでに 0 の場合もある
     let sawPos  = (lastCnt > 0);
+    let printed0toN = false;           // 転換ログの多重出力防止
+    let printedNto0 = false;
+    console.debug('[***settle] boot cnt=%d, h=%d', lastCnt, lastH);
 
     const turnsQ = 'article,[data-testid^="conversation-turn"]';
     const isTurnNode = (n) => n?.nodeType === 1 && (n.matches?.('article,[data-testid^="conversation-turn"]') || n.querySelector?.(turnsQ));
@@ -40,8 +54,20 @@
           // turnノードの増減があれば即チェック
           if ([...m.addedNodes, ...m.removedNodes].some(isTurnNode)){
             const cnt = cgtnCountTurns();
-            const h   = document.scrollingElement?.scrollHeight || 0;
+            const h   = cgtnScrollStats().h;
             if (cnt !== lastCnt || h !== lastH){
+
+              if (!printed0toN && lastCnt === 0 && cnt > 0) {
+                console.debug('[***settle] turns: 0→%d', cnt);
+                printed0toN = true;
+              }
+              if (!printedNto0 && lastCnt > 0 && cnt === 0) {
+                console.debug('[***settle] turns: %d→0', lastCnt);
+                printedNto0 = true;
+              }
+              if (cnt !== lastCnt) console.debug('[***settle] turns   %d→%d', lastCnt, cnt);
+              if (h   !== lastH)   console.debug('[***settle] scroll.h %d→%d', lastH, h);
+
               lastCnt = cnt; lastH = h; lastAt = performance.now();
               if (cnt === 0) sawZero = true;
               if (cnt  > 0)  sawPos  = true;
@@ -49,12 +75,18 @@
           }
         }else if (m.type === 'attributes'){
           // スクロール高さの変化も idle 判定に効かせる
-          const h = document.scrollingElement?.scrollHeight || 0;
+          const h = cgtnScrollStats().h;
           if (h !== lastH){ lastH = h; lastAt = performance.now(); }
         }
       }
     });
     mo.observe(root, { subtree:true, childList:true, attributes:true });
+
+    if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) {
+      console.debug('[***settle] aborted: cid changed');
+      return false; // 逆戻り/別タブ割込み
+    }
+    const now = performance.now();
 
     try{
       // フェーズA：URL切替直後は「0 → 正」の連鎖を優先
@@ -76,18 +108,31 @@
           // 0 を見ていなくても、すでに可視化（>0）されていれば B へ
           if (sawPos) break;
         }
+
+        while (performance.now() - start < maxMs){
+          if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) {
+            console.debug('[***settle] aborted: cid changed');
+            return false;
+          }
+          const h   = cgtnScrollStats().h;
+          const cnt = cgtnCountTurns();
+          if (cnt !== lastCnt || h !== lastH){
+            if (cnt !== lastCnt) console.debug('[settle] turns   %d→%d', lastCnt, cnt);
+            if (h   !== lastH)   console.debug('[settle] scroll.h %d→%d', lastH, h);
+            lastCnt = cnt; lastH = h; lastAt = performance.now();
+          }
+          if (performance.now() - lastAt >= idleMs) {
+            console.debug('[***settle] idle ok (cnt=%d, h=%d)', cnt, h);
+            return true; // 静穏
+          }
+
         await new Promise(r => setTimeout(r, tickMs));
       }
   
       // フェーズB：変化が idleMs 止まるのを待つ（安定化）
-      while (performance.now() - start < maxMs){
-        if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) return false;
-        const h   = document.scrollingElement?.scrollHeight || 0;
-        const cnt = cgtnCountTurns();
-        if (cnt !== lastCnt || h !== lastH){ lastCnt = cnt; lastH = h; lastAt = performance.now(); }
-        if (performance.now() - lastAt >= idleMs) return true; // 静穏
         await new Promise(r => setTimeout(r, tickMs));
       }
+      console.debug('[settle] timeout (%.0fms)', performance.now() - start);
       return false; // タイムアウト
     } finally {
       try{ mo.disconnect(); }catch{}
@@ -111,13 +156,23 @@ console.log("bindCgtnMessageOnce*1");
         if (!d || d.source !== 'cgtn') return;
         const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
-        const cidNow  = d.cid || SH?.getChatId?.();   // 受信時点の ID を優先
-        const kind    = d.kind || 'chat';
+      const kind    = d.kind || 'other';
+      const cidNow  = d.cid || SH?.getChatId?.();
 
-        if (kind !== 'chat' || !cidNow) {
+      // ホーム/プロジェクト等 → クリアだけ
+      if (kind === 'home' || kind === 'other') {
           LG?.clearListPanelUI?.();
           __lastCid = null;
           __gen++;
+          return;
+        }
+        // 新しいチャット（0のまま） → クリア＋空のrebuild（待機不要）
+        if (kind === 'new') {
+          if (!SH?.isListOpen?.()) return;
+          __lastCid = null; __gen++;
+          LG?.clearListPanelUI?.();
+          LG?.rebuild?.(null);     // chatIdなし→空
+          LG?.renderList?.(true);
           return;
         }
 
@@ -137,18 +192,24 @@ console.log("bindCgtnMessageOnce*1");
               (async () => {
                 // 途中で別イベントに追い越されたら中断
                 if (myGen !== __gen) return;
-
-                // URL 切替時だけ「落ち着くまで待つ」（0→N 優先 & idle 判定）
+                // URL 切替時だけ「落ち着くまで待つ」
+                // 既存チャット（/c/...）想定: N→0 を短時間観測→ 0→N → idle
                 if (d.type === 'url-change') {
                   await waitForChatSettled({
                     cid: cidNow,
-                    expectZeroFirst: true,
-                    idleMs: 350,
-                    tickMs: 120,
-                    maxMs: 12000
+                    requireDropToZero: true,  // N→0 を短時間狙う（拾えなくても続行）
+                    expectZeroFirst:   true,  // 0 を一度見た後に N を待つ
+                    // 速いポーリングで取り逃しを減らし、その後は軽く
+                    fastTickMs: 45,
+                    slowTickMs: 140,
+                    // 0 検出フェーズの上限 / 0→N 追跡フェーズの上限
+                    phase0ms: 900,
+                    phaseAms: 1800,
+                    // idle 判定はやや短めに
+                    idleMs: 280,
+                    maxMs: 15000
                   });
                 }
-
                 // 待機後も念のため照合
                 if (myGen !== __gen) return;
                 if (cidNow !== (SH?.getChatId?.())) return;
@@ -161,89 +222,16 @@ console.log("bindCgtnMessageOnce*1");
               })().catch(err => console.warn('[cgtn] settle/wait error:', err));
             }));
           }, 0);
-/*
-          clearTimeout(__debTo);
-          __debTo = setTimeout(async () => {
-            requestAnimationFrame(() => requestAnimationFrame(async () => {
-              // ★ URL切替のときだけ「落ち着くまで待つ」
-              if (d.type === 'url-change') {
-                const res = await waitForChatSettled({ quietMs:300, maxMs:8000, pollMs:120 });
-                console.debug('[cgtn] settle result:', res);
-              }
 
-              // 念のため世代とchatId照合（待機中に別イベントが来たら抜ける）
-              if (myGen !== __gen) return;
-              if (cidNow !== (SH?.getChatId?.())) return;
 
-              try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-              // ★ ページが落ち着くまで待つ（0→N を優先検出）
-              await waitForChatSettled({ cid: cidNow, expectZeroFirst: true, idleMs: 350, tickMs: 120, maxMs: 12000 });
-              // ★ cid を手渡して再構築（内部でも世代/IDガードあり）
-              LG?.rebuild?.(cidNow);
-              LG?.renderList?.(true);
-              console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render (settle)`);
-            }));
-          }, 0);
-*/
         }
+
+
       })();
     }, true);
   })();
 
-/*
-      const d = ev && ev.data;
-console.log("bindCgtnMessageOnce*2 message d.type:",d.type);
-      if (!d || d.source !== 'cgtn') return;
-      const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
-      const cidNow  = d.cid || SH?.getChatId?.();   // 受信時点の ID を優先
-      const kind    = d.kind || 'chat';
-
-console.log("bindCgtnMessageOnce*3 d.cid:", d.cid);
-console.log("bindCgtnMessageOnce*3 SH.getChatId?:", SH?.getChatId?.());
-console.log("bindCgtnMessageOnce*3 message kind:",kind);
-
-      if (kind !== 'chat' || !cidNow) {
-        // ← 新しいチャット編集前やホーム/プロジェクト先頭ページなど
-console.log("bindCgtnMessageOnce*4 新しいチャット");
-        LG?.clearListPanelUI?.();         // ヘッダ残して本文＆バッジを空に
-        __lastCid = null;
-        __gen++;                           // 以降の保留処理を無効化
-        return;
-      }
-
-      // ここから下は “chat ページ & cid 確定済み”
-      if (d.type === 'url-change' || d.type === 'turn-added') {
-        if (!SH?.isListOpen?.()) return;
-
-        // 切替判定は受信直後に確定
-        const prev = __lastCid;
-        __lastCid  = cidNow;
-        const changed = (prev !== null && cidNow !== prev);
-        const myGen   = ++__gen;        // このイベントの世代
-
-        // 軽いデバウンス（重複イベントの圧縮）
-        clearTimeout(__debTo);
-        __debTo = setTimeout(() => {
-          // “ON時と同じ見え方”：rAF×2 の後に短い待ち
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            setTimeout(() => {
-              // 途中で別イベントに追い越されたら無効化
-              if (myGen !== __gen) return;
-              // 念のため、描画直前にも chatId を照合
-              if (cidNow !== (SH?.getChatId?.())) return;
-              try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-              // ★ cid を手渡して再構築（内部でも世代/IDガードあり）
-              LG?.rebuild?.(cidNow);
-              LG?.renderList?.(true);
-console.debug(`[cgtn] ${changed?'chat-switch':'turn-added'} → rebuild+render (synced delay)`);
-            }, 180);  // ← ON時と合わせる待ち（目安 160〜180ms）
-          }));
-        }, 0);
-      }
-    }, true);
-  })();
-*/
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
   const AUTO_SYNC_OPEN_LIST = true;
