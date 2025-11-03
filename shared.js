@@ -37,8 +37,6 @@
   const _resolves = [];
   SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _resolves.push(r));
 
-
-
   // 読み込み完了を宣言（1回だけ）
   SH.markLoaded = () => {
     if (_loaded) return;
