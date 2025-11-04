@@ -1568,48 +1568,73 @@ console.log("updatePinOnlyBadge count:",count);
   }
 
 
+  // === フッターの件数を即時クリア（0表示） ===
+  NS.clearListFooterInfo = function clearListFooterInfo() {
+console.log("clearListFooterInfo ");
+
+    try {
+      const foot = document.querySelector('cgpt-list-foot-info');
+      if (!foot) return;
+      const ja = foot.querySelector('.ja');
+      const en = foot.querySelector('.en');
+      if (ja) ja.textContent = '会話数 : 0';
+      if (en) en.textContent = 'Count : 0';
+      if (!ja && !en) foot.textContent = '0';
+    } catch {}
+  };
+
   function updateListFooterInfo() {
-    const total = ST.all.length;
+    const total = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
+
+    // 0件なら即クリアして終了（前チャットの件数が残らない）
+    if (!total) {
+      try { window.CGTN_LOGIC?.clearListFooterInfo?.(); } catch {}
+      return;
+    }
+
+    // 通常更新
     const cfg = SH.getCFG?.() || {};
     const listCfg = cfg.list || {};
-    const pinOnly = !!listCfg.pinOnly;   // ← これを追加！
+    const pinOnly = !!listCfg.pinOnly;
 
-    const info = document.getElementById('cgpt-list-foot-info');
-    if (!info) return;
-
+    const T = (k)=> (window.CGTN_I18N?.t?.(k) || k);
     const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
 
-    /* ここから追加：アップロード/ダウンロード件数の計測（1ターン1カウント） */
-    //let uploads = 0, downloads = 0;
-/*
-    try {
-      const rows = Array.isArray(ST.all) ? ST.all : [];
-      rows.forEach(rows => {
-console.log("updateListFooterInfo rows:",rows);
-        const up = rows.querySelector('[data-filename], [data-testid*="attachment"], .text-token-file') ? 1 : 0;
-        const dl = rows.querySelector('a[download], [data-testid*="download"]') ? 1 : 0;
-        uploads   += up;
-        downloads += dl;
-      });
-    } catch(e) { console.warn('[footer-stats]', e); }
-    /* ここまで */
+    // 表示先（従来のinfoスロットがある場合はそちらに出す。無ければフッター全体に）
+    const info = document.getElementById('cgpt-list-foot-info');
+    const emit = (text) => {
+      if (info) {
+        info.textContent = text;
+      } else {
+        const foot = document.querySelector('#cgpt-list-foot');
+        if (foot) {
+          const ja = foot.querySelector('.ja');
+          const en = foot.querySelector('.en');
+          if (ja || en) {
+            // ja/en があるテーマなら両方を同期
+            if (ja) ja.textContent = text.replace('Count', '会話数');
+            if (en) en.textContent = text.replace('会話数', 'Count');
+          } else {
+            foot.textContent = text;
+          }
+        }
+      }
+    };
 
     if (pinOnly) {
-      // 付箋ターン数で数える
-      const chatId = SH.getChatId?.();
-      const pins = SH.getPinsForChat?.(chatId);
+      const cid  = SH.getChatId?.();
+      const pins = cid ? SH.getPinsForChat?.(cid) : null;
       const pinnedCount = Array.isArray(pins)
         ? pins.filter(Boolean).length
         : Object.values(pins || {}).filter(Boolean).length;
-      /* ここから追加：i18n 置換子に uploads / downloads を追加 */
-      info.textContent = fmt(T('list.footer.pinOnly'), {
-        count: pinnedCount, total, uploads, downloads
-      });
-      /* ここまで */
+
+      // 例: "会話数: 6 / 120" / "Count: 6 / 120"
+      emit(fmt(T('list.footer.pinOnly') || 'Count: {count} / {total}', {
+        count: pinnedCount, total
+      }));
     } else {
-      info.textContent = fmt(T('list.footer.all'), {
-        total, uploads, downloads
-      });
+      // 例: "会話数: 120" / "Count: 120"
+      emit(fmt(T('list.footer.all') || 'Count: {total}', { total }));
     }
   }
 

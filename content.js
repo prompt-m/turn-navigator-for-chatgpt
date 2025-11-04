@@ -142,6 +142,117 @@
 
   // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
   (function bindCgtnMessageOnce(){
+console.log("bindCgtnMessageOnce*0");
+    if (window.__CGTN_MSG_BOUND__) return;
+console.log("bindCgtnMessageOnce*1");
+    window.__CGTN_MSG_BOUND__ = true;
+
+    let __lastCid  = null;  // 直近のchatId
+    let __debTo    = 0;     // デバウンス用タイマ
+    let __gen      = 0;     // 世代トークン（逆戻り防止）
+    let __pageInfo = { kind:'other', cid:'', hasTurns:false }; // 直近のページ情報
+
+    window.addEventListener('message', (ev) => {
+      (async () => {  // ← async ラッパーで await が使えるように
+        const d = ev && ev.data;
+console.log("bindCgtnMessageOnce*2 d.source:",d.source);
+        if (!d || d.source !== 'cgtn') return;
+
+        const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
+        const kind   = d.kind   || 'other';
+        const cidNow = d.cid    || SH?.getChatId?.();
+        const fKind  = d.fromKind || 'other';
+        const fCid   = d.fromCid  || '';
+
+        __pageInfo = { kind, cid: cidNow || '', hasTurns: !!d.hasTurns };
+        try { SH.setPageInfo?.(__pageInfo); } catch {}
+
+        // ログ（どこから→どこへ）
+        try {
+          console.debug('[cgtn] nav', `${fKind}:${fCid || '-'}`, '→', `${kind}:${cidNow || '-'}`, 'hasTurns=', !!d.hasTurns);
+        } catch {}
+
+        // --- 非チャット系：クリアのみ（ONならメッセージA）
+        if (kind === 'home' || kind === 'project' || kind === 'other' || kind === 'new') {
+          LG?.clearListPanelUI?.();
+          try {
+            if (SH.getCFG?.()?.list?.enabled) {
+              window.CGTN_UI?.toast?.('ここにはチャットがありません（リストは表示できません）'); // メッセージA
+            }
+          } catch {}
+          __lastCid = null;
+          __gen++;
+          return;
+        }
+
+        // ---- 既存チャット（/c/...）でイベントが来た場合 ----
+        if (d.type === 'url-change' || d.type === 'turn-added') {
+          if (!SH?.isListOpen?.()) return;
+
+          const prev = __lastCid;
+          __lastCid  = cidNow;
+          const changed = (prev !== null && cidNow !== prev);
+          const myGen   = ++__gen;
+
+          clearTimeout(__debTo);
+          __debTo = setTimeout(() => {
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              (async () => {
+                // 途中で別イベントに追い越されたら中断
+                if (myGen !== __gen) return;
+
+                // URL切替時だけ「落ち着くまで待つ」（N→0を短時間→0→N→idle）
+                if (d.type === 'url-change') {
+                  await waitForChatSettled({
+                    cid: cidNow,
+                    requireDropToZero: true,   // N→0 を短時間狙う（拾えなくても続行）
+                    expectZeroFirst:   true,   // 0 を見てから N を待つ
+                    fastTickMs:        45,
+                    slowTickMs:        140,
+                    phase0ms:          900,
+                    phaseAms:          1800,
+                    idleMs:            280,
+                    maxMs:             15000,
+                    requirePositive:   true    // >0 を観測してから idle 成功
+                  });
+                }
+
+                // 待機後も念のため照合
+                if (myGen !== __gen) return;
+                if (cidNow !== (SH?.getChatId?.())) return;
+
+                try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
+
+                // 再構築＋描画
+                LG?.rebuild?.(cidNow);
+                LG?.renderList?.(true);
+
+                // 描画後の件数を見て B を出す（必要なら軽リトライ）
+                const turns = (window.CGTN_LOGIC?.STATE?.all?.length) || 0;
+                if (turns === 0) {
+                  window.CGTN_UI?.toast?.('リスト生成に失敗した可能性があります。［最新にする］を押してください'); // メッセージB
+                  setTimeout(async ()=>{
+                    try{
+                      await waitForChatSettled({ cid: cidNow, idleMs: 300, tickMs: 100, maxMs: 3000 });
+                      if (cidNow === (window.CGTN_SHARED?.getChatId?.())) {
+                        window.CGTN_LOGIC?.rebuild?.(cidNow);
+                        window.CGTN_LOGIC?.renderList?.(true);
+                      }
+                    }catch{}
+                  }, 600);
+                }
+
+                console.debug(`[cgtn] ${changed ? 'chat-switch' : 'turn-added'} → rebuild+render (settled)`);
+              })().catch(err => console.warn('[cgtn] settle/wait error:', err));
+            }));
+          }, 0);
+        }
+      })();
+    }, true);
+  })();
+
+/*
+  (function bindCgtnMessageOnce(){
 console.log("bindCgtnMessageOnce*1");
     if (window.__CGTN_MSG_BOUND__) return;
     window.__CGTN_MSG_BOUND__ = true;
@@ -230,7 +341,7 @@ console.log("bindCgtnMessageOnce*1");
       })();
     }, true);
   })();
-
+*/
 
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
@@ -880,12 +991,47 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
   }
 
   // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
+/*
   function injectUrlChangeHook() {
     try {
       const s = document.createElement('script');
       s.src = chrome.runtime.getURL('inject_url_hook.js');
       (document.head || document.documentElement).appendChild(s);
       s.remove();
+    } catch (e) {
+      console.warn('injectUrlChangeHook failed', e);
+    }
+  }
+*/
+  // ======== URL変化をフックして postMessage させる（page側IIFEを注入） ========
+  function injectUrlChangeHook() {
+    try {
+      // すでに差し込まれていればスキップ
+      if (document.getElementById('cgtn-url-hook')) {
+        console.debug('[cgtn] inject_url_hook already injected');
+        return;
+      }
+      // すでにIIFEが起動済みならスキップ（page側フラグを拾えない場合もあるので二段ガード）
+      if (window.__CGTN_URL_HOOKED__ === true) {
+        console.debug('[cgtn] page reports URL_HOOKED — skip injecting');
+        return;
+      }
+
+      const url = chrome.runtime.getURL('inject_url_hook.js');
+      const s   = document.createElement('script');
+      s.id      = 'cgtn-url-hook';
+      s.src     = url;
+      s.async   = false; // 実行順の安定化
+      s.onload  = () => {
+        console.debug('[cgtn] inject_url_hook loaded:', url);
+        // 読み込み完了後に掃除したい場合はここで remove する（実行済みだからOK）
+        // s.remove();
+      };
+      s.onerror = (e) => console.warn('[cgtn] inject_url_hook failed:', e);
+
+      (document.documentElement || document.head || document.body).appendChild(s);
+      console.debug('[cgtn] inject_url_hook injecting:', url);
+
     } catch (e) {
       console.warn('injectUrlChangeHook failed', e);
     }
@@ -1083,9 +1229,7 @@ console.log("installAutoSyncForTurns 4");
 //    bindListRefreshButton();
 //    forceListPanelOffOnBoot();
 
-    if (USE_INJECT_URL_HOOK){
-      injectUrlChangeHook();
-    }
+    if (USE_INJECT_URL_HOOK)injectUrlChangeHook();
 
    try { SH.cleanupZeroPinRecords?.(); } catch {}
 

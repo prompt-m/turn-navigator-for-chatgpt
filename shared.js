@@ -53,7 +53,9 @@
   const canUseStorage = () =>
     !!(chrome?.runtime?.id && chrome?.storage?.sync) && !_dying;
 
-
+  let __PAGE_INFO = { kind:'other', cid:'', hasTurns:false };
+  SH.setPageInfo = (x) => { __PAGE_INFO = Object.assign({}, __PAGE_INFO, x||{}); };
+  SH.getPageInfo = () => __PAGE_INFO;
 
   // === 既定値（options / content と完全一致） ===
   const DEFAULTS = Object.freeze({
