@@ -845,6 +845,8 @@ console.log("clearListPanelUI el.textContent:",el.textContent);
       }
       const badge = document.querySelector('#cgpt-pin-filter .cgtn-badge');
       if (badge) { badge.textContent = ''; badge.hidden = true; }
+      // ← フッターは DOM を壊さず「空状態」にする（ボタンは残す）
+      try { NS.clearListFooterInfo?.(); } catch {}
     } catch(e){
       console.warn('[clearListPanelUI] failed', e); 
     }
@@ -853,9 +855,11 @@ console.log("clearListPanelUI el.textContent:",el.textContent);
 console.log("clearListPanelUI*2");
       const ST = CGTN_LOGIC.ST || (CGTN_LOGIC.ST = {});
       ST.all = []; ST.user = []; ST.assistant = [];
-    } catch {
+      // 付箋バッジ/フッターの表示状態も同期（早期returnを避けるため最後に）
+      try { CGTN_LOGIC.updatePinOnlyBadge?.(); } catch {}
+      // ここではフッターは触らない（↑で empty に済）
+      } catch {
 console.log("clearListPanelUI catch");
-
     }
   };
 
@@ -912,7 +916,7 @@ console.log("clearListPanelUI catch");
 
           <span class="cgtn-badge" hidden>0</span>
         </button>
-        <button id="cgpt-list-collapse" aria-expanded="true">▾</button>
+        <button id="cgpt-list-collapse" aria-expanded="true">▴</button>
       </div>
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot">
@@ -1237,7 +1241,7 @@ console.debug('[renderList 冒頭] cidAtStart=', cidAtStart," my;".my);
     const my = ++_renderTicket;        // ← この呼び出しの券
     const panel = ensureListBox();
     const body  = panel.querySelector('#cgpt-list-body');
-    const foot  = panel.querySelector('#cgpt-list-foot');
+//    const foot  = panel.querySelector('#cgpt-list-foot');
 //    panel.style.display = 'flex';
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
@@ -1568,75 +1572,61 @@ console.log("updatePinOnlyBadge count:",count);
   }
 
 
-  // === フッターの件数を即時クリア（0表示） ===
-  NS.clearListFooterInfo = function clearListFooterInfo() {
-console.log("clearListFooterInfo ");
-
-    try {
-      const foot = document.querySelector('cgpt-list-foot-info');
-      if (!foot) return;
-      const ja = foot.querySelector('.ja');
-      const en = foot.querySelector('.en');
-      if (ja) ja.textContent = '会話数 : 0';
-      if (en) en.textContent = 'Count : 0';
-      if (!ja && !en) foot.textContent = '0';
-    } catch {}
-  };
+  // === フッターの件数を即時クリア（リスト無し表示） ===
+  // ===== フッター：状態セーフに更新 =====
+  function clearListFooterInfo(){
+console.log("**clearListFooterInfo ");
+    const foot = document.getElementById('cgpt-list-foot-info');
+    if (!foot) return;
+    foot.dataset.state = 'empty';      // スタイル用（既存CSSに影響しない属性名）
+    const ja = foot.querySelector('.ja');
+    const en = foot.querySelector('.en');
+    if (ja) ja.textContent = T('list.empty') || 'リストはありません';
+    if (en) en.textContent = T('list.empty') || 'No items to show';
+    // ★ ボタンは触らない（残す）
+  }
 
   function updateListFooterInfo() {
-    const total = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
 
-    // 0件なら即クリアして終了（前チャットの件数が残らない）
-    if (!total) {
-      try { window.CGTN_LOGIC?.clearListFooterInfo?.(); } catch {}
+    const foot = document.getElementById('cgpt-list-foot-info');
+    if (!foot) return;
+    const ja = foot.querySelector('.ja');
+    const en = foot.querySelector('.en');
+
+    // 現在の ST を参照（描画後に呼ばれる想定）
+    const total    = (NS?.ST?.all?.length)        || 0;
+    const uploads  = Number(NS?.uploads || 0);
+    const downloads= Number(NS?.downloads || 0);
+    const pinOnly  = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
+    const count    = pinOnly
+      ? (Array.isArray(NS?.ST?.all) ? NS.ST.all.filter(a => NS.isPinned?.(a)).length : 0)
+      : total;
+
+    // 0 件時は「リストはありません」を出してボタンは残す
+    if (total === 0){
+      foot.dataset.state = 'empty';
+      if (ja) ja.textContent = T('list.empty') || 'リストはありません';
+      if (en) en.textContent = T('list.empty') || 'No items to show';
+console.debug('**updateListFooterInfo: cleared');
       return;
     }
 
-    // 通常更新
-    const cfg = SH.getCFG?.() || {};
-    const listCfg = cfg.list || {};
-    const pinOnly = !!listCfg.pinOnly;
+    // 通常表示
+    foot.dataset.state = 'normal';
 
-    const T = (k)=> (window.CGTN_I18N?.t?.(k) || k);
-    const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars?.[k] ?? ''));
+    const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
+    let msg   = T(key) || '';
 
-    // 表示先（従来のinfoスロットがある場合はそちらに出す。無ければフッター全体に）
-    const info = document.getElementById('cgpt-list-foot-info');
-    const emit = (text) => {
-      if (info) {
-        info.textContent = text;
-      } else {
-        const foot = document.querySelector('#cgpt-list-foot');
-        if (foot) {
-          const ja = foot.querySelector('.ja');
-          const en = foot.querySelector('.en');
-          if (ja || en) {
-            // ja/en があるテーマなら両方を同期
-            if (ja) ja.textContent = text.replace('Count', '会話数');
-            if (en) en.textContent = text.replace('会話数', 'Count');
-          } else {
-            foot.textContent = text;
-          }
-        }
-      }
-    };
+    // プレースホルダを置換
+    msg = msg
+      .replace('{count}', count)
+      .replace('{total}', total)
+      .replace('{uploads}', uploads)
+      .replace('{downloads}', downloads);
 
-    if (pinOnly) {
-      const cid  = SH.getChatId?.();
-      const pins = cid ? SH.getPinsForChat?.(cid) : null;
-      const pinnedCount = Array.isArray(pins)
-        ? pins.filter(Boolean).length
-        : Object.values(pins || {}).filter(Boolean).length;
-
-      // 例: "会話数: 6 / 120" / "Count: 6 / 120"
-      emit(fmt(T('list.footer.pinOnly') || 'Count: {count} / {total}', {
-        count: pinnedCount, total
-      }));
-    } else {
-      // 例: "会話数: 120" / "Count: 120"
-      emit(fmt(T('list.footer.all') || 'Count: {total}', { total }));
-    }
+    foot.textContent = msg;
   }
+
 
   //付箋バッジ/チャット名更新
   document.addEventListener('cgtn:pins-updated', () => {
@@ -1778,6 +1768,7 @@ console.log("clearListFooterInfo ");
   }
 
   // --- expose ---
+  NS.clearListFooterInfo = clearListFooterInfo;
   NS.updatePinOnlyBadge = updatePinOnlyBadge;
   NS.updateListFooterInfo = updateListFooterInfo;
   NS.rebuild = rebuild;
