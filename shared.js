@@ -540,8 +540,13 @@
     try{
       const cfg = SH.getCFG?.() || {};
       const pinsObj = cfg?.pinsByChat?.[chatId]?.pins || {};
-      return Object.values(pinsObj).filter(Boolean).length;
-    }catch{ return 0; }
+      const pinsCount = Object.values(pinsObj).filter(Boolean).length;
+console.log("getPinsCountByChat chatId;",chatId," pinsCount:",pinsCount);
+      return pinsCount;
+    }catch{
+console.log("getPinsCountByChat catch");
+      return 0;
+    }
   };
 
 

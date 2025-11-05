@@ -63,7 +63,7 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
     // UI 反映（楽観）
     _applyPinsToUI(s);   // ← 既存の描画同期があればそれを呼ぶ（例: rows のクラス付け等）
-    updateListFooterInfo?.();
+//    updateListFooterInfo?.();
     updatePinOnlyBadge?.();
 
     // 永続化：'turn:n' を 0/1 配列へ（密配列）
@@ -78,7 +78,7 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
       const r = new Set(PINS); // 直前の正しい状態（PINS は失敗時まで書き換えない設計ならここで保持）
       if (next) r.delete(ks); else r.add(ks);
       _applyPinsToUI(r);
-      updateListFooterInfo?.();
+//      updateListFooterInfo?.();
       updatePinOnlyBadge?.();
     };
 
@@ -496,7 +496,7 @@ console.log("scrollListToTurn*6 top",top);
       idx = rows.findIndex(n => n?.dataset?.turnId === target.dataset.turnId);
     }
     // デバッグ
-console.debug('getTurnKey len:', rows.length, 'idx:', idx);
+//console.debug('getTurnKey len:', rows.length, 'idx:', idx);
     return idx >= 0 ? ('turn:' + (idx + 1)) : '';
 
   }
@@ -594,7 +594,7 @@ console.debug('getTurnKey len:', rows.length, 'idx:', idx);
 
       const next = SH.togglePinByIndex?.(idx1, chatId);
       paintPinRow(rowEl, !!next);
-      NS.updateListFooterInfo?.();
+//      NS.updateListFooterInfo?.();
 
       // pinOnly 表示中は再描画したい場合 ↓を有効化
       // const cfg = SH.getCFG() || {};
@@ -1198,13 +1198,13 @@ console.log("clearListPanelUI catch");
       // 4) pinOnly のとき、OFF になったターン行は即削除
       if (pinOnly && !nextOn) {
         rowsByTurn(k).forEach(n => n.remove());
-        NS.updateListFooterInfo?.();
+//        NS.updateListFooterInfo?.();
         return;
       }
 
       // 5) 同ターンの相方行を含め UI 同期（強制状態で反映）
       refreshPinUIForTurn(k, nextOn);
-      NS.updateListFooterInfo?.();
+//      NS.updateListFooterInfo?.();
 /*
       ev.stopPropagation();
       const k = getTurnKey(art);
@@ -1453,7 +1453,12 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     }
     const rowsCount = body.querySelectorAll('.row').length;   // ← 空行は .row じゃないので除外される
     NS._lastVisibleRows = rowsCount;
-    NS.updateListFooterInfo();
+    // フッター更新はここだけ
+    // --- 集計値をグローバル（NS）へ保存 ---
+    NS.uploads = uploads;
+    NS.downloads = downloads;
+    NS.pinsCount = Object.values(pinsArr).filter(Boolean).length;
+    updateListFooterInfo();
     // 付箋バッジ
     NS.updatePinOnlyBadge?.();
     // チャット名
@@ -1527,8 +1532,6 @@ console.debug('[setListEnabled*4]一覧OFF');
     }
   }
 
-
-
   function updatePinOnlyBadge(){
     try {
       const btn = document.getElementById('cgpt-pin-filter');
@@ -1552,7 +1555,6 @@ console.debug('[setListEnabled*4]一覧OFF');
 
       const cid = SH.getChatId?.();
       const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
-console.log("updatePinOnlyBadge count:",count);
       // 表示制御
       if (count > 0) {
         badge.textContent = count > 99 ? '99+' : count;
@@ -1576,57 +1578,40 @@ console.log("updatePinOnlyBadge count:",count);
   // ===== フッター：状態セーフに更新 =====
   function clearListFooterInfo(){
 console.log("**clearListFooterInfo ");
+  const foot = document.getElementById('cgpt-list-foot-info');
+  if (!foot) return;
+  foot.dataset.state = 'empty';
+  foot.textContent = T('list.empty') || 'リストはありません';
+}
+
+  // renderlistからしか呼んではいけない
+  function updateListFooterInfo(){
     const foot = document.getElementById('cgpt-list-foot-info');
     if (!foot) return;
-    foot.dataset.state = 'empty';      // スタイル用（既存CSSに影響しない属性名）
-    const ja = foot.querySelector('.ja');
-    const en = foot.querySelector('.en');
-    if (ja) ja.textContent = T('list.empty') || 'リストはありません';
-    if (en) en.textContent = T('list.empty') || 'No items to show';
-    // ★ ボタンは触らない（残す）
-  }
 
-  function updateListFooterInfo() {
+    const total     = (NS?.ST?.all?.length) || 0;
+    const uploads   = Number(NS?.uploads || 0);
+    const downloads = Number(NS?.downloads || 0);
+    const pinOnly   = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
+    const count     = Number(NS?.pinsCount || 0);
+console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
 
-    const foot = document.getElementById('cgpt-list-foot-info');
-    if (!foot) return;
-    const ja = foot.querySelector('.ja');
-    const en = foot.querySelector('.en');
-
-    // 現在の ST を参照（描画後に呼ばれる想定）
-    const total    = (NS?.ST?.all?.length)        || 0;
-    const uploads  = Number(NS?.uploads || 0);
-    const downloads= Number(NS?.downloads || 0);
-    const pinOnly  = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
-    const count    = pinOnly
-      ? (Array.isArray(NS?.ST?.all) ? NS.ST.all.filter(a => NS.isPinned?.(a)).length : 0)
-      : total;
-
-    // 0 件時は「リストはありません」を出してボタンは残す
+    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
     if (total === 0){
       foot.dataset.state = 'empty';
-      if (ja) ja.textContent = T('list.empty') || 'リストはありません';
-      if (en) en.textContent = T('list.empty') || 'No items to show';
-console.debug('**updateListFooterInfo: cleared');
+      foot.textContent = T('list.empty') || 'リストはありません';
       return;
     }
 
-    // 通常表示
     foot.dataset.state = 'normal';
-
     const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
-    let msg   = T(key) || '';
-
-    // プレースホルダを置換
-    msg = msg
-      .replace('{count}', count)
-      .replace('{total}', total)
-      .replace('{uploads}', uploads)
-      .replace('{downloads}', downloads);
-
-    foot.textContent = msg;
+    const tpl = T(key) || '';
+    foot.textContent = tpl
+      .replace('{count}',      String(count))
+      .replace('{total}',      String(total))
+      .replace('{uploads}',    String(uploads))
+      .replace('{downloads}',  String(downloads));
   }
-
 
   //付箋バッジ/チャット名更新
   document.addEventListener('cgtn:pins-updated', () => {
@@ -1649,7 +1634,7 @@ console.debug('**updateListFooterInfo: cleared');
     const { chatId, count } = ev.detail || {};
 
     // 件数表示などの小物を同期
-    try { updateListFooterInfo?.(); } catch {}
+//    try { updateListFooterInfo?.(); } catch {}
 
     // 「付箋のみ表示」モード中は見た目も即時反映
     const pinOnly = document.querySelector('#cgpt-pin-filter[aria-pressed="true"]');
@@ -1692,7 +1677,7 @@ console.debug('**updateListFooterInfo: cleared');
 
   // --- expose ---
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
-    updateListFooterInfo,                // ← ここはローカル名で参照できる
+//    updateListFooterInfo,                // ← ここはローカル名で参照できる
     getTurnKey: (NS.getTurnKey || getTurnKey),
     isPinnedByKey
   });
@@ -1770,7 +1755,6 @@ console.debug('**updateListFooterInfo: cleared');
   // --- expose ---
   NS.clearListFooterInfo = clearListFooterInfo;
   NS.updatePinOnlyBadge = updatePinOnlyBadge;
-  NS.updateListFooterInfo = updateListFooterInfo;
   NS.rebuild = rebuild;
   NS.setListEnabled = setListEnabled;
   NS.goTop = goTop; 

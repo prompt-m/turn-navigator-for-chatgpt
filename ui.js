@@ -772,7 +772,7 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
     const isListVisible = window.CGTN_LOGIC?.isListVisible?.();
     const isPinOnly = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
 
-    window.CGTN_LOGIC?.updateListFooterInfo?.();
+//    window.CGTN_LOGIC?.updateListFooterInfo?.();
     if (isListVisible || isPinOnly) {
       window.CGTN_LOGIC.renderList(true);
     }

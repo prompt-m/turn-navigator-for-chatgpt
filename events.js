@@ -47,7 +47,7 @@
           // 2) 描画（新CFGを読む）
           window.CGTN_LOGIC?.renderList?.(true);
           // 3) フッター（新CFGを読む）
-          window.CGTN_LOGIC?.updateListFooterInfo?.();
+//          window.CGTN_LOGIC?.updateListFooterInfo?.();
         });
 
         // UI状態（ARIA）は即時反映でOK

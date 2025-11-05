@@ -924,6 +924,7 @@ console.debug('[bindListRefreshButton]LG.rebuild() ');
       /* ここまで */
 
       /* ここから追加：② 現在チャットの集計：ターン数／アップありターン数／DLありターン数 */
+      /* ここは使っていない筈 */
       if (msg.type === 'cgtn:get-chat-stats') {
         try {
           const ST = window.ST || {};
@@ -937,6 +938,7 @@ console.debug('[bindListRefreshButton]LG.rebuild() ');
             uploads   += up;
             downloads += dl;
           });
+console.log("******content.js sendResponse  uploads:",uploads," downloads:",downloads);
           sendResponse({ ok:true, chatId, turns, uploads, downloads });
         } catch(e) {
           sendResponse({ ok:false, error:String(e) });
@@ -1234,9 +1236,9 @@ console.log("installAutoSyncForTurns 4");
    try { SH.cleanupZeroPinRecords?.(); } catch {}
 
     LG.rebuild?.();
-//    if (SH.isListOpen?.()) {
-//      LG.renderList?.(true);
-//    }
+    if (SH.isListOpen?.()) {
+      LG.renderList?.(true);
+    }
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
