@@ -1236,9 +1236,9 @@ console.log("installAutoSyncForTurns 4");
    try { SH.cleanupZeroPinRecords?.(); } catch {}
 
     LG.rebuild?.();
-    if (SH.isListOpen?.()) {
-      LG.renderList?.(true);
-    }
+//    if (SH.isListOpen?.()) {
+//      LG.renderList?.(true);
+//    }
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });

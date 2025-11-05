@@ -585,20 +585,51 @@ console.log("scrollListToTurn*6 top",top);
     clip.textContent = '🔖\uFE0E';
   }
 
-  function bindClipPinByIndex(clipEl, rowEl, chatId){
-    clipEl.addEventListener('click', (ev) => {
+//  function bindClipPinByIndex(clipEl, rowEl, chatId){
+//    clipEl.addEventListener('click', (ev) => {
+  function bindClipPinByIndex(clipEl, rowEl, chatId){ 
+    clipEl.addEventListener('click', async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       const idx1 = Number(rowEl?.dataset?.idx);
       if (!Number.isFinite(idx1) || idx1 < 1) return;
 
-      const next = SH.togglePinByIndex?.(idx1, chatId);
-      paintPinRow(rowEl, !!next);
-//      NS.updateListFooterInfo?.();
+//      const next = SH.togglePinByIndex?.(idx1, chatId);
+//      paintPinRow(rowEl, !!next);
+
+        // Promise の可能性があるので await。戻り形式の差異にも耐性を持たせる
+        const ret = await SH.togglePinByIndex?.(idx1, chatId);
+        let next;
+        if (typeof ret === 'boolean') {
+          next = ret;
+        } else if (ret && typeof ret === 'object') {
+          // {on:true}/{pinned:true} などにも対応
+          next = ('on' in ret) ? !!ret.on
+               : ('pinned' in ret) ? !!ret.pinned
+               : undefined;
+        }
+        // フォールバック：ストレージ反映後の実状態を読む
+        if (typeof next === 'undefined') {
+          next = !!(await SH.isPinnedByIndex?.(idx1, chatId));
+        }
+        paintPinRow(rowEl, next);
 
       // pinOnly 表示中は再描画したい場合 ↓を有効化
       // const cfg = SH.getCFG() || {};
       // if (cfg.list?.pinOnly) NS.renderList?.(true);
+//    }, { passive:false });
+
+      // 付箋数とフッターの同期もここで安全側更新
+      try{
+        const SHX = window.CGTN_SHARED || {};
+        let pinsArr = SHX.getPinsForChat?.(chatId);
+        if (!pinsArr) pinsArr = SHX.getCFG?.()?.pinsByChat?.[chatId]?.pins;
+        const pinsCount = Array.isArray(pinsArr)
+          ? pinsArr.filter(Boolean).length
+          : (pinsArr ? Object.values(pinsArr).filter(Boolean).length : 0);
+        NS.pinsCount = pinsCount;
+        NS.updateListFooterInfo?.();
+      }catch{}
     }, { passive:false });
   }
 
