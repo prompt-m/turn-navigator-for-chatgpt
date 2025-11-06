@@ -10,8 +10,7 @@
   const titleEscape = SH.titleEscape;
   let uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
 
-
-const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
+  const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
   function _L(){ return (SH?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
 
@@ -102,6 +101,51 @@ const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
     if (s.display === 'none' || s.visibility === 'hidden') return false;
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
+  }
+
+  // === 追加：ナビ専用デバッグ・ユーティリティ ===
+  const NAV_DEBUG = true;
+  function _navLog(...a){ if (NAV_DEBUG) console.debug('[nav]', ...a); }
+
+  // いまのアンカー・位置・候補を数値で可視化
+  function logScrollSpy(roleLabel='all'){
+    try{
+      const sc     = getTrueScroller();
+      const yTop   = sc.scrollTop;
+      const anchor = currentAnchorY();
+      const yStar  = yTop + anchor;       // 判定ライン
+      const eps    = Number(SH.getCFG().eps)||0;
+
+      const L = roleLabel==='user'      ? ST.user
+             : roleLabel==='assistant'  ? ST.assistant
+             : ST.all;
+
+      const rows = (L||[]).map((a,i)=>{
+        const y = articleTop(sc, a);
+        return { i:i+1, y, d: yStar - y };     // d>0 なら上にある
+      });
+
+      const prev = [...rows].reverse().find(r => r.y < yStar - eps);
+      const next = rows.find(r => r.y > yStar + eps);
+
+      _navLog('spy',
+        {role:roleLabel, turns:rows.length, eps, anchor, yTop, yStar,
+         prev: prev ? `#${prev.i}@${Math.round(prev.y)}` : null,
+         next: next ? `#${next.i}@${Math.round(next.y)}` : null}
+      );
+
+      // 直近±2件も出す（目視でズレが分かる）
+      if (prev){
+        const k = prev.i-1;
+        const pick = rows.slice(Math.max(0,k-2), Math.min(rows.length, k+3));
+        _navLog('around-prev', pick);
+      }
+      if (next){
+        const k = next.i-1;
+        const pick = rows.slice(Math.max(0,k-2), Math.min(rows.length, k+3));
+        _navLog('around-next', pick);
+      }
+    }catch(e){ _navLog('spy-failed', e); }
   }
 
   function getTrueScroller(){
@@ -585,8 +629,6 @@ console.log("scrollListToTurn*6 top",top);
     clip.textContent = '🔖\uFE0E';
   }
 
-//  function bindClipPinByIndex(clipEl, rowEl, chatId){
-//    clipEl.addEventListener('click', (ev) => {
   function bindClipPinByIndex(clipEl, rowEl, chatId){ 
     clipEl.addEventListener('click', async (ev) => {
       ev.preventDefault();
@@ -594,10 +636,9 @@ console.log("scrollListToTurn*6 top",top);
       const idx1 = Number(rowEl?.dataset?.idx);
       if (!Number.isFinite(idx1) || idx1 < 1) return;
 
-//      const next = SH.togglePinByIndex?.(idx1, chatId);
-//      paintPinRow(rowEl, !!next);
-
         // Promise の可能性があるので await。戻り形式の差異にも耐性を持たせる
+        // togglePinByIndex() は Promise を返す（await 必須）
+        // 返り値が boolean 以外でも動くように型ガード
         const ret = await SH.togglePinByIndex?.(idx1, chatId);
         let next;
         if (typeof ret === 'boolean') {
@@ -659,11 +700,19 @@ console.log("scrollListToTurn*6 top",top);
     const desired = articleTop(sc, article) - anchor; // 丸めない
     const maxScroll = Math.max(0, sc.scrollHeight - sc.clientHeight);
     const clamped   = Math.min(maxScroll, Math.max(0, desired));
+
+ _navLog('scrollToHead', {
+    key: getTurnKey(article), desired: Math.round(desired),
+    clamped: Math.round(clamped), maxScroll, anchor,
+    scTopBefore: Math.round(sc.scrollTop)
+  });
+
     lockFor(SH.getCFG().lockMs);
     sc.scrollTo({ top: clamped, behavior: 'smooth' });
     //注目ターンのキーを覚える
     NS._currentTurnKey = getTurnKey(article);
-console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
+//console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
+    _navLog('scrolled', { key: NS._currentTurnKey });
   }
 
   // ターン検出<article>
@@ -1738,28 +1787,48 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
     if (!L.length) return;
     scrollToHead(L[L.length-1]);
   }
+
   function goPrev(role){
     if (!ST?.all?.length) {
       console.debug('[nav-guard] ST.all empty → rebuild()');
       rebuild?.();
     }
 
-    /* ここから追加：⑤-A STが古ければ即再構築 */
+    /* STが古ければ即再構築 */
     try{
       const cur = pickAllTurns().filter(isRealTurn).length;
       if (cur !== (ST?.all?.length || 0)) rebuild?.();
     }catch{}
-    /* ここまで */
 
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L.length) return;
+
     const sc = getTrueScroller();
     const yStar = sc.scrollTop + currentAnchorY();
     const eps = Number(SH.getCFG().eps)||0;
-    for (let i=L.length-1;i>=0;i--){
-      if (articleTop(sc, L[i]) < yStar - eps) { scrollToHead(L[i]); return; }
-    }
+
+    // ★追加：実行直前スナップショット
+    logScrollSpy(role==='user' ? 'user' : role==='assistant' ? 'assistant' : 'all');
+
+    let picked = null, pickedIdx = -1, dbg = [];
+      for (let i=L.length-1;i>=0;i--){
+        const y = articleTop(sc, L[i]);
+        dbg.push({i:i+1, y, pass:(y < yStar - eps)});
+        if (y < yStar - eps) { picked=L[i]; pickedIdx=i; break; }
+      }
+      _navLog('goPrev-scan', {role, yStar, eps, tried:dbg.slice(0,6)}); // 直近6件だけ
+
+      if (picked){
+        _navLog('goPrev-hit', {role, idx1: pickedIdx+1, key: getTurnKey(picked)});
+        scrollToHead(picked);
+      }
+
+
+//    for (let i=L.length-1;i>=0;i--){
+//      if (articleTop(sc, L[i]) < yStar - eps) { scrollToHead(L[i]); return; }
+//    }
   }
+
   function goNext(role){
     if (!ST?.all?.length) {
       console.debug('[nav-guard] ST.all empty → rebuild()');
