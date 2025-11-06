@@ -498,13 +498,23 @@ console.log("scrollListToTurn*6 top",top);
     let txt = (clone.innerText || '').replace(/\s+/g, ' ').trim();
     return truncate(txt, maxChars);
   }
-
+/*
   function articleTop(scroller, article){
     const node = headNodeOf(article);
     const scR = scroller.getBoundingClientRect();
     const r = node.getBoundingClientRect();
     return scroller.scrollTop + (r.top - scR.top);
   }
+*/
+  function articleTop(sc, article){
+    if (!article || !sc) return 0;
+    const a = article.getBoundingClientRect();
+    const c = sc.getBoundingClientRect ? sc.getBoundingClientRect() : { top:0 };
+    // 容器の内容原点 = sc.scrollTop + sc.clientTop を考慮
+    const base = (sc.scrollTop || 0) - (sc.clientTop || 0);
+    return base + (a.top - c.top);
+  }
+
   const currentAnchorY = ()=> SH.computeAnchor(SH.getCFG()).y;
 
   // ここ変えたよ：ターンキー安定化。DOMに無ければ連番を割り当てて保持。
@@ -707,13 +717,38 @@ console.log("scrollListToTurn*6 top",top);
     scTopBefore: Math.round(sc.scrollTop)
   });
 
+/*
     lockFor(SH.getCFG().lockMs);
     sc.scrollTo({ top: clamped, behavior: 'smooth' });
     //注目ターンのキーを覚える
     NS._currentTurnKey = getTurnKey(article);
 //console.log("！！！scrollToHead NS._currentTurnKey: ",NS._currentTurnKey);
     _navLog('scrolled', { key: NS._currentTurnKey });
+*/
+
+    lockFor(SH.getCFG().lockMs);
+    // ① まずスムーズに近づける
+    sc.scrollTo({ top: Math.round(clamped), behavior: 'smooth' });
+ 
+    // ② 少し待ってから “現在の高さ” で再計算し、ズレてたら一発スナップ
+    const snapDelay = 220; // 150〜300msで好み調整
+    setTimeout(()=>{
+      try{
+        const anchor2  = currentAnchorY();
+        const desired2 = articleTop(sc, article) - anchor2;
+        const clamp2   = Math.min(maxScroll, Math.max(0, desired2));
+        const err      = Math.abs((sc.scrollTop||0) - clamp2);
+        if (err > 1) {
+          sc.scrollTo({ top: Math.round(clamp2), behavior: 'auto' }); // ←最終スナップ
+        }
+      }finally{
+        // 注目ターンキーを最後に確定
+        NS._currentTurnKey = getTurnKey(article);
+        console.debug('[nav] scrolled', { key:NS._currentTurnKey });
+      }
+    }, snapDelay);
   }
+
 
   // ターン検出<article>
   function pickAllTurns(){
@@ -998,6 +1033,14 @@ console.log("clearListPanelUI catch");
         </button>
         <button id="cgpt-list-collapse" aria-expanded="true">▴</button>
       </div>
+
+      <!-- ★ 表示切替（CSSだけで絞り込み） -->
+      <div id="cgpt-list-filter" role="group" aria-label="Filter" style="display:flex;gap:8px;padding:6px 8px;position:sticky;top:34px;z-index:1;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);">
+        <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span></span></label>
+        <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span></span></label>
+        <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span></span></label>
+      </div>
+
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot">
         <button id="cgpt-list-refresh" class="cgtn-mini-btn" type="button">↻</button>
@@ -1009,6 +1052,14 @@ console.log("clearListPanelUI catch");
 
     // リスト幅 文字数から算出
     CGTN_LOGIC.applyPanelWidthByChars(SH.getCFG()?.list?.maxChars || 52);
+
+    // ★ フィルタラベルに辞書を適用（ナビと同じキー）
+    try{
+      const T = (SH.T || SH?.t || ((k)=>k)); // プロジェクトのTヘルパに合わせて
+      listBox.querySelector('#lv-lab-user span').textContent  = T('user');
+      listBox.querySelector('#lv-lab-asst span').textContent  = T('assistant');
+      listBox.querySelector('#lv-lab-all  span').textContent  = T('all'); // ←「全体」
+    }catch{}
 
     // ツールチップ用titleを登録
     if (!listBox._tipsBound) {
@@ -1042,6 +1093,19 @@ console.log("clearListPanelUI catch");
         // 旧: align-items:flex-start だと本文と微ズレが出ることがある
         /* ここから追加 */
         st.textContent = `
+          /* --- フィルタUIの見た目 --- */
+          #cgpt-list-filter label { user-select:none; cursor:pointer; }
+          #cgpt-list-filter input { display:none; }
+          #cgpt-list-filter label span{
+            padding:3px 10px; border-radius:999px; border:1px solid #bbb; font-size:12px;
+          }
+          #cgpt-list-filter label:has(input:checked) span{
+            background:#222; color:#fff; border-color:#222;
+          }
+          /* --- 絞り込み（CSSのみ）--- */
+          #cgpt-list-filter:has(#lv-all:checked)    + #cgpt-list-body .row{ display:flex; }
+          #cgpt-list-filter:has(#lv-user:checked)   + #cgpt-list-body .row:not([data-role="user"])      { display:none; }
+          #cgpt-list-filter:has(#lv-assist:checked) + #cgpt-list-body .row:not([data-role="assistant"]) { display:none; }
           #cgpt-list-body { counter-reset: cgtn_turn; }
 
           /* 全行：左側に固定幅のダミーを置いて揃える（ベースライン揃え） */
@@ -1250,6 +1314,8 @@ console.log("clearListPanelUI catch");
     return listBox;
   }
 
+// ensureListBox ここまで
+
   // 行右端🗒️のイベントを二重で拾い、誤クリック防止
   function addPinHandlers(btn, art){
     if (!btn) return;
@@ -1428,7 +1494,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           scrollToHead(art);
         }); 
         row.dataset.preview = previewText || attachLine || '';
-
+        row.dataset.role = isUser ? 'user' : 'assistant';
         // 付箋の色設定(初期ピン色)：配列の index で決める
         const on = !!pinsArr[index1 - 1];
         paintPinRow(row, on);
@@ -1448,6 +1514,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         row2.style.fontSize = fontPx;
         row2.dataset.idx  = String(index1);
         row2.dataset.kind = 'body';
+        row2.dataset.role = isUser ? 'user' : 'assistant';
         // 連番アンカー
         if (!anchored){
           row2.classList.add('turn-idx-anchor'); // 添付が無いときだけ本文に番号
@@ -1789,6 +1856,8 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
   }
 
   function goPrev(role){
+
+console.log("goPrev*1 role:",role);
     if (!ST?.all?.length) {
       console.debug('[nav-guard] ST.all empty → rebuild()');
       rebuild?.();
@@ -1797,12 +1866,17 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
     /* STが古ければ即再構築 */
     try{
       const cur = pickAllTurns().filter(isRealTurn).length;
-      if (cur !== (ST?.all?.length || 0)) rebuild?.();
+      if (cur !== (ST?.all?.length || 0)){ 
+console.log("goPrev*2 ST古い->rebuild cur:",cur," ST?.all?.length:",ST?.all?.length);
+        rebuild?.();
+      }
     }catch{}
 
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
-    if (!L.length) return;
-
+    if (!L.length) {
+console.log("goPrev*3 L.length:",L.length);
+      return;
+    }
     const sc = getTrueScroller();
     const yStar = sc.scrollTop + currentAnchorY();
     const eps = Number(SH.getCFG().eps)||0;
@@ -1811,22 +1885,26 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
     logScrollSpy(role==='user' ? 'user' : role==='assistant' ? 'assistant' : 'all');
 
     let picked = null, pickedIdx = -1, dbg = [];
-      for (let i=L.length-1;i>=0;i--){
-        const y = articleTop(sc, L[i]);
-        dbg.push({i:i+1, y, pass:(y < yStar - eps)});
-        if (y < yStar - eps) { picked=L[i]; pickedIdx=i; break; }
+    for (let i=L.length-1;i>=0;i--){
+      const y = articleTop(sc, L[i]);
+      dbg.push({i:i+1, y, pass:(y < yStar - eps)});
+      if (y < yStar - eps) { picked=L[i]; pickedIdx=i; break; }
+    }
+    _navLog('goPrev-scan', {role, yStar, eps, tried:dbg.slice(0,6)}); // 直近6件だけ
+
+    if (picked){
+      _navLog('goPrev-hit', {role, idx1: pickedIdx+1, key: getTurnKey(picked)});
+console.log("goPrev*4 picked:",picked);
+      scrollToHead(picked);
+      return;
+    }
+
+    for (let i=L.length-1;i>=0;i--){
+      if (articleTop(sc, L[i]) < yStar - eps) {
+console.log("goPrev*5 L[i]:",L[i]);
+        scrollToHead(L[i]); return; 
       }
-      _navLog('goPrev-scan', {role, yStar, eps, tried:dbg.slice(0,6)}); // 直近6件だけ
-
-      if (picked){
-        _navLog('goPrev-hit', {role, idx1: pickedIdx+1, key: getTurnKey(picked)});
-        scrollToHead(picked);
-      }
-
-
-//    for (let i=L.length-1;i>=0;i--){
-//      if (articleTop(sc, L[i]) < yStar - eps) { scrollToHead(L[i]); return; }
-//    }
+    }
   }
 
   function goNext(role){
