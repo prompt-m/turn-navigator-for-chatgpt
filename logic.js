@@ -1461,25 +1461,57 @@ console.log("clearListPanelUI catch");
     btn.addEventListener('click',        handler, {passive:true});
   }
 
-
   let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
-    const cidAtStart = SH.getChatId?.();
+console.log('[renderList 冒頭]');
+    const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
-console.debug('[renderList 冒頭] cidAtStart=', cidAtStart," my;".my);
+    // 0) Shared 初期化待ち（最大4秒で打ち切り）
+    if (SH?.whenLoaded) {
+      try {
+        await Promise.race([
+          SH.whenLoaded(),
+          new Promise(r => setTimeout(r, 4000)),
+        ]);
+      } catch(_) {}
+    }
+console.log('[renderList *1]');
 
-    await SH.whenLoaded?.();
+    // 1) チャットページかどうか（getPageInfo → URL フォールバック）
+    const info = SH?.getPageInfo?.() || {};
+    const kind = info.kind || (location.pathname.includes('/c/') ? 'chat' : 'other');
+    if (kind !== 'chat') {
+      LG?.clearListPanelUI?.();
+console.log('[renderList *2]');
+      return;
+    }
 
+    // 2) 一覧ON判定（forceOn 最優先）
     const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
-    const enabled = forceOn ? true : !!cfg.list?.enabled;
+    const enabled = forceOn || !!cfg.list?.enabled;
+    if (!enabled){
+console.log('[renderList *3]');
+      return;
+    }
+    // 3) 競合キャンセル用チケット（待機後に採番）
+    const my = ++_renderTicket;
+console.log('[renderList*4] my:',my);
 
-    if (!enabled) return;
+    // 4) ST が空なら一度だけ再構築
+    if (!LG?.ST?.all?.length) {
+      LG?.rebuild?.();
+      if (!LG?.ST?.all?.length) {
+console.log('[renderList *5]');
+        return;
+      }
+    }
 
-    const my = ++_renderTicket;        // ← この呼び出しの券
+    const cidAtStart = SH.getChatId?.();
+    console.log('[renderList] start cid=', cidAtStart, 'ticket=', my);
+
     const panel = ensureListBox();
+
     const body  = panel.querySelector('#cgpt-list-body');
-//    const foot  = panel.querySelector('#cgpt-list-foot');
-//    panel.style.display = 'flex';
     body.style.maxHeight = 'min(75vh, 700px)';
     body.style.overflowY = 'auto';
     body.innerHTML = '';
@@ -1489,6 +1521,7 @@ console.debug('[renderList 冒頭] cidAtStart=', cidAtStart," my;".my);
     const pinOnly = (opts && Object.prototype.hasOwnProperty.call(opts,'pinOnlyOverride'))
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
+
 console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
 
     const pinBtn = panel.querySelector('#cgpt-pin-filter');

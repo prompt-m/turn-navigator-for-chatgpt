@@ -1239,25 +1239,10 @@ console.log("installAutoSyncForTurns 4");
     EV.bindEvents();
     bindPreviewDockOnce();
     bindBaselineAutoFollow();
-//    bindListRefreshButton();
-//    forceListPanelOffOnBoot();
 
     if (USE_INJECT_URL_HOOK)injectUrlChangeHook();
 
     try { SH.cleanupZeroPinRecords?.(); } catch {}
-/*
-   (async () => {
-     const LG = window.CGTN_LOGIC;
-     try {
-console.log("content.js rebuild call *6.1");
-        await LG.ensureTurnsReady?.();  // ← ここを追加
-console.log("content.js rebuild call *6.2");
-        LG.rebuild?.();                 // 既存の rebuild 呼び出し
-      } catch(e) {
-        console.warn('[init] ensureTurnsReady failed', e);
-      }
-    })();
-*/
   (async () => {
     const LG = window.CGTN_LOGIC;
     try {
@@ -1271,17 +1256,14 @@ console.log("content.js rebuild call *6.1");
       await LG.ensureTurnsReady?.();
 console.log("content.js rebuild call *6.2");
       LG.rebuild?.();
+      LG.renderList?.(true);
     } catch(e) {
       console.warn('[init] ensureTurnsReady failed', e);
       LG.rebuild?.(); // 最悪でも一度は試す
+      LG.renderList?.(true); 
     }
   })();
 
-
-
-//    if (SH.isListOpen?.()) {
-//      LG.renderList?.(true);
-//    }
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
