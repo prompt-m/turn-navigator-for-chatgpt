@@ -224,6 +224,7 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
                 try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
 
                 // 再構築＋描画
+console.log("content.js rebuild call *1");
                 LG?.rebuild?.(cidNow);
                 LG?.renderList?.(true);
 
@@ -235,6 +236,7 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
                     try{
                       await waitForChatSettled({ cid: cidNow, idleMs: 300, tickMs: 100, maxMs: 3000 });
                       if (cidNow === (window.CGTN_SHARED?.getChatId?.())) {
+console.log("content.js rebuild call *2");
                         window.CGTN_LOGIC?.rebuild?.(cidNow);
                         window.CGTN_LOGIC?.renderList?.(true);
                       }
@@ -812,6 +814,7 @@ console.log("＊＊＊＊closeDockOnUrlChange 3 open＊＊＊＊");
             const cid = SH.getChatId?.();
             // pins → 新チャットへ切替（引数省略版でもOK）
             if (cid) LG?.hydratePinsCache?.(cid); else LG?.hydratePinsCache?.();
+console.log("content.js rebuild call *3");
             LG?.rebuild?.('auto:chat-switch');
             LG?.renderList?.(true);
           } catch (e) {
@@ -884,6 +887,7 @@ console.debug('[forceListPanelOffOnBoot] LG?.setListEnabled false ');
       const aKind = anchor?.dataset?.kind || null;
 
       // 再スキャン & 再描画
+console.log("content.js rebuild call *4");
 console.debug('[bindListRefreshButton]LG.rebuild() ');
       LG?.rebuild?.();
       LG?.renderList?.(true);
@@ -993,19 +997,6 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
   }
 
   // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
-/*
-  function injectUrlChangeHook() {
-    try {
-      const s = document.createElement('script');
-      s.src = chrome.runtime.getURL('inject_url_hook.js');
-      (document.head || document.documentElement).appendChild(s);
-      s.remove();
-    } catch (e) {
-      console.warn('injectUrlChangeHook failed', e);
-    }
-  }
-*/
-  // ======== URL変化をフックして postMessage させる（page側IIFEを注入） ========
   function injectUrlChangeHook() {
     try {
       // すでに差し込まれていればスキップ
@@ -1164,6 +1155,7 @@ console.log("installAutoSyncForTurns 2");
       clearTimeout(to);
       to = setTimeout(() => {
         try{
+console.log("content.js rebuild call *5");
           LG.rebuild?.();
           LG.renderList?.(true);
           console.debug('[auto-sync] turns+ (list open) → rebuild+render');
@@ -1208,6 +1200,25 @@ console.log("installAutoSyncForTurns 4");
     }
   }
 
+  // 1) 最初の turn-added を待つ Promise
+  function waitForFirstTurnAdded(timeout = 15000){
+    return new Promise(resolve => {
+      const to = setTimeout(() => {
+        window.removeEventListener('message', onMsg, true);
+        resolve('timeout');
+      }, timeout);
+      const onMsg = (ev) => {
+        const d = ev?.data;
+        if (d && d.source === 'cgtn' && d.type === 'turn-added') {
+          window.removeEventListener('message', onMsg, true);
+          clearTimeout(to);
+          resolve('turn-added');
+        }
+      };
+      window.addEventListener('message', onMsg, true);
+    });
+  }
+
   // ========= 9) 初期セットアップ =========
   async function initialize(){
     await SH.loadSettings();
@@ -1233,9 +1244,41 @@ console.log("installAutoSyncForTurns 4");
 
     if (USE_INJECT_URL_HOOK)injectUrlChangeHook();
 
-   try { SH.cleanupZeroPinRecords?.(); } catch {}
+    try { SH.cleanupZeroPinRecords?.(); } catch {}
+/*
+   (async () => {
+     const LG = window.CGTN_LOGIC;
+     try {
+console.log("content.js rebuild call *6.1");
+        await LG.ensureTurnsReady?.();  // ← ここを追加
+console.log("content.js rebuild call *6.2");
+        LG.rebuild?.();                 // 既存の rebuild 呼び出し
+      } catch(e) {
+        console.warn('[init] ensureTurnsReady failed', e);
+      }
+    })();
+*/
+  (async () => {
+    const LG = window.CGTN_LOGIC;
+    try {
+console.log("content.js rebuild call *6.1");
+      // どちらか早い方（turn-added か ensureTurnsReady）
+      await Promise.race([
+        waitForFirstTurnAdded(15000),
+        LG.ensureTurnsReady?.()
+      ]);
+      // さらに“安定”をもう一度だけ待つ（高さ変動の収束）
+      await LG.ensureTurnsReady?.();
+console.log("content.js rebuild call *6.2");
+      LG.rebuild?.();
+    } catch(e) {
+      console.warn('[init] ensureTurnsReady failed', e);
+      LG.rebuild?.(); // 最悪でも一度は試す
+    }
+  })();
 
-    LG.rebuild?.();
+
+
 //    if (SH.isListOpen?.()) {
 //      LG.renderList?.(true);
 //    }

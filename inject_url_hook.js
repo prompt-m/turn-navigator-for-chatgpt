@@ -18,6 +18,7 @@
     if (/^\/g\/p-/.test(p)) return 'project';
     return 'other';
   };
+
   const log  = (...a) => console.log('[cgtn:inject]', now(), ...a);
   const post = (type, extra={}) => {
     const payload = { source:'cgtn', type, cid: chatIdFromUrl(), kind: pageKind(), ...extra };
