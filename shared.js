@@ -4,8 +4,6 @@
   window.CGTN_SHARED = Object.assign(window.CGTN_SHARED || {}, { t });
   const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
 
-//  let CFG = structuredClone(DEFAULTS);
-//  let CFG = SH.getCFG ? SH.getCFG() : (SH._BOOT_CFG || {}); // 既存があれば引き継ぐ
   // メモリCFG
   let CFG = window.CGTN_SHARED?._BOOT_CFG || {};
 
@@ -426,6 +424,54 @@
     }
     if (changed) SH.saveSettingsPatch({ pinsByChat: map });
   };
+
+
+   // ===== 新仕様 =====
+   // ===== Pins storage helpers (options画面・管理用) =====
+   async function _loadCfgRaw(){
+     return new Promise(res=>{
+       try{
+         chrome.storage.sync.get('cgNavSettings', ({ cgNavSettings })=>{
+           res(cgNavSettings || {});
+         });
+       }catch{ res({}); }
+     });
+   }
+   async function _saveCfgRaw(next){
+     return new Promise((res,rej)=>{
+       try{
+         chrome.storage.sync.set({ cgNavSettings: next }, ()=>res(true));
+       }catch(e){ rej(e); }
+     });
+   }
+ 
+   SH.loadPinsMapAsync = async function loadPinsMapAsync(){
+     const cfg = await _loadCfgRaw();
+     const map = cfg.pinsByChat || {};
+     return map; // { [chatId]: boolean[] }
+   };
+ 
+   SH.savePinsMapAsync = async function savePinsMapAsync(nextMap){
+     const cfg = await _loadCfgRaw();
+     cfg.pinsByChat = nextMap || {};
+     await _saveCfgRaw(cfg);
+     return true;
+   };
+ 
+   SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr){
+     const map = await SH.loadPinsMapAsync();
+     if (pinsArr && pinsArr.length) map[chatId] = pinsArr;
+     else delete map[chatId];
+     await SH.savePinsMapAsync(map);
+     return true;
+   };
+ 
+   SH.deletePinsForChatAsync = async function deletePinsForChatAsync(chatId){
+     const map = await SH.loadPinsMapAsync();
+     if (map[chatId]){ delete map[chatId]; await SH.savePinsMapAsync(map); }
+     return true;
+   };
+
 
   // 読み出しは同期しても良いけど、呼び元の都合上 sync版も提供
   SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
