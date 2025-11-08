@@ -139,7 +139,6 @@
     }
   }
 
-
   // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
   (function bindCgtnMessageOnce(){
 console.log("bindCgtnMessageOnce*0");
@@ -187,163 +186,34 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
 
         // ---- 既存チャット（/c/...）でイベントが来た場合 ----
         if (d.type === 'url-change' || d.type === 'turn-added') {
-          if (!SH?.isListOpen?.()) return;
+          const prev   = __lastCid;
+          __lastCid    = cidNow;
+          const changed= (prev !== null && cidNow !== prev);
+          const myGen  = ++__gen;
 
-          const prev = __lastCid;
-          __lastCid  = cidNow;
-          const changed = (prev !== null && cidNow !== prev);
-          const myGen   = ++__gen;
+          // 先にプレビューは畳む
+          try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
 
-          clearTimeout(__debTo);
-          __debTo = setTimeout(() => {
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-              (async () => {
-                // 途中で別イベントに追い越されたら中断
-                if (myGen !== __gen) return;
-
-                // URL切替時だけ「落ち着くまで待つ」（N→0を短時間→0→N→idle）
-                if (d.type === 'url-change') {
-                  await waitForChatSettled({
-                    cid: cidNow,
-                    requireDropToZero: true,   // N→0 を短時間狙う（拾えなくても続行）
-                    expectZeroFirst:   true,   // 0 を見てから N を待つ
-                    fastTickMs:        45,
-                    slowTickMs:        140,
-                    phase0ms:          900,
-                    phaseAms:          1800,
-                    idleMs:            280,
-                    maxMs:             15000,
-                    requirePositive:   true    // >0 を観測してから idle 成功
-                  });
-                }
-
-                // 待機後も念のため照合
-                if (myGen !== __gen) return;
-                if (cidNow !== (SH?.getChatId?.())) return;
-
-                try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-
-                // 再構築＋描画
-console.log("content.js rebuild call *1");
-                LG?.rebuild?.(cidNow);
-                LG?.renderList?.(true);
-
-                // 描画後の件数を見て B を出す（必要なら軽リトライ）
-                const turns = (window.CGTN_LOGIC?.STATE?.all?.length) || 0;
-                if (turns === 0) {
-                  window.CGTN_UI?.toast?.('リスト生成に失敗した可能性があります。［最新にする］を押してください'); // メッセージB
-                  setTimeout(async ()=>{
-                    try{
-                      await waitForChatSettled({ cid: cidNow, idleMs: 300, tickMs: 100, maxMs: 3000 });
-                      if (cidNow === (window.CGTN_SHARED?.getChatId?.())) {
-console.log("content.js rebuild call *2");
-                        window.CGTN_LOGIC?.rebuild?.(cidNow);
-                        window.CGTN_LOGIC?.renderList?.(true);
-                      }
-                    }catch{}
-                  }, 600);
-                }
-
-                console.debug(`[cgtn] ${changed ? 'chat-switch' : 'turn-added'} → rebuild+render (settled)`);
-              })().catch(err => console.warn('[cgtn] settle/wait error:', err));
-            }));
-          }, 0);
-        }
-      })();
-    }, true);
-  })();
-
-/*
-  (function bindCgtnMessageOnce(){
-console.log("bindCgtnMessageOnce*1");
-    if (window.__CGTN_MSG_BOUND__) return;
-    window.__CGTN_MSG_BOUND__ = true;
-
-    let __lastCid = null;        // 直近のchatId
-    let __debTo   = 0;           // デバウンス用タイマ
-    let __gen     = 0;           // 世代トークン（逆戻り防止）
-
-    window.addEventListener('message', (ev) => {
-      (async () => {  // ← async ラッパーで await が使えるように
-        const d = ev && ev.data;
-        if (!d || d.source !== 'cgtn') return;
-        const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
-
-      const kind    = d.kind || 'other';
-      const cidNow  = d.cid || SH?.getChatId?.();
-
-      // ホーム/プロジェクト等 → クリアだけ
-      if (kind === 'home' || kind === 'other') {
-          LG?.clearListPanelUI?.();
-          __lastCid = null;
-          __gen++;
-          return;
-        }
-        // 新しいチャット（0のまま） → クリア＋空のrebuild（待機不要）
-        if (kind === 'new') {
-          if (!SH?.isListOpen?.()) return;
-          __lastCid = null; __gen++;
-          LG?.clearListPanelUI?.();
-          LG?.rebuild?.(null);     // chatIdなし→空
-          LG?.renderList?.(true);
-          return;
-        }
-
-        // ---- チャットページでイベントが来た場合 ----
-        if (d.type === 'url-change' || d.type === 'turn-added') {
-          if (!SH?.isListOpen?.()) return;
-
-          const prev = __lastCid;
-          __lastCid  = cidNow;
-          const changed = (prev !== null && cidNow !== prev);
-          const myGen   = ++__gen;
+          // マスクをすばやくON（視覚フィードバック）
+          try { setUiBusy?.(true); } catch {}
 
           clearTimeout(__debTo);
           __debTo = setTimeout(() => {
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-              // rAF 内では async を直接使わず、即時 async を起動
+            requestAnimationFrame(() => {
               (async () => {
-                // 途中で別イベントに追い越されたら中断
-                if (myGen !== __gen) return;
-                // URL 切替時だけ「落ち着くまで待つ」
-                // 既存チャット（/c/...）想定: N→0 を短時間観測→ 0→N → idle
-                if (d.type === 'url-change') {
-                  await waitForChatSettled({
-                    cid: cidNow,
-                    requireDropToZero: true,  // N→0 を短時間狙う（拾えなくても続行）
-                    expectZeroFirst:   true,  // 0 を一度見た後に N を待つ
-                    // 速いポーリングで取り逃しを減らし、その後は軽く
-                    fastTickMs: 45,
-                    slowTickMs: 140,
-                    // 0 検出フェーズの上限 / 0→N 追跡フェーズの上限
-                    phase0ms: 900,
-                    phaseAms: 1800,
-                    // idle 判定はやや短めに
-                    idleMs: 280,
-                    maxMs: 15000
-                  });
-                }
-                // 待機後も念のため照合
-                if (myGen !== __gen) return;
-                if (cidNow !== (SH?.getChatId?.())) return;
-
-                try { if (d.type === 'url-change') window.CGTN_PREVIEW?.hide?.('url-change'); } catch {}
-                // 再構築＋描画
-                LG?.rebuild?.(cidNow);
-                LG?.renderList?.(true);
-                console.debug(`[cgtn] ${changed ? 'chat-switch' : 'turn-added'} → rebuild+render (settled)`);
-              })().catch(err => console.warn('[cgtn] settle/wait error:', err));
-            }));
-          }, 0);
-
-
+                if (myGen !== __gen) return; // 競合キャンセル
+                // 一括待機＋rebuild＋必要ならrenderList（一覧OFFなら内部でスキップ）
+                await rebuildAndRenderSafely({ /* forceList:false */ });
+                console.debug(`[cgtn] ${changed ? 'chat-switch' : 'turn-added'} → rebuild(+render) done`);
+              })().catch(err => console.warn('[cgtn] rebuildAndRenderSafely error:', err))
+                .finally(() => { try { setUiBusy?.(false); } catch {} });
+            });
+          }, 80); // 軽デバウンス
         }
-
 
       })();
     }, true);
   })();
-*/
 
   // --- 自動同期フラグ（最小差分用） ---
   // リスト開状態なら「チャット切替時」に中身だけ差し替える
@@ -1219,6 +1089,76 @@ console.log("installAutoSyncForTurns 4");
     });
   }
 
+
+  // 画面操作を一時的にブロック
+  function setUiBusy(busy = true) {
+    const ids = ['cgpt-nav', 'cgpt-list-panel']; // 必要なら増やす
+    for (const id of ids) {
+      const host = document.getElementById(id);
+      if (!host) continue;
+
+      // CSS-only 無効化
+      host.classList.toggle('loading', busy);
+
+      // 半透明マスク（見た目も分かりやすく）
+      let mask = host.querySelector(':scope > .cgtn-mask');
+      if (busy) {
+        if (!mask) {
+          mask = document.createElement('div');
+          mask.className = 'cgtn-mask';
+          Object.assign(mask.style, {
+            position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.55)',
+            backdropFilter: 'blur(2px)', cursor: 'wait', zIndex: 9999, pointerEvents: 'auto'
+          });
+          // relative が無いと被せられない
+          if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+          host.appendChild(mask);
+        }
+      } else {
+        mask?.remove();
+      }
+    }
+  }
+
+  // CSS（どこかで1回注入）
+  (function ensureBusyStyle(){
+    if (document.getElementById('cgtn-busy-style')) return;
+    const st = document.createElement('style');
+    st.id = 'cgtn-busy-style';
+    st.textContent = `
+      #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none; opacity: .6; cursor: not-allowed; }
+    `;
+    document.head.appendChild(st);
+  })();
+
+  let __buildGen = 0;
+
+  async function rebuildAndRenderSafely({ forceList = false } = {}) {
+    const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
+    const myGen = ++__buildGen;
+    setUiBusy(true);
+    try {
+      // どちらか早い方（turn-added or ensureTurnsReady）
+      await Promise.race([ waitForFirstTurnAdded(15000), LG.ensureTurnsReady?.() ]);
+      // もう一度だけ安定待ち
+      await LG.ensureTurnsReady?.();
+      // 競合キャンセル
+      if (myGen !== __buildGen) return;
+
+      LG.rebuild?.();
+      if (myGen !== __buildGen) return;
+
+      const kind = SH.getPageInfo?.()?.kind || 'other';
+      const on   = forceList || !!(SH.getCFG?.()?.list?.enabled);
+      if (kind === 'chat' && on) {
+        await LG.renderList?.(forceList);
+      }
+    } finally {
+      if (myGen === __buildGen) setUiBusy(false);
+    }
+  }
+
+
   // ========= 9) 初期セットアップ =========
   async function initialize(){
     await SH.loadSettings();
@@ -1243,27 +1183,15 @@ console.log("installAutoSyncForTurns 4");
     if (USE_INJECT_URL_HOOK)injectUrlChangeHook();
 
     try { SH.cleanupZeroPinRecords?.(); } catch {}
-  (async () => {
-    const LG = window.CGTN_LOGIC;
-    try {
-console.log("content.js rebuild call *6.1");
-      // どちらか早い方（turn-added か ensureTurnsReady）
-      await Promise.race([
-        waitForFirstTurnAdded(15000),
-        LG.ensureTurnsReady?.()
-      ]);
-      // さらに“安定”をもう一度だけ待つ（高さ変動の収束）
-      await LG.ensureTurnsReady?.();
-console.log("content.js rebuild call *6.2");
-      LG.rebuild?.();
-      LG.renderList?.(true);
-    } catch(e) {
-      console.warn('[init] ensureTurnsReady failed', e);
-      LG.rebuild?.(); // 最悪でも一度は試す
-      LG.renderList?.(true); 
-    }
-  })();
 
+    // content.js → initialize() 内の最初の rebuild 呼び出しを置き換え
+    (async () => {
+      try {
+        await rebuildAndRenderSafely({ forceList:true });
+      } catch(e) {
+        console.warn('[init] rebuildAndRenderSafely failed', e);
+      }
+    })();
 
     // viewport 変化でナビ位置クランプ
     window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });

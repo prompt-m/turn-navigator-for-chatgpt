@@ -13,15 +13,16 @@
 
     // 初期チェック状態を反映
     try {
-      window.CGTN_SHARED?.saveSettingsPatch?.({ list:{ enabled:false } });
-      box.querySelector('#cgpt-viz').checked  = !!SH.getCFG()?.showViz;
-//      box.querySelector('#cgpt-list-toggle').checked = !!(SH.getCFG()?.list?.enabled);
-      box.querySelector('#cgpt-list-toggle').checked = false;
+      box.querySelector('#cgpt-viz').checked  = !!(SH.getCFG()?.showViz);
+      // 保存済みCFGをそのまま反映（強制OFF禁止）
+      const on = !!(SH.getCFG()?.list?.enabled);
+      const chk = box.querySelector('#cgpt-list-toggle');
+      if (chk) chk.checked = on;
 
-      const pinOnlyChk = document.getElementById('cgpt-pinonly');
-      if (pinOnlyChk){
+       const pinOnlyChk = document.getElementById('cgpt-pinonly');
+       if (pinOnlyChk){
         pinOnlyChk.checked  = !!(SH.getCFG()?.list?.pinOnly);
-        pinOnlyChk.disabled = !SH.getCFG()?.list?.enabled;
+        pinOnlyChk.disabled = !on;
       }
     } catch {}
 

@@ -1441,21 +1441,7 @@ console.log("clearListPanelUI catch");
 
       // 5) 同ターンの相方行を含め UI 同期（強制状態で反映）
       refreshPinUIForTurn(k, nextOn);
-//      NS.updateListFooterInfo?.();
-/*
-      ev.stopPropagation();
-      const k = getTurnKey(art);
-      const before = isPinned(art);
-      togglePin(art);                  // 保存（SH.saveSettingsPatchベース）
-      const after = isPinned(art);
 
-      const cur = SH.getCFG() || {};
-      if (cur.list?.pinOnly && before && !after){
-        rowsByTurn(k).forEach(n => n.remove()); // 付箋のみで外した→そのターン行を削除
-        return;
-      }
-      refreshPinUIForTurn(k);                   // 同ターン2行を部分更新
-*/
     };
     btn.addEventListener('pointerdown', handler, {passive:true});
     btn.addEventListener('click',        handler, {passive:true});
@@ -1485,14 +1471,31 @@ console.log('[renderList *1]');
 console.log('[renderList *2]');
       return;
     }
-
+/*
     // 2) 一覧ON判定（forceOn 最優先）
     const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
     const enabled = forceOn || !!cfg.list?.enabled;
     if (!enabled){
-console.log('[renderList *3]');
       return;
     }
+*/
+
+    const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
+    const enabled = forceOn ? true : !!cfg.list?.enabled;
+    if (!enabled) { NS._panelOpen = false; return; }
+
+    // ★ forceOn の時は“実体を必ず開く”
+    NS._panelOpen = true;
+    const panel = ensureListBox();
+    panel.classList.remove('collapsed');
+    const btn = panel.querySelector('#cgpt-list-collapse');
+    // 開=▴ / 閉=▾
+    if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
+    panel.style.display = 'flex';          // CSS 既定の display:none を解除
+    panel.style.visibility = 'hidden';     // レイアウト確定まで
+
+console.log('[renderList *3 panel.style.display:]',panel.style.display);
+
     // 3) 競合キャンセル用チケット（待機後に採番）
     const my = ++_renderTicket;
 console.log('[renderList*4] my:',my);
@@ -1508,8 +1511,6 @@ console.log('[renderList *5]');
 
     const cidAtStart = SH.getChatId?.();
     console.log('[renderList] start cid=', cidAtStart, 'ticket=', my);
-
-    const panel = ensureListBox();
 
     const body  = panel.querySelector('#cgpt-list-body');
     body.style.maxHeight = 'min(75vh, 700px)';
@@ -1747,10 +1748,13 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     }
     //注目ターンのキー行へスクロール
     scrollListToTurn(NS._currentTurnKey); // 高さが取れるので末尾へ確実にスクロール
-    if (my === _renderTicket && NS._panelOpen) {
+
+    if (my === _renderTicket && (NS._panelOpen || forceOn)) {
       panel.style.visibility = 'visible'; // 最後に見せる（任意）
     }
 
+    console.debug('[renderList 末尾] panel.style.display:',panel.style.display);
+    console.debug('[renderList 末尾] panel.style.visibility:',panel.style.visibility);
     console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 

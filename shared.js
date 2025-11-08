@@ -671,6 +671,7 @@ console.log("getPinsCountByChat catch");
   // === UIの実状態: 今まさにリストが開いているか？ ===
   /** UI(checkbox) → ランタイムフラグ → 保存値 の順で判定 */
   SH.isListOpen = function isListOpen(){
+console.log("***isListOpen***");
     try{
       const cb = document.getElementById('cgpt-list-toggle');
       if (cb) return !!cb.checked;
