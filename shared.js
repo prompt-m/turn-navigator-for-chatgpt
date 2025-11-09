@@ -21,7 +21,7 @@
     const fileCfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
     // ここで既定値とマージ（DEFAULTS はこの時点で定義済み）
     CFG = Object.assign(structuredClone(DEFAULTS), fileCfg);
-    try { cb && cb(cfg); } catch {}
+    try { cb && cb(CFG); } catch {}
     try { SH.markLoaded?.(); } catch {}
     return CFG;
  }

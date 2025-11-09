@@ -292,34 +292,72 @@ console.log("flashMsgInline id:",id);
 
   // 表示直前に“最新タイトルへ置換”してから描画
   async function renderPinsManager(){
-    const box = $('pins-table'); if (!box) return;
-    await new Promise(res => (SH.loadSettings ? SH.loadSettings(res) : res()));
+
+    // 設定ロード（await で確実に完了させる）
+    if (SH.loadSettings) await SH.loadSettings();
+
+    // 新仕様：chatIdごとの分割キーを走査してmapを構築
+    const all = await new Promise(res => {
+      try {
+        chrome.storage.sync.get(null, items => res(items || {})); 
+      }
+      catch {
+        res({}); 
+      }
+    });
+console.log("renderPinsManager*2 all:",all);
+    const map = {};
+    for (const [key, val] of Object.entries(all)) {
+      if (!/^cgtnPins::/.test(key)) continue;
+      const chatId  = key.replace(/^cgtnPins::/, '');
+      const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
+      if (pinsArr.length > 0) {
+        const title = (SH.getChatTitle?.(chatId) || '(No Title)');
+        const updated = val.updatedAt || Date.now();
+        map[chatId] = { pins: pinsArr, title, updatedAt: updated };
+      }
+    }
+console.log("renderPinsManager*3 map:",map);
+    const box = $('pins-table'); 
+    if (!box) return;
+
     const cfg = (SH.getCFG && SH.getCFG()) || {};
+console.log("renderPinsManager*3.1 cfg:",cfg);
 
-    //const pins = cfg.pinsByChat || {};
-    const pins = getNormalizedPinsForOptions(cfg);
-    const liveIdx = (cfg.chatIndex && cfg.chatIndex.ids) || {};
+    // options では runtime キャッシュが無いので、直前で構築した map を pins として使う
+    const pins = map;
+    console.log("renderPinsManager*3.2 pins(map):", pins);
+  
+    // サイドバーの“生存チャット索引”があれば補助で使う（無ければ空でOK）
+    const liveIdx = (cfg.chatIndex && (cfg.chatIndex.ids || cfg.chatIndex.map)) || {};
+    console.log("renderPinsManager*3.3 liveIdx:", liveIdx);
+  
+    // 今開いているチャットID（options では基本 null でOK）
+    const nowOpen  = cfg.currentChatId ?? null;
+    console.log("renderPinsManager*3.5 nowOpen:", nowOpen);
 
-    const aliveMap = (cfg.chatIndex && cfg.chatIndex.ids) || {};
-    const nowOpen  = cfg.currentChatId || null;
 
     const rows = Object.entries(pins).map(([cid, rec]) => {
       // タイトルは保存しない方針：live（chatIndexや現在タブ）に無ければ chatId を表示
       const liveTitle = (liveIdx[cid]?.title || '').trim();
-      const title = (liveTitle || cid).replace(/\s+/g,' ').slice(0,120);
+      const title = (rec?.title || liveTitle || cid).replace(/\s+/g,' ').slice(0,120);
 
       // pins は配列想定（shared.js の方針に合わせる）：1 の数を数える
       const pinsArr = Array.isArray(rec?.pins) ? rec.pins : [];
       const pinsCount = pinsArr.filter(Boolean).length;
 
       const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
-      const existsInSidebar = !!liveIdx[cid]; // ここも liveIdx に揃える
+      const existsInSidebar = !!liveIdx[cid];
       const isNowOpen = (cid === nowOpen);
       const canDelete = true; // 仕様：常に削除可（必要なら条件に戻す）
 
-      return { cid, title, count: pinsCount, date, canDelete, isNowOpen, existsInSidebar };
-     }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
+      return {
+        cid, title, count: pinsCount, date, canDelete, isNowOpen, existsInSidebar 
+      };
+    }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
 
+console.log("renderPinsManager*4 rows:", rows);
+console.log("renderPinsManager*5 rows.length:",rows.length);
     if (!rows.length){
       box.innerHTML = `
         <div class="empty" style="padding:14px 8px; color:var(--muted);">
@@ -329,8 +367,29 @@ console.log("flashMsgInline id:",id);
       return;
     }
 
+    const html = Object.entries(map).map(([cid, rec]) => {
+      const count = Array.isArray(rec.pins)
+        ? rec.pins.filter(Boolean).length
+        : 0;
+      const dateStr = rec.updatedAt
+        ? new Date(rec.updatedAt).toLocaleString()
+        : '-';
+      return `
+        <tr data-cid="${cid}">
+          <td style="word-break:break-all;">${rec.title || '(No Title)'}</td>
+          <td style="text-align:center;">${count}</td>
+          <td style="text-align:center;">${dateStr}</td>
+          <td style="text-align:center;">
+            <button class="pm-del" type="button">🗑</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+
+/*
     const html = [
-      /* ここから追加：正しいテーブル構造に刷新 */
+      // ここから追加：正しいテーブル構造に刷新 
       '<table class="cgtn-pins-table">',
       `<thead>
          <tr>
@@ -352,10 +411,12 @@ console.log("flashMsgInline id:",id);
           </tr>`;
         }),
       '</tbody></table>'
-      /* ここまで */
+      // ここまで 
     ].join('');
-    box.innerHTML = html;
+*/
 
+    box.innerHTML = html;
+console.log("renderPinsManager*6 html:",html);
     /* ここから追加：ラッパにスクロールを付与（options.html 側の .pins-wrap を再利用） */
     const wrap = box.parentElement;           // <div class="pins-wrap">
     if (wrap) wrap.classList.add('cgtn-pins-scroll');
@@ -443,7 +504,7 @@ console.log("flashMsgInline id:",id);
       try{ updateSyncUsageLabel(); }catch(_){}
       });
     }
-    /* ここまで */
+    /* renderPinsManager ここまで */
   }
 
 

@@ -224,28 +224,54 @@
       <button id="lang-en" class="pill-btn" type="button" data-i18n="opts.lang.en"></button>
     </div>
 
+
     <!-- ===== 付箋データ管理 ===== -->
     <div class="section-block">
       <div class="section-inner">
-        <div class="section-head">
-          <div class="section-title" data-i18n="options.pinsTitle"></div>
-          <div class="section-tools">
+
+        <div class="section-head" style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="section-title" data-i18n="options.pinsTitle">付箋データ管理</div>
+            <div class="hint" data-i18n="options.pinsHint">各チャットの付箋を一覧。不要になったチャットは削除できます。</div>
+          </div>
+          <div class="section-tools" style="display:flex;align-items:center;gap:8px;">
             <span id="sync-usage" class="usage-label" title="chrome.storage.sync usage">sync...</span>
-            <button id="cgtn-refresh" class="btn" type="button" data-i18n="options.refreshTitles"></button>
+            <button id="pins-refresh" class="btn small" type="button">
+              <span data-i18n="options.refreshTitles">最新にします</span>
+            </button>
           </div>
         </div>
-        <div class="hint-row">
-          <p class="hint" id="pins-hint" data-i18n="options.pinsHint"></p>
-          <p class="hint flash-msg" id="pins-msg"></p>
-        </div>
-        <div class="island">
-          <div class="pins-wrap">
-            <!-- テーブルは options.js が #pins-table に描画 -->
-            <div id="pins-table"></div>
+
+        <div class="island" style="margin-top:8px;">
+          <div class="pins-wrap" style="border:1px solid var(--hair);border-radius:8px;max-height:320px;overflow:auto;">
+            <table class="pins-table" style="width:100%;border-collapse:separate;border-spacing:0;">
+              <thead style="position:sticky;top:0;background:var(--panel-bg);z-index:1;">
+                <tr>
+                  <th style="width:56px;text-align:right;padding:8px 10px;">No.</th>
+                  <th style="text-align:left;padding:8px 10px;">
+                    <span data-i18n="options.thChat">チャット</span>
+                  </th>
+                  <th style="width:80px;text-align:right;padding:8px 10px;">
+                    <span data-i18n="options.thCount">付箋数</span>
+                  </th>
+                  <th style="width:54px;text-align:center;">
+                    <span data-i18n="options.thOps">操作</span>
+                  </th>
+                  <th style="width:210px;text-align:center;padding:8px 10px;">
+                    <span data-i18n="options.thUpdated">更新</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="pins-tbody"></tbody>
+            </table>
           </div>
         </div>
+
       </div>
     </div>
+    <!-- ===== /付箋データ管理 ===== -->
+
+
 
     <!-- ===== 一覧パネルの表示設定（保存帯つき） ===== -->
     <div class="section-block">
