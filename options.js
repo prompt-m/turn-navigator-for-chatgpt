@@ -56,23 +56,6 @@ console.log("syncSetAsync",obj);
       console.warn('updateSyncUsageLabel failed', e);
     }
   }
-  /* sync 使用量ラベルを更新（常時表示＋i18n対応） */
-
-//  async function updateSyncUsageLabel(){
-//    try{
-//      const el = document.getElementById('sync-usage');
-//      if (!el || !chrome?.storage?.sync?.getBytesInUse) return;
-//      chrome.storage.sync.getBytesInUse(null, (bytes)=>{
-//        // ※ 100KB は Chrome Sync の合計上限
-//        const used = (bytes || 0);
-//        const usedKB = (Math.round(used/102.4)/10).toFixed(1); // 8.0KB など
-//        const totalKB = 100;
-//        // i18n：「options.syncUsage」が無ければフォールバック
-//        const label = (typeof T === 'function' ? T('options.syncUsage') : 'sync usage:');
-//        el.textContent = `${label} ${usedKB}KB / ${totalKB}KB`;
-//      });
-//    }catch(e){ /* no-op */ }
-//  }
 
   function sanitize(raw){
     const base = JSON.parse(JSON.stringify(DEF));
@@ -190,6 +173,7 @@ console.log("syncSetAsync",obj);
       else                               el.textContent = v;
     });
   }
+
 
   // --- pointer tracker（マウス/タッチの最後の位置を保持） ---
   let _lastPt = { x: window.innerWidth/2, y: window.innerHeight/2 };
@@ -318,8 +302,8 @@ console.log("renderPinsManager*2 all:",all);
       }
     }
 console.log("renderPinsManager*3 map:",map);
-    const box = $('pins-table'); 
-    if (!box) return;
+    const tbody = document.getElementById('pins-tbody');
+    if (!tbody) return;
 
     const cfg = (SH.getCFG && SH.getCFG()) || {};
 console.log("renderPinsManager*3.1 cfg:",cfg);
@@ -331,16 +315,24 @@ console.log("renderPinsManager*3.1 cfg:",cfg);
     // サイドバーの“生存チャット索引”があれば補助で使う（無ければ空でOK）
     const liveIdx = (cfg.chatIndex && (cfg.chatIndex.ids || cfg.chatIndex.map)) || {};
     console.log("renderPinsManager*3.3 liveIdx:", liveIdx);
-  
+
+    // 追加：プロジェクト名を付けた見出しに整形
+    function formatTitleForOptions(cid, fallback='') {
+      const live = liveIdx[cid] || {};
+      // live.title … チャット名、live.project / live.folder / live.group … プロジェクト名（どれか入っている想定）
+      const proj = (live.project || live.folder || live.group || '').trim();
+      let t = (live.title || fallback || cid).trim();
+      if (proj && !t.startsWith(proj)) t = `${proj} - ${t}`;
+      return t.replace(/\s+/g,' ');
+    }
+
     // 今開いているチャットID（options では基本 null でOK）
     const nowOpen  = cfg.currentChatId ?? null;
     console.log("renderPinsManager*3.5 nowOpen:", nowOpen);
 
 
     const rows = Object.entries(pins).map(([cid, rec]) => {
-      // タイトルは保存しない方針：live（chatIndexや現在タブ）に無ければ chatId を表示
-      const liveTitle = (liveIdx[cid]?.title || '').trim();
-      const title = (rec?.title || liveTitle || cid).replace(/\s+/g,' ').slice(0,120);
+      const title = formatTitleForOptions(cid, rec?.title || '').slice(0, 120);
 
       // pins は配列想定（shared.js の方針に合わせる）：1 の数を数える
       const pinsArr = Array.isArray(rec?.pins) ? rec.pins : [];
@@ -359,7 +351,7 @@ console.log("renderPinsManager*3.1 cfg:",cfg);
 console.log("renderPinsManager*4 rows:", rows);
 console.log("renderPinsManager*5 rows.length:",rows.length);
     if (!rows.length){
-      box.innerHTML = `
+      tbody.innerHTML = `
         <div class="empty" style="padding:14px 8px; color:var(--muted);">
           <div style="font-weight:700; margin-bottom:4px;">${T('options.emptyPinsTitle')}</div>
           <div>${T('options.emptyPinsDesc')}</div>
@@ -367,74 +359,50 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
       return;
     }
 
-    const html = Object.entries(map).map(([cid, rec]) => {
-      const count = Array.isArray(rec.pins)
-        ? rec.pins.filter(Boolean).length
-        : 0;
-      const dateStr = rec.updatedAt
-        ? new Date(rec.updatedAt).toLocaleString()
-        : '-';
+
+    // 新: tbody だけ差し替え
+    const rowHtml = rows.map((r, i) => {
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      const del = r.count > 0
+        ? `<button class="btn del inline" data-cid="${esc(r.cid)}" title="${T('options.delBtn')}">🗑</button>` : '';
       return `
-        <tr data-cid="${cid}">
-          <td style="word-break:break-all;">${rec.title || '(No Title)'}</td>
-          <td style="text-align:center;">${count}</td>
-          <td style="text-align:center;">${dateStr}</td>
-          <td style="text-align:center;">
-            <button class="pm-del" type="button">🗑</button>
-          </td>
-        </tr>
-      `;
+        <tr data-cid="${esc(r.cid)}">
+          <td class="no">${i + 1}</td>
+          <td class="title" title="${esc(r.title)}">${esc(r.title)}</td>
+          <td class="count" style="text-align:right">${r.count}${del}</td>
+          <td class="updated">${esc(r.date || '')}</td>
+        </tr>`;
     }).join('');
+    tbody.innerHTML = rowHtml || `
+      <tr class="empty"><td colspan="4" style="padding:12px;color:var(--muted);">
+        ${T('options.emptyPinsDesc') || 'No pinned data.'}
+      </td></tr>`;
 
-
-/*
-    const html = [
-      // ここから追加：正しいテーブル構造に刷新 
-      '<table class="cgtn-pins-table">',
-      `<thead>
-         <tr>
-           <th>No.</th>
-           <th class="title">${T('options.thChat')}</th>
-           <th>${T('options.thCount')}</th>
-           <th>${T('options.thUpdated')}</th>
-         </tr>
-       </thead>`,
-      '<tbody>',
-        ...rows.map((r, i) => {
-          const inlineDel = r.count > 0
-            ? ` <button class="btn del inline" data-cid="${r.cid}" title="${T('options.delBtn')}">🗑</button>` : '';
-          return `<tr data-cid="${r.cid}">
-            <td class="no">${i+1}</td>
-            <td class="title" title="${titleEscape(r.title)}">${titleEscape(r.title)}</td>
-            <td class="count" style="text-align:right">${r.count}${inlineDel}</td>
-            <td class="updated">${titleEscape(r.date || '')}</td>
-          </tr>`;
-        }),
-      '</tbody></table>'
-      // ここまで 
-    ].join('');
-*/
-
-    box.innerHTML = html;
-console.log("renderPinsManager*6 html:",html);
     /* ここから追加：ラッパにスクロールを付与（options.html 側の .pins-wrap を再利用） */
     const wrap = box.parentElement;           // <div class="pins-wrap">
     if (wrap) wrap.classList.add('cgtn-pins-scroll');
     /* ここまで */
 
-    // 削除ボタン（行内🗑）配線
-    box.querySelectorAll('button.del').forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
-        e.stopPropagation?.(); // 行クリック誤発火防止
-        const cid = btn.getAttribute('data-cid');
-        if (!cid) return;
-        await deletePinsFromOptions(cid);
-        try{ updateSyncUsageLabel(); }catch(_){}
-
-      });
+    tbody.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button.del');
+      if (!btn) return;
+      const cid = btn.getAttribute('data-cid');
+      if (!cid) return;
+      const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
+      if (!yes) return;
+      try {
+        // 新ストレージ仕様：chatIdごとのキーを削除
+        await SH.deletePinsForChat?.(cid);      // あればこれで
+        await renderPinsManager();              // 再描画
+        updateSyncUsageLabel?.();               // 使用量ラベル再計算（任意）
+      } catch (e2) {
+        console.warn('[pins-delete] failed', e2);
+        alert('Failed to delete.');
+      }
     });
 
-    const refreshBtn = document.getElementById('cgtn-refresh');
+    const refreshBtn = document.getElementById('pins-refresh');
+//    const refreshBtn = document.getElementById('cgtn-refresh');
     if (refreshBtn){
       /* ここから追加：スピナー版 */
       refreshBtn.onclick = async () => {
