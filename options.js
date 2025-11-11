@@ -302,8 +302,9 @@ console.log("renderPinsManager*2 all:",all);
       }
     }
 console.log("renderPinsManager*3 map:",map);
+    const table = document.getElementById('pins-table');
     const tbody = document.getElementById('pins-tbody');
-    if (!tbody) return;
+    if (!table || !tbody) return;
 
     const cfg = (SH.getCFG && SH.getCFG()) || {};
 console.log("renderPinsManager*3.1 cfg:",cfg);
@@ -316,6 +317,7 @@ console.log("renderPinsManager*3.1 cfg:",cfg);
     const liveIdx = (cfg.chatIndex && (cfg.chatIndex.ids || cfg.chatIndex.map)) || {};
     console.log("renderPinsManager*3.3 liveIdx:", liveIdx);
 
+/*
     // 追加：プロジェクト名を付けた見出しに整形
     function formatTitleForOptions(cid, fallback='') {
       const live = liveIdx[cid] || {};
@@ -325,12 +327,20 @@ console.log("renderPinsManager*3.1 cfg:",cfg);
       if (proj && !t.startsWith(proj)) t = `${proj} - ${t}`;
       return t.replace(/\s+/g,' ');
     }
+*/
+    // プロジェクト名 – タイトル に整形（なければ従来名）
+    function formatTitleForOptions(cfg, cid, fallback='(No Title)'){
+      const idx = cfg?.chatIndex?.ids?.[cid] || {};
+      const proj = idx.project || idx.folder || idx.group || ''; // 手持ちのフィールド名に幅を持たせる
+      const t    = (idx.title || fallback || '').trim();
+      return proj ? `${proj} – ${t}` : t;
+    }
 
     // 今開いているチャットID（options では基本 null でOK）
     const nowOpen  = cfg.currentChatId ?? null;
     console.log("renderPinsManager*3.5 nowOpen:", nowOpen);
 
-
+/*
     const rows = Object.entries(pins).map(([cid, rec]) => {
       const title = formatTitleForOptions(cid, rec?.title || '').slice(0, 120);
 
@@ -347,9 +357,36 @@ console.log("renderPinsManager*3.1 cfg:",cfg);
         cid, title, count: pinsCount, date, canDelete, isNowOpen, existsInSidebar 
       };
     }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
+*/
+
+    // rows を作って tbody に流し込む
+    const rows = Object.entries(pins).map(([cid, rec], i) => {
+      const pinsArr   = Array.isArray(rec?.pins) ? rec.pins : [];
+      const pinsCount = pinsArr.filter(Boolean).length;
+      const title = formatTitleForOptions(cfg, cid, rec?.title || cid);
+      const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
+      const canDelete = true;
+      return `
+        <tr data-cid="${cid}">
+          <td class="no">${i+1}</td>
+          <td class="title" title="${titleEscape(title)}">${titleEscape(title)}</td>
+          <td class="count" style="text-align:right">
+            ${pinsCount}
+            ${canDelete ? ` <button class="btn del" data-cid="${cid}" aria-label="${T('options.delBtn')}">🗑</button>`     : ''}
+          </td>
+          <td class="updated">${titleEscape(date)}</td>
+        </tr>`;
+    }).join('');
+
 
 console.log("renderPinsManager*4 rows:", rows);
 console.log("renderPinsManager*5 rows.length:",rows.length);
+
+    if (!rows.length){
+        tbody.innerHTML = rows || '';
+    }
+
+/*
     if (!rows.length){
       tbody.innerHTML = `
         <div class="empty" style="padding:14px 8px; color:var(--muted);">
@@ -358,7 +395,7 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
         </div>`;
       return;
     }
-
+*/
 
     // 新: tbody だけ差し替え
     const rowHtml = rows.map((r, i) => {
@@ -383,6 +420,33 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
     if (wrap) wrap.classList.add('cgtn-pins-scroll');
     /* ここまで */
 
+    // クリック委任（初回だけ）
+    if (!tbody._bound){
+      tbody._bound = true;
+      tbody.addEventListener('click', async (ev)=>{
+        const btn = ev.target.closest('button.btn.del');
+        if (!btn) return;
+        const cid = btn.dataset.cid || '';
+        if (!cid) return;
+    
+        const ok = confirm(T('options.delConfirm') || 'Delete pin data for this chat. Are you sure?');
+        if (!ok) return;
+    
+        try{
+          await chrome.storage.sync.remove(`cgtnPins::${cid}`);
+          try{ chrome.runtime?.sendMessage?.({ type:'cgtn:pins-deleted', chatId: cid }); }catch{}
+          await SH.reloadFromSync?.();
+          await renderPinsManager();
+          try{ updateSyncUsageLabel(); }catch{}
+          toastNearPointer(T('options.deleted') || 'Deleted');
+        }catch(e){
+          console.warn(e);
+          toastNearPointer(T('options.saveFailed') || 'Failed to save');
+        }
+      }, {passive:false});
+    }
+
+/*
     tbody.addEventListener('click', async (e) => {
       const btn = e.target.closest('button.del');
       if (!btn) return;
@@ -400,55 +464,50 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
         alert('Failed to delete.');
       }
     });
+*/
+//    const refreshBtn = document.getElementById('pins-refresh');
 
-    const refreshBtn = document.getElementById('pins-refresh');
-//    const refreshBtn = document.getElementById('cgtn-refresh');
-    if (refreshBtn){
-      /* ここから追加：スピナー版 */
-      refreshBtn.onclick = async () => {
-        if (refreshBtn.classList.contains('is-busy')) return;
-        setBusy(refreshBtn, true, { onTimeout: () => {
-            // タイムアウト通知（既存のインラインメッセージ機構があれば使う）
-            try{
-             (flashMsgInline
-               ? flashMsgInline('pins-msg', 'options.refreshTimeout')
-               : console.warn('Refresh timeout'));
-            }catch(_){
-            }
-          }
-        });
-        try{
-          const meta = await sendToActive({ type:'cgtn:get-chat-meta' });
-
-          if (meta?.ok){
-            const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
-            if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
-          }
-          try{ 
-            updateSyncUsageLabel();
-          }catch(_){
-          }
-
-          // 成功時の軽い通知（任意）
-          try{
-            flashMsgInline('pins-msg','options.refreshed'); 
-          }catch(_){
-          }
-        }catch(e){
-          console.warn(e);
-          try{ window.flashMsgInline?.('pins-msg','options.refreshFailed'); }catch(_){}
-        }finally{
-          setBusy(refreshBtn, false);
-          //「最新にする」スピナー／… 残存対策（後片付け保証）
-          refreshBtn.classList.remove('is-busy');
-          refreshBtn.removeAttribute('aria-busy');
-        }
-      };
-      /* ここまで */
-    }
-
+    const refreshBtn = document.getElementById('cgtn-refresh');
     let refreshInFlight = false;
     let refreshTO = null;
+
+    if (refreshBtn){
+      refreshBtn.addEventListener('click', ()=>{
+        if (refreshTO) clearTimeout(refreshTO);
+        refreshTO = setTimeout(async ()=>{
+          if (refreshInFlight) return;
+          refreshInFlight = true;
+          refreshBtn.disabled = true;
+          refreshBtn.classList.add('is-busy');
+          refreshBtn.setAttribute('aria-busy', 'true');
+          try{
+            const meta = await sendToActive({ type:'cgtn:get-chat-meta' });
+            if (meta?.ok){
+              const tr = document.querySelector(`tr[data-cid="${meta.chatId}"]`);
+              if (tr){
+                const title = formatTitleForOptions(SH.getCFG?.(), meta.chatId, meta.title || meta.chatId);
+                tr.querySelector('.title').textContent = title;
+              }else{
+                // 行が無ければ全描画
+                await SH.reloadFromSync?.();
+                await renderPinsManager();
+              }
+              await updateSyncUsageLabel?.();
+            }
+            flashMsgInline('pins-msg','options.refreshed');
+          }catch(e){
+            console.warn(e);
+            flashMsgInline('pins-msg','options.refreshFailed');
+          }finally{
+            refreshInFlight = false;
+            refreshBtn.disabled = false;
+            refreshBtn.classList.remove('is-busy');
+            refreshBtn.removeAttribute('aria-busy');
+          }
+        }, 350); // 軽いデバウンス
+      });
+    }
+/*  
     if (refreshBtn){
       refreshBtn.addEventListener('click', ()=>{
         if (refreshTO) clearTimeout(refreshTO);
@@ -472,6 +531,7 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
       try{ updateSyncUsageLabel(); }catch(_){}
       });
     }
+*/
     /* renderPinsManager ここまで */
   }
 

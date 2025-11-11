@@ -1126,7 +1126,7 @@ console.log("clearListPanelUI catch");
       </div>
 
       <!-- ★ 表示切替（CSSだけで絞り込み） -->
-      <div id="cgpt-list-filter" role="group" aria-label="Filter" style="display:flex;gap:8px;padding:6px 8px;position:sticky;top:34px;z-index:1;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);">
+      <div id="cgpt-list-filter" role="group" aria-label="Filter">
         <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span></span></label>
         <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span></span></label>
         <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span></span></label>

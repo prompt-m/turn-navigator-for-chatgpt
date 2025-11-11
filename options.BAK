@@ -191,6 +191,12 @@
     .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){ width:42%; word-break:break-word; white-space:normal; }
     .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){ width:20%; text-align:right; }
     .cgtn-pins-table th:nth-child(4), .cgtn-pins-table td:nth-child(4){ width:30%; text-align:center; vertical-align:middle; }
+    /* 付箋数セルのボタン間隔 */
+    .cgtn-pins-table td.count .btn.inline { margin-left: 10px; }
+    /* 右寄せはそのまま */
+    .cgtn-pins-table td.count { text-align: right; }
+    .cgtn-pins-table .count .btn.del{ margin-left: 8px; }
+
     .cgtn-pins-scroll{
       overflow-y:auto;
       border:1px solid rgba(0,0,0,.08);
@@ -198,7 +204,13 @@
       max-height:280px;          /* 表だけスクロール */
       background:var(--bg);
     }
-    /* ここまで */
+
+    #sync-usage {
+      display: inline-block;
+      min-width: 320px;        /* 好きな幅に。280–360px 目安 */
+      text-align: right;
+      white-space: nowrap;
+    }
 
   }
 
@@ -235,7 +247,7 @@
             <div class="hint" data-i18n="options.pinsHint">各チャットの付箋を一覧。不要になったチャットは削除できます。</div>
           </div>
           <div class="section-tools" style="display:flex;align-items:center;gap:8px;">
-            <span id="sync-usage" class="usage-label" title="chrome.storage.sync usage">sync...</span>
+            <span id="sync-usage" class="usage-label" style="min-width:18ch" title="chrome.storage.sync usage">sync...</span>
             <button id="pins-refresh" class="btn small" type="button">
               <span data-i18n="options.refreshTitles">最新にします</span>
             </button>

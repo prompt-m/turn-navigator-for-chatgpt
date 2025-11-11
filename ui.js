@@ -436,6 +436,18 @@ const MISC_CSS = `
 /* =========================
    7) リスト補助（情報/色/スクロールバー）
 ========================= */
+#cgpt-list-filter{
+  display:flex;
+  gap:8px;
+  padding:6px 8px;
+  position:sticky;
+  top:34px;
+  z-index:1;
+  background:rgba(255,255,255,.85);
+  backdrop-filter:blur(4px);
+  text-align: center;
+}
+
 #cgpt-list-foot { display:flex; align-items:center; gap:6px; }
 #cgpt-list-foot-info { margin-left:auto; }
 
@@ -502,6 +514,7 @@ const PREVIEW_CSS = `
 /* ---------- Preview window ---------- */
 #cgpt-preview{ border-radius:var(--cgtn-radius); }
 #cgpt-preview .header .cgtn-iconbtn{ /* 共通ボタン */ }
+
 `;
 
 /* ここで一括注入（順序固定） */
@@ -523,6 +536,7 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
 #cgpt-nav :where(button,label,input[type=checkbox])::-moz-focus-inner,
 #cgpt-list-panel :where(button,label,input[type=checkbox])::-moz-focus-inner{
   border:0 !important;
+
 }
   `;
   document.head.appendChild(s);
