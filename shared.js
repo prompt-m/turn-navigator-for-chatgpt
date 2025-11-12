@@ -730,6 +730,35 @@ console.log("***isListOpen***");
     }
   };
 
+  //チャットID→表示用タイトル関数
+  SH.getTitleForChatId = function getTitleForChatId(cid, fallback=''){
+    try{
+      const cfg    = SH.getCFG?.() || {};
+      const ids    = (cfg.chatIndex && cfg.chatIndex.ids)  || {};
+      const map    = (cfg.chatIndex && cfg.chatIndex.map)  || {};
+      const live   = ids[cid] || map[cid] || {};
+  
+      // タイトル候補の優先度：
+      // 1) chatIndex（ids/map）にある title
+      // 2) pinsByChat に保存済みの title
+      // 3) 引数 fallback
+      // 4) 何も無ければ CID
+      const t2 = (live.title || '').trim();
+      const t3 = (cfg.pinsByChat?.[cid]?.title || '').trim();
+      let base = t2 || t3 || (fallback || '').trim();
+
+      // プロジェクト名/フォルダ名などの接頭辞
+      const proj = (live.project || live.folder || live.group || '').trim();
+
+      if (!base) base = cid;
+      if (proj && !base.startsWith(proj)) base = `${proj} - ${base}`;
+
+      return base.replace(/\s+/g, ' ');
+    }catch{
+      return (fallback || cid);
+    }
+  };
+
   SH.DEFAULTS = DEFAULTS;
 //  SH.getCFG       = () => CFG;
 //  SH.setCFG       = setCFG;

@@ -296,112 +296,71 @@ console.log("renderPinsManager*2 all:",all);
       const chatId  = key.replace(/^cgtnPins::/, '');
       const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
       if (pinsArr.length > 0) {
-        const title = (SH.getChatTitle?.(chatId) || '(No Title)');
-        const updated = val.updatedAt || Date.now();
-        map[chatId] = { pins: pinsArr, title, updatedAt: updated };
+        const cfg = (SH.getCFG && SH.getCFG()) || {};      // ← 先に取得（1回だけ）
+
+        for (const [key, val] of Object.entries(all)) {
+          if (!/^cgtnPins::/.test(key)) continue;
+          const chatId  = key.replace(/^cgtnPins::/, '');
+          const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
+          if (pinsArr.length > 0) {
+            // ここではタイトルを決めない（display時に整形）
+            const updated = (val?.updatedAt ?? cfg?.chatIndex?.map?.[chatId]?.updated ?? null);
+            map[chatId] = { pins: pinsArr, updatedAt: updated };
+          }
+        }
+
       }
     }
 console.log("renderPinsManager*3 map:",map);
-    const table = document.getElementById('pins-table');
     const tbody = document.getElementById('pins-tbody');
-    if (!table || !tbody) return;
+    if (!tbody) return;
 
     const cfg = (SH.getCFG && SH.getCFG()) || {};
 console.log("renderPinsManager*3.1 cfg:",cfg);
-
-    // options では runtime キャッシュが無いので、直前で構築した map を pins として使う
-    const pins = map;
-    console.log("renderPinsManager*3.2 pins(map):", pins);
   
     // サイドバーの“生存チャット索引”があれば補助で使う（無ければ空でOK）
     const liveIdx = (cfg.chatIndex && (cfg.chatIndex.ids || cfg.chatIndex.map)) || {};
     console.log("renderPinsManager*3.3 liveIdx:", liveIdx);
 
-/*
-    // 追加：プロジェクト名を付けた見出しに整形
-    function formatTitleForOptions(cid, fallback='') {
-      const live = liveIdx[cid] || {};
-      // live.title … チャット名、live.project / live.folder / live.group … プロジェクト名（どれか入っている想定）
-      const proj = (live.project || live.folder || live.group || '').trim();
-      let t = (live.title || fallback || cid).trim();
-      if (proj && !t.startsWith(proj)) t = `${proj} - ${t}`;
-      return t.replace(/\s+/g,' ');
-    }
-*/
-    // プロジェクト名 – タイトル に整形（なければ従来名）
-    function formatTitleForOptions(cfg, cid, fallback='(No Title)'){
-      const idx = cfg?.chatIndex?.ids?.[cid] || {};
-      const proj = idx.project || idx.folder || idx.group || ''; // 手持ちのフィールド名に幅を持たせる
-      const t    = (idx.title || fallback || '').trim();
-      return proj ? `${proj} – ${t}` : t;
-    }
-
     // 今開いているチャットID（options では基本 null でOK）
     const nowOpen  = cfg.currentChatId ?? null;
     console.log("renderPinsManager*3.5 nowOpen:", nowOpen);
 
-/*
-    const rows = Object.entries(pins).map(([cid, rec]) => {
-      const title = formatTitleForOptions(cid, rec?.title || '').slice(0, 120);
-
-      // pins は配列想定（shared.js の方針に合わせる）：1 の数を数える
-      const pinsArr = Array.isArray(rec?.pins) ? rec.pins : [];
-      const pinsCount = pinsArr.filter(Boolean).length;
-
-      const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
-      const existsInSidebar = !!liveIdx[cid];
-      const isNowOpen = (cid === nowOpen);
-      const canDelete = true; // 仕様：常に削除可（必要なら条件に戻す）
-
-      return {
-        cid, title, count: pinsCount, date, canDelete, isNowOpen, existsInSidebar 
-      };
-    }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
-*/
-
-    // rows を作って tbody に流し込む
-    const rows = Object.entries(pins).map(([cid, rec], i) => {
+    // ★ rows は配列のまま保持
+    const rows = Object.entries(map).map(([cid, rec]) => {
       const pinsArr   = Array.isArray(rec?.pins) ? rec.pins : [];
       const pinsCount = pinsArr.filter(Boolean).length;
-      const title = formatTitleForOptions(cfg, cid, rec?.title || cid);
-      const date  = rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : '';
-      const canDelete = true;
-      return `
-        <tr data-cid="${cid}">
-          <td class="no">${i+1}</td>
-          <td class="title" title="${titleEscape(title)}">${titleEscape(title)}</td>
-          <td class="count" style="text-align:right">
-            ${pinsCount}
-            ${canDelete ? ` <button class="btn del" data-cid="${cid}" aria-label="${T('options.delBtn')}">🗑</button>`     : ''}
-          </td>
-          <td class="updated">${titleEscape(date)}</td>
-        </tr>`;
-    }).join('');
-
+      const t = SH.getTitleForChatId(cid, rec?.title || '');
+console.log("renderPinsManager*3.6 t:", t);
+      return {
+        cid,
+        title: t.slice(0,120),
+        count: pinsCount,
+        date : rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : ''
+      };
+    }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
 
 console.log("renderPinsManager*4 rows:", rows);
 console.log("renderPinsManager*5 rows.length:",rows.length);
 
-    if (!rows.length){
-        tbody.innerHTML = rows || '';
-    }
-
-/*
+    // 空
     if (!rows.length){
       tbody.innerHTML = `
-        <div class="empty" style="padding:14px 8px; color:var(--muted);">
-          <div style="font-weight:700; margin-bottom:4px;">${T('options.emptyPinsTitle')}</div>
-          <div>${T('options.emptyPinsDesc')}</div>
-        </div>`;
+        <tr class="empty">
+          <td colspan="4" style="padding:12px;color:var(--muted);">
+            ${T('options.emptyPinsDesc') || 'No pinned data.'}
+          </td>
+        </tr>`;
       return;
     }
-*/
 
     // 新: tbody だけ差し替え
     const rowHtml = rows.map((r, i) => {
-      const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      const esc = s => String(s ?? '').replace(/[&<>"']/g,
+          m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
       const del = r.count > 0
-        ? `<button class="btn del inline" data-cid="${esc(r.cid)}" title="${T('options.delBtn')}">🗑</button>` : '';
+        ? `<button class="btn del inline" data-cid="${esc(r.cid)}" title="${T('options.delBtn')}">🗑</button>`
+        : '';
       return `
         <tr data-cid="${esc(r.cid)}">
           <td class="no">${i + 1}</td>
@@ -410,43 +369,39 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
           <td class="updated">${esc(r.date || '')}</td>
         </tr>`;
     }).join('');
-    tbody.innerHTML = rowHtml || `
-      <tr class="empty"><td colspan="4" style="padding:12px;color:var(--muted);">
-        ${T('options.emptyPinsDesc') || 'No pinned data.'}
-      </td></tr>`;
 
-    /* ここから追加：ラッパにスクロールを付与（options.html 側の .pins-wrap を再利用） */
-    const wrap = box.parentElement;           // <div class="pins-wrap">
+    tbody.innerHTML = rowHtml;
+
+    // ← box 未定義対策＋スクロール
+    const box  = document.getElementById('pins-table');
+    const wrap = box?.parentElement;
     if (wrap) wrap.classList.add('cgtn-pins-scroll');
-    /* ここまで */
 
-    // クリック委任（初回だけ）
-    if (!tbody._bound){
-      tbody._bound = true;
-      tbody.addEventListener('click', async (ev)=>{
-        const btn = ev.target.closest('button.btn.del');
+    // 削除（tbody に委譲） — 二重バインド防止
+    if (!tbody._cgtnDelBound) {
+      tbody._cgtnDelBound = true;
+      tbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button.del');
         if (!btn) return;
-        const cid = btn.dataset.cid || '';
+        const cid = btn.getAttribute('data-cid');
         if (!cid) return;
-    
-        const ok = confirm(T('options.delConfirm') || 'Delete pin data for this chat. Are you sure?');
-        if (!ok) return;
-    
-        try{
-          await chrome.storage.sync.remove(`cgtnPins::${cid}`);
-          try{ chrome.runtime?.sendMessage?.({ type:'cgtn:pins-deleted', chatId: cid }); }catch{}
-          await SH.reloadFromSync?.();
-          await renderPinsManager();
-          try{ updateSyncUsageLabel(); }catch{}
-          toastNearPointer(T('options.deleted') || 'Deleted');
-        }catch(e){
-          console.warn(e);
-          toastNearPointer(T('options.saveFailed') || 'Failed to save');
+        const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
+        if (!yes) return;
+        try {
+          const ok = await SH.deletePinsForChat?.(cid);
+          if (ok) {
+            await renderPinsManager();
+            try { updateSyncUsageLabel(); } catch {}
+          }
+        } catch (err) {
+          console.warn('[pins-delete] failed', err);
+          alert('Failed to delete.');
         }
-      }, {passive:false});
+      });
     }
 
 /*
+    // 削除（tbody に委譲）
     tbody.addEventListener('click', async (e) => {
       const btn = e.target.closest('button.del');
       if (!btn) return;
@@ -455,83 +410,39 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
       const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
       if (!yes) return;
       try {
-        // 新ストレージ仕様：chatIdごとのキーを削除
-        await SH.deletePinsForChat?.(cid);      // あればこれで
-        await renderPinsManager();              // 再描画
-        updateSyncUsageLabel?.();               // 使用量ラベル再計算（任意）
-      } catch (e2) {
-        console.warn('[pins-delete] failed', e2);
+        await SH.deletePinsForChat?.(cid);
+        await renderPinsManager();
+        try{ updateSyncUsageLabel(); }catch{}
+      } catch (err) {
+        console.warn('[pins-delete] failed', err);
         alert('Failed to delete.');
       }
     });
 */
-//    const refreshBtn = document.getElementById('pins-refresh');
 
-    const refreshBtn = document.getElementById('cgtn-refresh');
-    let refreshInFlight = false;
-    let refreshTO = null;
 
+    // 「最新にします」（id=pins-refresh）
+    const refreshBtn = document.getElementById('pins-refresh');
     if (refreshBtn){
-      refreshBtn.addEventListener('click', ()=>{
-        if (refreshTO) clearTimeout(refreshTO);
-        refreshTO = setTimeout(async ()=>{
-          if (refreshInFlight) return;
-          refreshInFlight = true;
-          refreshBtn.disabled = true;
-          refreshBtn.classList.add('is-busy');
-          refreshBtn.setAttribute('aria-busy', 'true');
-          try{
-            const meta = await sendToActive({ type:'cgtn:get-chat-meta' });
-            if (meta?.ok){
-              const tr = document.querySelector(`tr[data-cid="${meta.chatId}"]`);
-              if (tr){
-                const title = formatTitleForOptions(SH.getCFG?.(), meta.chatId, meta.title || meta.chatId);
-                tr.querySelector('.title').textContent = title;
-              }else{
-                // 行が無ければ全描画
-                await SH.reloadFromSync?.();
-                await renderPinsManager();
-              }
-              await updateSyncUsageLabel?.();
-            }
-            flashMsgInline('pins-msg','options.refreshed');
-          }catch(e){
-            console.warn(e);
-            flashMsgInline('pins-msg','options.refreshFailed');
-          }finally{
-            refreshInFlight = false;
-            refreshBtn.disabled = false;
-            refreshBtn.classList.remove('is-busy');
-            refreshBtn.removeAttribute('aria-busy');
+      refreshBtn.onclick = async () => {
+        if (refreshBtn.classList.contains('is-busy')) return;
+        setBusy(refreshBtn, true, { onTimeout: ()=> flashMsgInline?.('pins-msg','options.refreshTimeout') });
+        try{
+          const meta = await sendToActive({ type:'cgtn:get-chat-meta' });
+          if (meta?.ok){
+            const tr = box?.querySelector(`tr[data-cid="${meta.chatId}"]`);
+            if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
           }
-        }, 350); // 軽いデバウンス
-      });
+          try{ updateSyncUsageLabel(); }catch{}
+          flashMsgInline?.('pins-msg','options.refreshed');
+        }catch(e){
+          console.warn(e);
+          flashMsgInline?.('pins-msg','options.refreshFailed');
+        }finally{
+          setBusy(refreshBtn, false);
+        }
+      };
     }
-/*  
-    if (refreshBtn){
-      refreshBtn.addEventListener('click', ()=>{
-        if (refreshTO) clearTimeout(refreshTO);
-        refreshTO = setTimeout(async ()=>{
-          if (refreshInFlight) return;
-          refreshInFlight = true;
-          const old = refreshBtn.textContent;
-          refreshBtn.disabled = true;
-          try{
-            const meta  = await sendToActive({ type:'cgtn:get-chat-meta'  });
-            if (meta?.ok){
-              const tr = box.querySelector(`tr[data-cid="${meta.chatId}"]`);
-              if (tr) tr.querySelector('.title').textContent = meta.title || meta.chatId;
-            }
-          } finally {
-            refreshInFlight = false;
-            refreshBtn.disabled = false;
-          }
-        }, 400); // デバウンス
-      // 使用量ラベル更新
-      try{ updateSyncUsageLabel(); }catch(_){}
-      });
-    }
-*/
     /* renderPinsManager ここまで */
   }
 
