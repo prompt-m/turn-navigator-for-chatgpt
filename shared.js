@@ -490,9 +490,13 @@
     }catch(_){ return []; }
   };
 
+  // 付箋データ保存
   SH.savePinsArr = async function savePinsArr(arr, chatId = SH.getChatId?.()) {
     if (!chatId) return { ok:false, err:'no-chat-id' };
-    const pins = Array.isArray(arr) ? arr.slice() : [];
+//    const pins = Array.isArray(arr) ? arr.slice() : [];
+    const title = await SH.resolveTitleFor(chatId);
+    await syncSet({ [pinKeyOf(chatId)] : { pins, updatedAt: Date.now(), title } });
+
     try{
       await syncSet({ [pinKeyOf(chatId)] : { pins } });
       // インデックスの pinCount だけ更新
@@ -517,11 +521,15 @@
     }
   };
 
+  // 付箋データ保存
   SH.savePinsArrAsync = async (arr, chatId = SH.getChatId?.()) => {
     if (!chatId) return { ok:false };
     const key = pinKeyOf(chatId);
     try{
-      await syncSet({ [key]: { pins: arr } });
+//      await syncSet({ [key]: { pins: arr } });
+    const title = await SH.resolveTitleFor(chatId);
+    await syncSet({ [key]: { pins: arr, updatedAt: Date.now(), title } });
+
       // インデックスの件数も更新
       const cfg = SH.getCFG() || {};
       const map = { ...(cfg.chatIndex?.map || {}) };
@@ -727,6 +735,37 @@ console.log("***isListOpen***");
       return !!(SH.getCFG?.()?.list?.enabled);
     }catch{
       return !!(SH.getCFG?.()?.list?.enabled);
+    }
+  };
+
+  // タイトル解決（副作用なし / DOM非依存）
+  SH.resolveTitleFor = async function resolveTitleFor(chatId, fallback=''){
+    try{
+      const cfg   = SH.getCFG?.() || {};
+      const ids   = (cfg.chatIndex && cfg.chatIndex.ids) || {};
+      const map   = (cfg.chatIndex && cfg.chatIndex.map) || {};
+      const live  = ids[chatId] || map[chatId] || {};
+
+      // ① 現在のチャット画面で同一CIDなら live title を最優先
+      let liveTitle = '';
+      try{
+        if (SH.getChatId?.() === chatId) liveTitle = (SH.getChatTitle?.() || '').trim();
+      }catch{}
+
+      // ② インデックスの title、③ 既存保存の title、④ fallback、⑤ CID
+      const key   = `cgtnPins::${chatId}`;
+      const prev  = (await SH.syncGet?.(key))?.[key] || {};
+      const t2    = (live.title || '').trim();
+      const t3    = (prev.title || '').trim();
+      let   base  = liveTitle || t2 || t3 || (fallback || '').trim() || chatId;
+
+      // プロジェクト接頭辞
+      const proj  = (live.project || live.folder || live.group || '').trim();
+      if (proj && !base.startsWith(proj)) base = `${proj} - ${base}`;
+
+      return base.replace(/\s+/g, ' ');
+    }catch{
+      return fallback || chatId;
     }
   };
 

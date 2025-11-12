@@ -227,6 +227,7 @@ console.log("flashMsgInline id:",id);
     el._to = setTimeout(()=> el.classList.remove('show'), 1600);
   }
 
+/*
   //表示直前での正規化
   function loadAndRenderPins(){
     const cfg = SH.getCFG() || {};
@@ -237,7 +238,7 @@ console.log("flashMsgInline id:",id);
     // 以降は norm を使う
     renderPinsTable(norm); // ← あなたの実装に合わせた関数名でOK
   }
-
+*/
   //エクスポート直前での正規化
   function onExportPinsClick(){
     const cfg = SH.getCFG() || {};
@@ -290,7 +291,11 @@ console.log("flashMsgInline id:",id);
       }
     });
 console.log("renderPinsManager*2 all:",all);
+    const cfg = SH.getCFG?.() || {};
+console.log("renderPinsManager*2.1 cfg:",cfg);
     const map = {};
+
+/*
     for (const [key, val] of Object.entries(all)) {
       if (!/^cgtnPins::/.test(key)) continue;
       const chatId  = key.replace(/^cgtnPins::/, '');
@@ -311,12 +316,36 @@ console.log("renderPinsManager*2 all:",all);
 
       }
     }
+*/
+    for (const [key, val] of Object.entries(all)) {
+      if (!key.startsWith('cgtnPins::')) continue;
+      const chatId  = key.slice('cgtnPins::'.length);
+      const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
+      if (pinsArr.length === 0) continue;
+
+      // ① 付箋データに保存されたタイトルを最優先
+      const savedTitle = (val.title || '').trim();
+
+      // ② インデックス（chatIndex.ids/map）にも同じCIDがあれば補完
+      const live = (cfg.chatIndex?.ids?.[chatId] || cfg.chatIndex?.map?.[chatId]) || {};
+      const proj = (live.project || live.folder || live.group || '').trim();
+      const idxTitle = (live.title || '').trim();
+
+      // ③ 優先度：savedTitle > idxTitle > fallback(CID)
+      let title = savedTitle || idxTitle || chatId;
+      if (proj && !title.startsWith(proj)) title = `${proj} - ${title}`;
+
+      // ④ 更新日時は val.updatedAt をそのまま採用
+      const updated = val.updatedAt || live.updated || null;
+
+      map[chatId] = { pins: pinsArr, title, updatedAt: updated };
+    }
+
 console.log("renderPinsManager*3 map:",map);
     const tbody = document.getElementById('pins-tbody');
     if (!tbody) return;
 
-    const cfg = (SH.getCFG && SH.getCFG()) || {};
-console.log("renderPinsManager*3.1 cfg:",cfg);
+//    const cfg = (SH.getCFG && SH.getCFG()) || {};
   
     // サイドバーの“生存チャット索引”があれば補助で使う（無ければ空でOK）
     const liveIdx = (cfg.chatIndex && (cfg.chatIndex.ids || cfg.chatIndex.map)) || {};
