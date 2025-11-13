@@ -165,11 +165,6 @@ const LIST_CSS = `
   display:flex; align-items:center; gap:8px;
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
 }
-/*
-#cgpt-list-collapse{
-  all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; color:#000;
-  padding:6px 8px; cursor:pointer; display:inline-grid; place-items:center;
-}*/
 #cgpt-list-collapse{
   all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; color:#000;
   padding:6px 8px; display:inline-grid; place-items:center;
@@ -225,11 +220,7 @@ const LIST_CSS = `
   border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px;
   position:sticky; top:0; background:rgba(255,255,255,.98)
 }
-/*#cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; cursor:pointer; }
-*/
 #cgpt-list-close{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; }
-/*#cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px; cursor:pointer; }
-*/
 #cgpt-list-collapse{ all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px;}
 
 /* =========================
@@ -445,7 +436,8 @@ const MISC_CSS = `
   z-index:1;
   background:rgba(255,255,255,.85);
   backdrop-filter:blur(4px);
-  text-align: center;
+  justify-content: center;
+  align-items: center;
 }
 
 #cgpt-list-foot { display:flex; align-items:center; gap:6px; }

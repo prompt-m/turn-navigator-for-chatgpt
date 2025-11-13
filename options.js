@@ -227,18 +227,6 @@ console.log("flashMsgInline id:",id);
     el._to = setTimeout(()=> el.classList.remove('show'), 1600);
   }
 
-/*
-  //表示直前での正規化
-  function loadAndRenderPins(){
-    const cfg = SH.getCFG() || {};
-    const raw = cfg.pinsByChat || {};
-    // ★ 正規化をかける（ゼロ件削除＋タイトル最新化）
-    const norm = SH.normalizePinsByChat?.(raw, { dropZero: true, preferNewTitle: true }) || raw;
-  
-    // 以降は norm を使う
-    renderPinsTable(norm); // ← あなたの実装に合わせた関数名でOK
-  }
-*/
   //エクスポート直前での正規化
   function onExportPinsClick(){
     const cfg = SH.getCFG() || {};
@@ -295,28 +283,6 @@ console.log("renderPinsManager*2 all:",all);
 console.log("renderPinsManager*2.1 cfg:",cfg);
     const map = {};
 
-/*
-    for (const [key, val] of Object.entries(all)) {
-      if (!/^cgtnPins::/.test(key)) continue;
-      const chatId  = key.replace(/^cgtnPins::/, '');
-      const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
-      if (pinsArr.length > 0) {
-        const cfg = (SH.getCFG && SH.getCFG()) || {};      // ← 先に取得（1回だけ）
-
-        for (const [key, val] of Object.entries(all)) {
-          if (!/^cgtnPins::/.test(key)) continue;
-          const chatId  = key.replace(/^cgtnPins::/, '');
-          const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
-          if (pinsArr.length > 0) {
-            // ここではタイトルを決めない（display時に整形）
-            const updated = (val?.updatedAt ?? cfg?.chatIndex?.map?.[chatId]?.updated ?? null);
-            map[chatId] = { pins: pinsArr, updatedAt: updated };
-          }
-        }
-
-      }
-    }
-*/
     for (const [key, val] of Object.entries(all)) {
       if (!key.startsWith('cgtnPins::')) continue;
       const chatId  = key.slice('cgtnPins::'.length);
@@ -358,12 +324,14 @@ console.log("renderPinsManager*3 map:",map);
     // ★ rows は配列のまま保持
     const rows = Object.entries(map).map(([cid, rec]) => {
       const pinsArr   = Array.isArray(rec?.pins) ? rec.pins : [];
+      const turns = pinsArr.length;                 // ★ pinsArr の要素数が「会話数」
       const pinsCount = pinsArr.filter(Boolean).length;
       const t = SH.getTitleForChatId(cid, rec?.title || '');
 console.log("renderPinsManager*3.6 t:", t);
       return {
         cid,
         title: t.slice(0,120),
+        turns,
         count: pinsCount,
         date : rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : ''
       };
@@ -394,6 +362,7 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
         <tr data-cid="${esc(r.cid)}">
           <td class="no">${i + 1}</td>
           <td class="title" title="${esc(r.title)}">${esc(r.title)}</td>
+          <td class="turns" style="text-align:right">${r.turns}</td>
           <td class="count" style="text-align:right">${r.count}${del}</td>
           <td class="updated">${esc(r.date || '')}</td>
         </tr>`;
@@ -414,41 +383,10 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
         if (!btn) return;
         const cid = btn.getAttribute('data-cid');
         if (!cid) return;
-        const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
-        if (!yes) return;
-        try {
-          const ok = await SH.deletePinsForChat?.(cid);
-          if (ok) {
-            await renderPinsManager();
-            try { updateSyncUsageLabel(); } catch {}
-          }
-        } catch (err) {
-          console.warn('[pins-delete] failed', err);
-          alert('Failed to delete.');
-        }
+        // 共通の通知/再描画ロジックへ一本化
+        deletePinsFromOptions(cid);
       });
     }
-
-/*
-    // 削除（tbody に委譲）
-    tbody.addEventListener('click', async (e) => {
-      const btn = e.target.closest('button.del');
-      if (!btn) return;
-      const cid = btn.getAttribute('data-cid');
-      if (!cid) return;
-      const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
-      if (!yes) return;
-      try {
-        await SH.deletePinsForChat?.(cid);
-        await renderPinsManager();
-        try{ updateSyncUsageLabel(); }catch{}
-      } catch (err) {
-        console.warn('[pins-delete] failed', err);
-        alert('Failed to delete.');
-      }
-    });
-*/
-
 
     // 「最新にします」（id=pins-refresh）
     const refreshBtn = document.getElementById('pins-refresh');
@@ -519,7 +457,6 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
     const yes = confirm(T('options.delConfirm') || 'Delete pins for this chat?');
     if (!yes) return;
   
-    // const ok = await SH.deletePinsForChat(chatId); // ←現状のままでOK
     /* 成功/失敗の分岐でUI処理を強化 */
     const ok = await SH.deletePinsForChat(chatId);
   
@@ -543,6 +480,7 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
       toastNearPointer(T('options.deleted') || 'Deleted');
 
     } else {
+
       // 保存失敗（lastError など）→ UI でアラート/トースト
       try{
         toastNearPointer(T('options.saveFailed') || 'Failed to save');

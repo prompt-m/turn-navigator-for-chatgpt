@@ -546,7 +546,7 @@
 
   SH.deletePinsForChat = async function(chatId){
     try{
-      await syncRemove(pinKeyOf(chatId));
+      await syncRemoveAsync(pinKeyOf(chatId));
       // インデックスを 0 件に
       const cfg = SH.getCFG() || {};
       const idx = cfg.chatIndex?.map || (cfg.chatIndex = { ids:[], map:{} }).map;
