@@ -1809,6 +1809,8 @@ console.debug('[setListEnabled*4]一覧OFF');
   }
 
   function updatePinOnlyBadge(){
+console.debug('[*****updatePinOnlyBadge]');
+
     try {
       const btn = document.getElementById('cgpt-pin-filter');
       if (!btn) return;
@@ -1816,6 +1818,7 @@ console.debug('[setListEnabled*4]一覧OFF');
       if (!badge) return;
 
       if ((CGTN_LOGIC.ST?.all?.length ?? 0) === 0) {
+console.debug('[*****updatePinOnlyBadge] zero');
         badge.hidden = true;
         badge.textContent='';
         return; 
@@ -1824,18 +1827,22 @@ console.debug('[setListEnabled*4]一覧OFF');
       // ★ articleゼロ件なら非表示
       const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
       if (turns === 0) {
+console.debug('[*****updatePinOnlyBadge] turn0');
         badge.hidden = true;
         badge.textContent = '';
         return;
       }
 
       const cid = SH.getChatId?.();
+console.debug('[*****updatePinOnlyBadge]cid',cid);
       const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
       // 表示制御
       if (count > 0) {
-        badge.textContent = count > 99 ? '99+' : count;
+//        badge.textContent = count > 99 ? '99+' : count;
+        badge.textContent = count;
         badge.hidden = false;
       } else {
+console.debug('[*****updatePinOnlyBadge]count0');
         badge.hidden = true;
       }
 

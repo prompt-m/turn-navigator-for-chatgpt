@@ -84,7 +84,6 @@
       'opts.pins.note': '各チャットの付箋を一覧。不要になった付箋データは削除できます。',
       'options.refreshTitles': '最新にしますよ',
       'options.openChatAndRefresh': 'チャット名を表示するには、ChatGPT画面を開いて［最新にする］を押してください。',
-      'options.thTurns': 'ターン数',
       'options.thUploads': 'アップあり',
       'options.thDownloads': 'ダウンロードあり',
       // ===== ツールチップ =====
@@ -166,7 +165,6 @@
       'options.resetBtn':     'Reset',
       'options.refreshTitles': 'Refresh',
       'options.openChatAndRefresh': 'To show chat titles, open a ChatGPT tab and press “Refresh”.',
-      'options.thTurns': 'Turns',
       'options.thUploads': 'With uploads',
       'options.thDownloads': 'With downloads',
       'options.refreshTimeout': 'Refresh did not complete in time',

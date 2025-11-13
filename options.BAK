@@ -183,14 +183,19 @@
       max-height:var(--pins-h);
     }
 
-    .cgtn-pins-table{ width:100%; border-collapse:collapse; font-size:13px; }
+    .cgtn-pins-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
     .cgtn-pins-table th, .cgtn-pins-table td{ padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.08); }
     .cgtn-pins-table thead th{ position:sticky; top:0; background:var(--pill); z-index:1; }
-    /* ここから追加：No. / チャット / 付箋数 / 更新 = 8% / 42% / 20% / 30% */
-    .cgtn-pins-table th:nth-child(1), .cgtn-pins-table td:nth-child(1){ width:8%;  text-align:right; padding-right:10px; }
-    .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){ width:42%; word-break:break-word; white-space:normal; }
-    .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){ width:20%; text-align:right; }
-    .cgtn-pins-table th:nth-child(4), .cgtn-pins-table td:nth-child(4){ width:30%; text-align:center; vertical-align:middle; }
+    /* ここから追加：No. / チャット / 会話数 / 付箋数 / 更新 = 5% / 45% / 10% / 10% / 30% */
+    .cgtn-pins-table th:nth-child(1), .cgtn-pins-table td:nth-child(1){ width:5%;  text-align:right; padding-right:10px; }
+    .cgtn-pins-table th:nth-child(2), .cgtn-pins-table td:nth-child(2){ width:45%; word-break:break-word; white-space:normal; }
+    .cgtn-pins-table th:nth-child(3), .cgtn-pins-table td:nth-child(3){ width:10%; text-align:right; }
+    .cgtn-pins-table th:nth-child(4), .cgtn-pins-table td:nth-child(4){ width:10%; text-align:right; }
+    .cgtn-pins-table th:nth-child(5), .cgtn-pins-table td:nth-child(5){ width:30%; text-align:center; vertical-align:middle; }
     /* 付箋数セルのボタン間隔 */
     .cgtn-pins-table td.count .btn.inline { margin-left: 10px; }
     /* 右寄せはそのまま */
@@ -262,6 +267,7 @@
                   <tr>
                     <th style="width:72px;">No.</th>
                     <th data-i18n="options.thChat">チャット</th>
+                    <th style="width:120px;" data-i18n="options.thTurns">会話数</th>
                     <th style="width:120px;" data-i18n="options.thCount">付箋数</th>
                     <th style="width:180px;" data-i18n="options.thUpdated">更新</th>
                   </tr>

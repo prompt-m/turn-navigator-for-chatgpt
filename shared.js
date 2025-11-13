@@ -590,19 +590,40 @@
     }catch{ return 0; }
   };
 
-  SH.getPinsCountByChat = function(chatId){
+  // 付箋バッジなどで使う：チャットごとの付箋数
+  SH.getPinsCountByChat = function getPinsCountByChat(chatId){
     try{
+      const cid = chatId || SH.getChatId?.();
+      if (!cid) return 0;
+
       const cfg = SH.getCFG?.() || {};
-      const pinsObj = cfg?.pinsByChat?.[chatId]?.pins || {};
-      const pinsCount = Object.values(pinsObj).filter(Boolean).length;
-console.log("getPinsCountByChat chatId;",chatId," pinsCount:",pinsCount);
-      return pinsCount;
-    }catch{
-console.log("getPinsCountByChat catch");
+      const map = cfg.chatIndex?.map || {};
+
+      // 新仕様：chatIndex.map に pinCount をキャッシュしている
+      const rec = map[cid];
+      if (rec && typeof rec.pinCount === 'number') {
+        return rec.pinCount;
+      }
+
+      // フォールバック（旧データ／移行中対策）
+      const pinsRec = cfg.pinsByChat?.[cid];
+      let arr;
+      if (Array.isArray(pinsRec?.pins)) {
+        arr = pinsRec.pins;
+      } else if (Array.isArray(pinsRec)) {
+        arr = pinsRec;
+      } else if (pinsRec && typeof pinsRec === 'object') {
+        arr = Object.values(pinsRec);
+      } else {
+        arr = [];
+      }
+      return arr.filter(Boolean).length;
+
+    } catch (e){
+      console.warn('[getPinsCountByChat] failed', e);
       return 0;
     }
   };
-
 
   // ========= saveSettingsPatch（書き込みガード付き）=========
   SH.saveSettingsPatch = async function saveSettingsPatch(patch = {}, cb){

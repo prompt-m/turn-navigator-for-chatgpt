@@ -42,7 +42,7 @@ console.log("syncSetAsync",obj);
       const usedKB  = (bytesInUse/1024).toFixed(1);
       const totalKB = 100;       // sync 全体上限=約100KB
       const items   = Object.keys(allItems).length;
-      const itemsMax = 512;      // sync のキー上限
+      const itemsMax = 512-1;      // sync のキー上限
   
       // i18n（無ければフォールバック）
       const t = window.CGTN_I18N?.t || (s=>s);
