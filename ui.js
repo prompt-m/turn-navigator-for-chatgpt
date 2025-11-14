@@ -210,7 +210,7 @@ const LIST_CSS = `
 /* フッター常時最下（sticky不要） */
 
 /* パネルを畳んだ見た目（ヘッダだけ残す） */
-#cgpt-list-panel.collapsed { max-height: 48px; }
+#cgpt-list-panel.collapsed { max-height: 38px; }
 #cgpt-list-panel.collapsed #cgpt-list-body,
 #cgpt-list-panel.collapsed #cgpt-list-foot { display:none; }
 

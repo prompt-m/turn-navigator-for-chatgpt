@@ -1471,14 +1471,6 @@ console.log('[renderList *1]');
 console.log('[renderList *2]');
       return;
     }
-/*
-    // 2) 一覧ON判定（forceOn 最優先）
-    const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
-    const enabled = forceOn || !!cfg.list?.enabled;
-    if (!enabled){
-      return;
-    }
-*/
 
     const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
     const enabled = forceOn ? true : !!cfg.list?.enabled;
@@ -1490,7 +1482,10 @@ console.log('[renderList *2]');
     panel.classList.remove('collapsed');
     const btn = panel.querySelector('#cgpt-list-collapse');
     // 開=▴ / 閉=▾
-    if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
+    if (btn) {
+      btn.textContent = '▴';
+      btn.setAttribute('aria-expanded','true'); 
+    }
     panel.style.display = 'flex';          // CSS 既定の display:none を解除
     panel.style.visibility = 'hidden';     // レイアウト確定まで
 
@@ -1531,7 +1526,9 @@ console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length)
 
     const chatId  = SH.getChatId?.();
     //const pinsArr = SH.getPinsArr?.(chatId) || [];
-    const pinsArr = await SH.getPinsArrAsync(chatId) || [];//←★★★★
+    //const pinsArr = await SH.getPinsArrAsync(chatId) || [];//←★★★★
+    const pinsArr = SH.getPinsArrFromCfg?.(chatId) || [];
+
     let turns     = ST.all.slice();
 
     // pinOnly のときは「配列」でフィルタ

@@ -41,7 +41,7 @@ console.log("syncSetAsync",obj);
   
       const usedKB  = (bytesInUse/1024).toFixed(1);
       const totalKB = 100;       // sync 全体上限=約100KB
-      const items   = Object.keys(allItems).length;
+      const items   = Object.keys(allItems).length - 1;//共通キー分をマイナス
       const itemsMax = 512-1;      // sync のキー上限
   
       // i18n（無ければフォールバック）
@@ -458,7 +458,8 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
     if (!yes) return;
   
     /* 成功/失敗の分岐でUI処理を強化 */
-    const ok = await SH.deletePinsForChat(chatId);
+    //const ok = await SH.deletePinsForChat(chatId);
+    const ok = await SH.deletePinsForChatAsync(chatId);
   
     if (ok){
       // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）

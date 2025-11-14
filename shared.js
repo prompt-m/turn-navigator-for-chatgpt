@@ -125,8 +125,8 @@
   }
 
   // ===== Pins split storage (schema v2) =====
-  const PINS_KEY_PREFIX = 'cgtnPins::';
-  const pinKeyOf = (chatId) => `${PINS_KEY_PREFIX}${chatId}`;
+//  const PINS_KEY_PREFIX = 'cgtnPins::';
+//  const pinKeyOf = (chatId) => `${PINS_KEY_PREFIX}${chatId}`;
 
   // storage.sync.set/get を Promise 化（lastError 準拠）
   async function syncGet(keys){
@@ -200,7 +200,7 @@
         delete map[id];
         continue;
       }
-      // 2) タイトルの最新化（savePinsArrの順序に合わせて同等の優先度）
+      // 2) タイトルの最新化
       if (preferNewTitle) {
         const oldTitle = map[id]?.title || '';
         const newTitle = SH.getChatTitle?.(id) || ''; // 取れない環境なら '' のまま
@@ -444,42 +444,118 @@
        }catch(e){ rej(e); }
      });
    }
- 
+
    SH.loadPinsMapAsync = async function loadPinsMapAsync(){
      const cfg = await _loadCfgRaw();
      const map = cfg.pinsByChat || {};
      return map; // { [chatId]: boolean[] }
    };
- 
+
    SH.savePinsMapAsync = async function savePinsMapAsync(nextMap){
      const cfg = await _loadCfgRaw();
      cfg.pinsByChat = nextMap || {};
      await _saveCfgRaw(cfg);
      return true;
    };
- 
+
+/*
    SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr){
+console.log("◎setPinsArrAsync◎ :chatId",chatId," pinsArr:",pinsArr);
      const map = await SH.loadPinsMapAsync();
      if (pinsArr && pinsArr.length) map[chatId] = pinsArr;
      else delete map[chatId];
      await SH.savePinsMapAsync(map);
      return true;
    };
- 
+*/
+
+  SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr){
+    console.log("◎setPinsArrAsync◎ :chatId", chatId, " pinsArr:", pinsArr);
+
+    const safeArr = Array.isArray(pinsArr) ? pinsArr.slice() : [];
+    const map = await SH.loadPinsMapAsync();
+
+    if (safeArr.length === 0) {
+      // 要素ゼロならレコード自体を削除
+      delete map[chatId];
+    } else {
+      const prev   = map[chatId] || {};
+      const title  = (SH.getChatTitle?.() || prev.title || '').trim();
+      const now    = Date.now();
+
+      map[chatId] = {
+        ...prev,
+        pins: safeArr,
+        title,
+        updatedAt: now
+      };
+    }
+
+    await SH.savePinsMapAsync(map);
+    return true;
+  };
+
    SH.deletePinsForChatAsync = async function deletePinsForChatAsync(chatId){
      const map = await SH.loadPinsMapAsync();
      if (map[chatId]){ delete map[chatId]; await SH.savePinsMapAsync(map); }
      return true;
    };
 
+  // === ピン保存バッファリング =======================================
+  const PIN_SAVE_DEBOUNCE_MS = 1200;      // まとめ書きの待ち時間
+  const _pinSaveBuf = new Map();          // chatId -> { arr, timer, lastErrorAt }
 
+  function scheduleBufferedPinsSave(chatId, pinsArr){
+console.log("◆scheduleBufferedPinsSave◆ :chatId",chatId," pinsArr:",pinsArr);
+    if (!chatId) return;
+    let buf = _pinSaveBuf.get(chatId);
+    if (!buf){
+      buf = { arr: pinsArr.slice(), timer: null, lastErrorAt: 0 };
+      _pinSaveBuf.set(chatId, buf);
+    } else {
+      buf.arr = pinsArr.slice();          // 最新状態で上書き
+    }
+    if (buf.timer) return;                // 既にタイマがあれば何もしない
+
+console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
+
+    buf.timer = setTimeout(async () => {
+      buf.timer = null;
+      try{
+        // 実保存（失敗すると quota エラーなどがここに飛んでくる）
+        await SH.setPinsArrAsync?.(chatId, buf.arr);
+      }catch(e){
+        console.warn('[pins-buffer] save failed', e);
+        const now = Date.now();
+        // 連続アラートを防ぐため 5 秒に 1 回まで
+        if (!buf.lastErrorAt || now - buf.lastErrorAt > 5000){
+          buf.lastErrorAt = now;
+          const t = window.CGTN_I18N?.t || (s=>s);
+          const title = t('storage.saveFailed.title') ||
+                        '付箋の保存に失敗しました';
+          const body  = t('storage.saveFailed.body')  ||
+                        'しばらく待ってから再度お試しください。\n' +
+                        '（ストレージの上限に達している可能性があります）';
+          try{ alert(`${title}\n\n${body}`); }catch(_){}
+        }
+      }
+    }, PIN_SAVE_DEBOUNCE_MS);
+  }
+
+  // 新フォーマット用：cfg.pinsByChat から配列だけ取り出す
+  SH.getPinsArrFromCfg = function(chatId = SH.getChatId?.()) {
+    const cfg = SH.getCFG?.() || {};
+    const rec = cfg.pinsByChat?.[chatId];
+    const arr = Array.isArray(rec?.pins) ? rec.pins : [];
+    return arr.slice();
+  };
+/*
   // 読み出しは同期しても良いけど、呼び元の都合上 sync版も提供
   SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
     // 非同期を使えない箇所のためのフォールバック（空配列）
     console.warn('[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync');
     return [];
   };
-
   SH.getPinsArrAsync = async function(chatId = SH.getChatId?.()){
     if (!chatId) return [];
     try{
@@ -543,7 +619,7 @@
       return { ok:false, err:e };
     }
   };
-
+/*
   SH.deletePinsForChat = async function(chatId){
     try{
       await syncRemoveAsync(pinKeyOf(chatId));
@@ -560,15 +636,12 @@
   };
 
   // トグル（1始まり）
-//  SH.togglePinByIndex = function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
   SH.togglePinByIndex = async function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
     if (!Number.isFinite(index1) || index1 < 1) return false;
-//    const arr = SH.getPinsArr(chatId).slice();
     const arr = await SH.getPinsArrAsync(chatId);
     if (arr.length < index1) { const old = arr.length; arr.length = index1; arr.fill(0, old, index1); }
     const next = arr[index1 - 1] ? 0 : 1;
     arr[index1 - 1] = next;
-//    SH.savePinsArr(arr, chatId);
     const { ok } = await SH.savePinsArrAsync(arr, chatId);
     if (!ok){
       // 失敗→UIロールバック：元に戻す 
@@ -580,6 +653,53 @@
     try{ document.dispatchEvent(new CustomEvent('cgtn:pins-updated',{detail:{chatId}})); }catch{}
 
     return !!next;
+  };
+*/
+
+  // idx1: 1 始まりのターン番号
+  SH.togglePinByIndex = async function togglePinByIndex(idx1, chatId){
+    chatId = chatId || SH.getChatId?.();
+    const idx0 = Number(idx1) - 1;
+    if (!chatId || !Number.isFinite(idx0) || idx0 < 0) return false;
+
+    const cfg = SH.getCFG?.() || {};
+    const map = (cfg.pinsByChat = cfg.pinsByChat || {});
+    const rec = map[chatId] || { pins: [] };
+
+    const pinsArr = Array.isArray(rec.pins) ? rec.pins.slice() : [];
+console.log("◆togglePinByIndex*1 pinsArr:",pinsArr);
+    const cur  = !!pinsArr[idx0];
+    const next = !cur;
+    pinsArr[idx0] = next ? 1 : 0;
+console.log("◆togglePinByIndex*2 pinsArr:",pinsArr);
+    // タイトル／更新日時もここで更新しておく
+    const title = rec.title
+      || SH.getChatTitle?.()   // 現在タブのタイトル
+      || '';
+    map[chatId] = {
+      ...rec,
+      pins: pinsArr,
+      title,
+      updatedAt: Date.now()
+    };
+
+    // メモリ上の CFG を更新（即座に参照される系用）
+    SH.setCFG?.(cfg);
+
+    // 実保存はバッファリング（quota 対策）
+    scheduleBufferedPinsSave(chatId, pinsArr);
+
+    return next;   // 次状態 true=ON / false=OFF
+  };
+
+  SH.isPinnedByIndex = function isPinnedByIndex(idx1, chatId){
+    chatId = chatId || SH.getChatId?.();
+    const idx0 = Number(idx1) - 1;
+    if (!chatId || !Number.isFinite(idx0) || idx0 < 0) return false;
+    const cfg = SH.getCFG?.() || {};
+    const rec = cfg.pinsByChat?.[chatId];
+    const arr = Array.isArray(rec?.pins) ? rec.pins : [];
+    return !!arr[idx0];
   };
 
   // 件数ヘルパ（配列方式に合わせて修正）
