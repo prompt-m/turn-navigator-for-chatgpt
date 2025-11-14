@@ -1831,8 +1831,8 @@ console.debug('[*****updatePinOnlyBadge] turn0');
       }
 
       const cid = SH.getChatId?.();
-console.debug('[*****updatePinOnlyBadge]cid',cid);
       const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
+console.debug('[*****updatePinOnlyBadge]cid',cid," count:",count);
       // 表示制御
       if (count > 0) {
 //        badge.textContent = count > 99 ? '99+' : count;
