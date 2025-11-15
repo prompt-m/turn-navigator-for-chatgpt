@@ -1526,8 +1526,8 @@ console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length)
 
     const chatId  = SH.getChatId?.();
     //const pinsArr = SH.getPinsArr?.(chatId) || [];
-    //const pinsArr = await SH.getPinsArrAsync(chatId) || [];//←★★★★
-    const pinsArr = SH.getPinsArrFromCfg?.(chatId) || [];
+    const pinsArr = await SH.getPinsArrAsync(chatId) || [];//←★★★★
+    //const pinsArr = SH.getPinsArrFromCfg?.(chatId) || [];
 
     let turns     = ST.all.slice();
 

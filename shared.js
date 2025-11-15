@@ -95,6 +95,8 @@
   // === keys & wrappers ===
   const KEY_CFG  = 'cgNavSettings';
   const KEY_PINS = (id) => `cgtn:pins:${id}`;
+  const PINS_KEY_PREFIX = 'cgtnPins::';
+  const pinKeyOf = (chatId) => `${PINS_KEY_PREFIX}${chatId}`;
 
   async function syncGetAsync(keys){
     return await new Promise((res, rej)=>{
@@ -123,10 +125,6 @@
       });
     });
   }
-
-  // ===== Pins split storage (schema v2) =====
-//  const PINS_KEY_PREFIX = 'cgtnPins::';
-//  const pinKeyOf = (chatId) => `${PINS_KEY_PREFIX}${chatId}`;
 
   // storage.sync.set/get を Promise 化（lastError 準拠）
   async function syncGet(keys){
@@ -458,7 +456,7 @@
      return true;
    };
 
-/*
+
    SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr){
 console.log("◎setPinsArrAsync◎ :chatId",chatId," pinsArr:",pinsArr);
      const map = await SH.loadPinsMapAsync();
@@ -467,8 +465,8 @@ console.log("◎setPinsArrAsync◎ :chatId",chatId," pinsArr:",pinsArr);
      await SH.savePinsMapAsync(map);
      return true;
    };
-*/
 
+/*
   SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr){
     console.log("◎setPinsArrAsync◎ :chatId", chatId, " pinsArr:", pinsArr);
 
@@ -494,13 +492,9 @@ console.log("◎setPinsArrAsync◎ :chatId",chatId," pinsArr:",pinsArr);
     await SH.savePinsMapAsync(map);
     return true;
   };
+*/
 
-   SH.deletePinsForChatAsync = async function deletePinsForChatAsync(chatId){
-     const map = await SH.loadPinsMapAsync();
-     if (map[chatId]){ delete map[chatId]; await SH.savePinsMapAsync(map); }
-     return true;
-   };
-
+/*
   // === ピン保存バッファリング =======================================
   const PIN_SAVE_DEBOUNCE_MS = 1200;      // まとめ書きの待ち時間
   const _pinSaveBuf = new Map();          // chatId -> { arr, timer, lastErrorAt }
@@ -549,13 +543,15 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
     const arr = Array.isArray(rec?.pins) ? rec.pins : [];
     return arr.slice();
   };
-/*
+*/
+
   // 読み出しは同期しても良いけど、呼び元の都合上 sync版も提供
   SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
     // 非同期を使えない箇所のためのフォールバック（空配列）
     console.warn('[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync');
     return [];
   };
+
   SH.getPinsArrAsync = async function(chatId = SH.getChatId?.()){
     if (!chatId) return [];
     try{
@@ -619,8 +615,9 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
       return { ok:false, err:e };
     }
   };
-/*
+
   SH.deletePinsForChat = async function(chatId){
+console.log("付箋データ削除deletePinsForChat chatId:",chatId);
     try{
       await syncRemoveAsync(pinKeyOf(chatId));
       // インデックスを 0 件に
@@ -634,6 +631,12 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
       return false;
     }
   };
+
+   SH.deletePinsForChatAsync = async function deletePinsForChatAsync(chatId){
+     const map = await SH.loadPinsMapAsync();
+     if (map[chatId]){ delete map[chatId]; await SH.savePinsMapAsync(map); }
+     return true;
+   };
 
   // トグル（1始まり）
   SH.togglePinByIndex = async function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
@@ -654,8 +657,8 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
 
     return !!next;
   };
-*/
 
+/*
   // idx1: 1 始まりのターン番号
   SH.togglePinByIndex = async function togglePinByIndex(idx1, chatId){
     chatId = chatId || SH.getChatId?.();
@@ -701,7 +704,7 @@ console.log("◆togglePinByIndex*2 pinsArr:",pinsArr);
     const arr = Array.isArray(rec?.pins) ? rec.pins : [];
     return !!arr[idx0];
   };
-
+*/
   // 件数ヘルパ（配列方式に合わせて修正）
   SH.countPinsForChat = function(chatId = SH.getChatId()){
     try{

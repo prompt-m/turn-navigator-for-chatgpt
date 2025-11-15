@@ -185,6 +185,7 @@ console.log("syncSetAsync",obj);
   // --- near-pointer toast ---
   function toastNearPointer(msg, { ms=1400, dx=18, dy=-22 } = {}){
     const host = document.getElementById('cgtn-floater');
+console.log("近くにポワンtoastNearPointer host:",host);
     if (!host) return;
 
     // 画面端でははみ出さない程度にクランプ
@@ -458,10 +459,11 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
     if (!yes) return;
   
     /* 成功/失敗の分岐でUI処理を強化 */
-    //const ok = await SH.deletePinsForChat(chatId);
-    const ok = await SH.deletePinsForChatAsync(chatId);
+    const ok = await SH.deletePinsForChat(chatId);
+    //const ok = await SH.deletePinsForChatAsync(chatId);
   
     if (ok){
+console.log("付箋データ削除 deletePinsFromOptions ok");
       // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）
       try {
         const targets = ['*://chatgpt.com/*', '*://chat.openai.com/*'];
@@ -481,6 +483,7 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
       toastNearPointer(T('options.deleted') || 'Deleted');
 
     } else {
+console.log("付箋データ削除 deletePinsFromOptions ng");
 
       // 保存失敗（lastError など）→ UI でアラート/トースト
       try{
