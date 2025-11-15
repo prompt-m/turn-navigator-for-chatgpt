@@ -1338,7 +1338,7 @@ console.log("clearListPanelUI catch");
       });
     })();
 
-    // ここ変えたよ：つまみ横の付箋のみ（1クリック目から確実に反映）
+    // つまみ横の付箋のみ（1クリック目から確実に反映）
     (function bindPinFilter(){
       const btn = listBox.querySelector('#cgpt-pin-filter');
       if (!btn || btn._cgtnBound) return;
@@ -1369,7 +1369,7 @@ console.log("clearListPanelUI catch");
       }, {passive:true});
     })();
 
-    // ここ変えたよ：畳み/開きのバインドを安全に一度だけ行う
+    // 畳み/開きのバインドを安全に一度だけ行う
     function bindCollapseOnce(panel){
       const btn = panel.querySelector('#cgpt-list-collapse');
       if (!btn) return;
