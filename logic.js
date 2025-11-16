@@ -10,6 +10,12 @@
   const titleEscape = SH.titleEscape;
   let uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
 
+  // 集計結果の置き場
+  NS.metrics = {
+    all:   { uploads: 0, downloads: 0 },  // 「すべて表示」時
+    pins:  { uploads: 0, downloads: 0 },  // 「付箋のみ」時
+  };
+
   const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
   function _L(){ return (SH?.getLang?.() || '').toLowerCase().startsWith('en') ? 'en':'ja'; }
@@ -1541,7 +1547,6 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
     uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
 
-
     // === 行生成 ===
     for (const art of turns){
       // “元の全体順”の1始まり index を算出して、行に刻む
@@ -1724,6 +1729,9 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     NS._lastVisibleRows = rowsCount;
     // フッター更新はここだけ
     // --- 集計値をグローバル（NS）へ保存 ---
+    const box = pinOnly ? NS.metrics.pins : NS.metrics.all;
+    box.uploads   = uploads;
+    box.downloads = downloads;
     NS.uploads = uploads;
     NS.downloads = downloads;
     NS.pinsCount = Object.values(pinsArr).filter(Boolean).length;
@@ -1856,6 +1864,7 @@ console.debug('[*****updatePinOnlyBadge]count0');
 
   // === フッターの件数を即時クリア（リスト無し表示） ===
   // ===== フッター：状態セーフに更新 =====
+
   function clearListFooterInfo(){
 console.log("**clearListFooterInfo ");
   const foot = document.getElementById('cgpt-list-foot-info');
@@ -1865,6 +1874,7 @@ console.log("**clearListFooterInfo ");
 }
 
   // renderlistからしか呼んではいけない
+/*
   function updateListFooterInfo(){
     const foot = document.getElementById('cgpt-list-foot-info');
     if (!foot) return;
@@ -1892,6 +1902,50 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
       .replace('{uploads}',    String(uploads))
       .replace('{downloads}',  String(downloads));
   }
+*/
+
+  function updateListFooterInfo(){
+    try {
+      const cfg  = SH.getCFG?.() || {};
+      const pinOnly = !!cfg.list?.pinOnly;
+
+      const ST   = NS.STATE || {};
+      const role = ST.viewRole || 'all';   // 'all' | 'user' | 'assistant'
+
+      // ① ベース値を選ぶ（全体 vs 付箋のみ）
+      const base = pinOnly ? (NS.metrics?.pins || {}) 
+                         : (NS.metrics?.all  || {});
+
+      let uploads   = base.uploads   || 0;
+      let downloads = base.downloads || 0;
+
+      // ② role に応じて見せ方を変える
+      if (role === 'user') {
+        // ユーザー = アップロード担当 → ダウンロードはゼロ扱い
+        downloads = 0;
+      } else if (role === 'assistant') {
+        // アシスタント = ダウンロード担当
+        uploads = 0;
+      }
+      // role === 'all' のときは両方そのまま
+
+      // ③ あとは今までの DOM 反映処理に、上の uploads / downloads を使う
+      const foot = document.getElementById('cgpt-list-footer'); // 例
+      if (!foot) return;
+
+      const elTotal     = foot.querySelector('.cgtn-foot-total');
+      const elUploads   = foot.querySelector('.cgtn-foot-up');
+      const elDownloads = foot.querySelector('.cgtn-foot-down');
+
+      if (elTotal)     elTotal.textContent     = /* 既存ロジックの total 値 */;
+      if (elUploads)   elUploads.textContent   = String(uploads);
+      if (elDownloads) elDownloads.textContent = String(downloads);
+
+    } catch(e) {
+      console.warn('updateListFooterInfo failed', e);
+    }
+  }
+
 
   //付箋バッジ/チャット名更新
   document.addEventListener('cgtn:pins-updated', () => {
