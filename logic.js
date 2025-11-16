@@ -754,45 +754,6 @@ console.log("scrollListToTurn*6 top",top);
   const isLocked = () => performance.now() < _lockUntil;
   function lockFor(ms){ _lockUntil = performance.now() + (Number(ms)||0); }
 
-/*
-  function scrollToHead(article){
-    if (!article) return;
-    const sc = getTrueScroller();
-    const anchor  = currentAnchorY();
-    const desired = articleTop(sc, article) - anchor; // 丸めない
-    const maxScroll = Math.max(0, sc.scrollHeight - sc.clientHeight);
-    const clamped   = Math.min(maxScroll, Math.max(0, desired));
-
- _navLog('scrollToHead', {
-    key: getTurnKey(article), desired: Math.round(desired),
-    clamped: Math.round(clamped), maxScroll, anchor,
-    scTopBefore: Math.round(sc.scrollTop)
-  });
-
-    lockFor(SH.getCFG().lockMs);
-    // ① まずスムーズに近づける
-    sc.scrollTo({ top: Math.round(clamped), behavior: 'smooth' });
- 
-    // ② 少し待ってから “現在の高さ” で再計算し、ズレてたら一発スナップ
-    const snapDelay = 220; // 150〜300msで好み調整
-    setTimeout(()=>{
-      try{
-        const anchor2  = currentAnchorY();
-        const desired2 = articleTop(sc, article) - anchor2;
-        const clamp2   = Math.min(maxScroll, Math.max(0, desired2));
-        const err      = Math.abs((sc.scrollTop||0) - clamp2);
-        if (err > 1) {
-          sc.scrollTo({ top: Math.round(clamp2), behavior: 'auto' }); // ←最終スナップ
-        }
-      }finally{
-        // 注目ターンキーを最後に確定
-        NS._currentTurnKey = getTurnKey(article);
-        console.debug('[nav] scrolled', { key:NS._currentTurnKey });
-      }
-    }, snapDelay);
-  }
-*/
-
   // ターン検出<article>
   function pickAllTurns(){
     const seen = new Set();
@@ -887,34 +848,6 @@ console.log("scrollListToTurn*6 top",top);
     }
     console.debug('[logic] ensureTurnsReady done');
   }
-
-/*
-  async function ensureTurnsReady({
-    maxMs = 15000,
-    idle  = 300,
-    tick  = 120
-  } = {}){
-    const sc = getTrueScroller?.();
-    let prevN = -1, prevH = -1, stable = 0, t0 = performance.now();
-    let seenAny = false;             // ★最初の1件が出るまで「安定」を始めない
-    while (performance.now() - t0 < maxMs){
-      await new Promise(r => setTimeout(r, tick));
-      const arts = pickAllTurns?.().filter(isRealTurn) || [];
-      const n = arts.length;
-      const h = sc?.scrollHeight || 0;
-      if (n > 0) seenAny = true;
-      if (seenAny && n === prevN && Math.abs(h - prevH) <= 1){
-        stable += tick;
-        if (stable >= idle) break;
-      } else {
-        stable = 0;
-        prevN = n;
-        prevH = h;
-      }
-    }
-    console.debug('[logic] ensureTurnsReady done');
-  }
-*/
 
   // ST: 現在ページ（チャット）内のターン情報を保持する状態オブジェクト。
   //   - all        : ページ中の全ターン（<article>）要素を上から順に格納
@@ -1905,45 +1838,71 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
 */
 
   function updateListFooterInfo(){
-    try {
-      const cfg  = SH.getCFG?.() || {};
-      const pinOnly = !!cfg.list?.pinOnly;
+    const foot = document.getElementById('cgpt-list-foot-info');
+    if (!foot) return;
 
-      const ST   = NS.STATE || {};
-      const role = ST.viewRole || 'all';   // 'all' | 'user' | 'assistant'
+    const ST = NS?.ST || {};
+    const totalTurns = Array.isArray(ST.all) ? ST.all.length : 0;
 
-      // ① ベース値を選ぶ（全体 vs 付箋のみ）
-      const base = pinOnly ? (NS.metrics?.pins || {}) 
-                         : (NS.metrics?.all  || {});
+    // 付箋モード（全体 / 付箋のみ）
+    const pinOnly = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
 
-      let uploads   = base.uploads   || 0;
-      let downloads = base.downloads || 0;
+    // 集計値は renderList で詰めた NS.metrics を使う
+    const m = (NS.metrics || {});
+    const box = pinOnly ? (m.pins || {}) : (m.all || {});
+    let uploads   = Number(box.uploads   || 0);
+    let downloads = Number(box.downloads || 0);
 
-      // ② role に応じて見せ方を変える
-      if (role === 'user') {
-        // ユーザー = アップロード担当 → ダウンロードはゼロ扱い
-        downloads = 0;
-      } else if (role === 'assistant') {
-        // アシスタント = ダウンロード担当
-        uploads = 0;
-      }
-      // role === 'all' のときは両方そのまま
+    const pinsCount = Number(NS?.pinsCount || 0);
 
-      // ③ あとは今までの DOM 反映処理に、上の uploads / downloads を使う
-      const foot = document.getElementById('cgpt-list-footer'); // 例
-      if (!foot) return;
-
-      const elTotal     = foot.querySelector('.cgtn-foot-total');
-      const elUploads   = foot.querySelector('.cgtn-foot-up');
-      const elDownloads = foot.querySelector('.cgtn-foot-down');
-
-      if (elTotal)     elTotal.textContent     = /* 既存ロジックの total 値 */;
-      if (elUploads)   elUploads.textContent   = String(uploads);
-      if (elDownloads) elDownloads.textContent = String(downloads);
-
-    } catch(e) {
-      console.warn('updateListFooterInfo failed', e);
+    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
+    if (!totalTurns){
+      foot.dataset.state = 'empty';
+      foot.textContent = T('list.empty') || 'リストはありません';
+      return;
     }
+
+    // ── 現在のロール（全体 / ユーザー / アシスタント）を DOM から推定 ──
+    let role = 'all';
+    try {
+      const root =
+        document.getElementById('cgpt-role-filter')  // ロールボタンの親があれば
+        || document;                                 // なければ document 全体
+
+      // ここは実際の HTML に合わせて id / class を調整してOK
+      if (root.querySelector('[data-role="user"].active,  #cgpt-role-user.active')) {
+        role = 'user';
+      } else if (root.querySelector('[data-role="assistant"].active, #cgpt-role-asst.active')) {
+        role = 'assistant';
+      }
+    } catch(_) {}
+
+    // ユーザー表示中 → アップロードだけ表示
+    // アシスタント表示中 → ダウンロードだけ表示
+    if (role === 'user') {
+      downloads = 0;
+    } else if (role === 'assistant') {
+      uploads = 0;
+    }
+
+    // ── 表示用「会話数」はリストの最後の No. を引用 ──
+    let totalDisplay = totalTurns;
+    try {
+      const body = document.getElementById('cgpt-list-body');
+      const lastNoCell = body?.querySelector('tr:last-child td.no');
+      const lastNo = lastNoCell ? Number(lastNoCell.textContent.trim()) : 0;
+      if (lastNo > 0) totalDisplay = lastNo;
+    } catch(_) {}
+
+    foot.dataset.state = 'normal';
+    const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
+    const tpl = T(key) || '';
+
+    foot.textContent = tpl
+      .replace('{count}',     String(pinsCount))    // 付箋数（pinOnly 以外では無視してもOK）
+      .replace('{total}',     String(totalDisplay)) // 会話数（画面上の No. の最終値）
+      .replace('{uploads}',   String(uploads))      // 「アップあり」
+      .replace('{downloads}', String(downloads));   // 「ダウンあり」
   }
 
 
