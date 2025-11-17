@@ -86,19 +86,7 @@ console.debug('bindEvents 一覧トグル [forceListPanelOffOnBoot] LG?.setListE
         UI.toggleLang?.();
         return;
       }
-/*
-      // --- 設定を開く ---
-      if (el.closest('#cgtn-open-settings')) {
-        // 1) 正規ルート：options_ui に従ってタブで開く
-        if (chrome.runtime?.openOptionsPage) {
-          chrome.runtime.openOptionsPage();
-        } else {
-          // 2) 古い環境などのフォールバックは SW に委譲（window.open は使わない）
-          chrome.runtime.sendMessage({ cmd: 'openOptions' });
-        }
-        return;
-      }
-*/
+
       // --- 設定を開く ---
       if (el.closest('#cgtn-open-settings')) {
         /* ここから追加：堅牢版 openOptions */

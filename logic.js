@@ -1374,7 +1374,6 @@ console.log("clearListPanelUI catch");
       // 4) pinOnly のとき、OFF になったターン行は即削除
       if (pinOnly && !nextOn) {
         rowsByTurn(k).forEach(n => n.remove());
-//        NS.updateListFooterInfo?.();
         return;
       }
 
@@ -1877,6 +1876,7 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
       }
     } catch(_) {}
 
+console.log("★★★role:",role);
     // ユーザー表示中 → アップロードだけ表示
     // アシスタント表示中 → ダウンロードだけ表示
     if (role === 'user') {
@@ -1904,6 +1904,7 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
       .replace('{uploads}',   String(uploads))      // 「アップあり」
       .replace('{downloads}', String(downloads));   // 「ダウンあり」
   }
+  NS.updateListFooterInfo = updateListFooterInfo;
 
 
   //付箋バッジ/チャット名更新
@@ -1925,9 +1926,6 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
 
   window.addEventListener('cgtn:pins-updated', (ev) => {
     const { chatId, count } = ev.detail || {};
-
-    // 件数表示などの小物を同期
-//    try { updateListFooterInfo?.(); } catch {}
 
     // 「付箋のみ表示」モード中は見た目も即時反映
     const pinOnly = document.querySelector('#cgpt-pin-filter[aria-pressed="true"]');
@@ -1970,7 +1968,6 @@ console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
 
   // --- expose ---
   window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
-//    updateListFooterInfo,                // ← ここはローカル名で参照できる
     getTurnKey: (NS.getTurnKey || getTurnKey),
     isPinnedByKey
   });

@@ -199,7 +199,7 @@ const LIST_CSS = `
 }
 
 #cgpt-list-body .txt{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 }
-#cgpt-list-body .txt:hover {background: lightgray;}
+#cgpt-list-body .txt:hover {background: skyblue;}
 
 
 
@@ -237,8 +237,8 @@ const LIST_CSS = `
   white-space: nowrap;
 }
 
-#cgpt-list-panel .row.user-turn  { background: rgba(240,246,255,.60); }
-#cgpt-list-panel .row.asst-turn  { background: rgba(234,255,245,.60); }
+#cgpt-list-panel .row.user-turn  { background: #F2F5F8; }
+#cgpt-list-panel .row.asst-turn  { background: #F2FFF9; }
 
 #cgpt-nav button:focus,
 #cgpt-nav label:focus,
@@ -282,7 +282,10 @@ const LIST_CSS = `
 /* リストパネル内の行（ライト読みやすさ重視） */
 #cgpt-list-panel .row{ background: #fafafa; color: #0b0d12; }
 /* 交互やホバーがあれば微差で */
-#cgpt-list-panel .row:hover{ background:#f2f5f8; }
+/*#cgpt-list-panel .row:hover{ background:#f2f5f8; }//要修正　緑系*/
+#cgpt-list-panel .row.user-turn:hover  { background: #D9E2EB; }
+#cgpt-list-panel .row.asst-turn:hover  { background: #DDFFF0; }
+
 
 #cgpt-chat-title {
   max-width:100%;
