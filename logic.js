@@ -635,6 +635,7 @@ console.log("scrollListToTurn*6 top",top);
 
   // === pin theme (gold test) ===
   function applyPinTheme(){
+
     const cfg = SH.getCFG() || {};
     const theme = cfg.list?.pinTheme || 'red';
     const btn = document.getElementById('cgpt-pin-filter');
@@ -1107,6 +1108,8 @@ console.log("clearListPanelUI catch");
     if (refreshBtn && !refreshBtn._cgtnBound) {
       refreshBtn._cgtnBound = true;
       refreshBtn.addEventListener('click', (e) => {
+console.log("******logic.js refreshBtn click");
+
         e.preventDefault();
         e.stopPropagation();
         try { NS.renderList?.(true); } catch {}
@@ -1114,7 +1117,7 @@ console.log("clearListPanelUI catch");
     }
 
 
-    /* ここから追加：行番号（インデックス）をCSSカウンタで表示 */
+    /* 行番号（インデックス）をCSSカウンタで表示 */
     (function ensureIndexCounterStyle(){
       try{
         if (document.getElementById('cgtn-idx-style')) return;
@@ -1166,7 +1169,7 @@ console.log("clearListPanelUI catch");
         document.head.appendChild(st);
       }catch(_){}
     })();
-    /* ここまで */
+    /* ensureIndexCounterStyle ここまで */
 
     // === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
     (function enforceNoFocusList(panel){
@@ -1204,6 +1207,7 @@ console.log("clearListPanelUI catch");
         } catch {}
       }, { capture:true });
     })(listBox);
+    // enforceNoFocusList ここまで
 
     // === リスト側：マウス操作のフォーカス残りを抑止 ===
     (function suppressMouseFocusInList(){
@@ -1231,7 +1235,7 @@ console.log("clearListPanelUI catch");
         } catch {}
       }, { capture:true });
     })();
-
+    // suppressMouseFocusInList ここまで
 
     // リストパネル内でもクリックでフォーカスを残さない
     (function suppressMouseFocusInList(panel){
@@ -1248,6 +1252,7 @@ console.log("clearListPanelUI catch");
         if (el && el.blur) el.blur();
       }, { passive: true });
     })(listBox);
+    // suppressMouseFocusInList ここまで
 
     // パネルDOM生成の直後に追加：bottom固定からtop固定へ切替
     const r = listBox.getBoundingClientRect();
@@ -1276,6 +1281,7 @@ console.log("clearListPanelUI catch");
         SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), x:r.left, y:r.top } });
       });
     })();
+    // enableDrag ここまで
 
     // つまみ横の付箋のみ（1クリック目から確実に反映）
     (function bindPinFilter(){
@@ -1286,8 +1292,11 @@ console.log("clearListPanelUI catch");
         ev.stopPropagation();
         const cur = SH.getCFG() || {};
 
+console.log("*****付箋のみクリック cgpt-pin-filter click ev.altkey",ev.altkey);
+
         // Alt+クリックはテーマ切替（任意運用）
         if (ev.altKey){
+console.log("*****bindPinFilter Alt+クリック click");
           const nextTheme = (cur.list?.pinTheme === 'gold') ? 'red' : 'gold';
           SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinTheme: nextTheme } });
           applyPinTheme?.();
@@ -1296,7 +1305,7 @@ console.log("clearListPanelUI catch");
 
         // 通常クリック：pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
-//console.debug('[pinFilter] next=%s (before renderList override)', next);
+console.debug('******付箋のみ通常クリック next=%s', next);
         SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
 
         btn.setAttribute('aria-pressed', String(next));
@@ -1307,6 +1316,7 @@ console.log("clearListPanelUI catch");
         NS.renderList(true, { pinOnlyOverride: next });
       }, {passive:true});
     })();
+    // bindPinFilter ここまで
 
     // 畳み/開きのバインドを安全に一度だけ行う
     function bindCollapseOnce(panel){
@@ -1316,6 +1326,7 @@ console.log("clearListPanelUI catch");
       btn._cgtnBound = true;
 
       btn.addEventListener('click', () => {
+console.log("******logic.js 畳む開く click");
         const collapsed = panel.classList.toggle('collapsed');
         const on = !collapsed; // 展開=true
         btn.textContent = on ? '▴' : '▾';       // 開=▴ / 閉=▾
@@ -1343,8 +1354,7 @@ console.log("clearListPanelUI catch");
     NS.updateListChatTitle?.()
     return listBox;
   }
-
-// ensureListBox ここまで
+  // ensureListBox ここまで
 
   // 行右端🗒️のイベントを二重で拾い、誤クリック防止
   function addPinHandlers(btn, art){

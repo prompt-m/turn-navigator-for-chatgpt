@@ -717,7 +717,7 @@ console.log("＊＊＊＊closeDockOnUrlChange 7 ＊＊＊＊");
       };
     }
 }
-
+/*
   // ========= 6) 一覧パネルの初期状態をOFFに強制 =========
   function forceListPanelOffOnBoot(){
     try {
@@ -727,13 +727,14 @@ console.log("＊＊＊＊closeDockOnUrlChange 7 ＊＊＊＊");
       const pinOnlyChk = document.getElementById('cgpt-pinonly');
       if (pinOnlyChk){ pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
 console.debug('[forceListPanelOffOnBoot] LG?.setListEnabled false ');
-      LG?.setListEnabled?.(false, /*save*/ false);
+      LG?.setListEnabled?.(false,  false);
     } catch {}
   }
 
   // ========= 7) リスト「最新にする」ボタン =========
   function bindListRefreshButton(){
     document.addEventListener('click', (e) => {
+console.log("******content.js bindListRefreshButton click");
       const btn = e.target.closest?.('#cgpt-list-refresh'); if (!btn) return;
       e.preventDefault(); e.stopPropagation();
 
@@ -777,6 +778,7 @@ console.debug('[bindListRefreshButton]LG.rebuild() ');
       });
     }, true);
   }
+*/
 
 // 基準線の表示ON/OFF 設定画面より受信
   // === options.html からの即時反映メッセージを受ける ===

@@ -36,9 +36,33 @@
 
       const el = e.target.closest('*');
       if (!el) return;
+/*
+      // --- ロール切り替え（全体 / ユーザー / アシスタント） ---
+      if (el.closest('#lv-lab-user')) {
+console.log("*****addEventListener lv-lab-user");
+//        NS.viewRole = 'user';
+//        UI.updateRoleButtons?.('user');          // ボタンのactive切替え用（ui.jsに用意）
+        window.CGTN_LOGIC?.updateListFooterInfo?.();
+        return;
+      }
+      if (el.closest('#lv-lab-asst')) {
+console.log("*****addEventListener lv-lab-asst");
+//        NS.viewRole = 'assistant';
+//        UI.updateRoleButtons?.('assistant');
+        window.CGTN_LOGIC?.updateListFooterInfo?.();
+        return;
+      }
+      if (el.closest('#lv-lab-all')) {
+console.log("*****addEventListener lv-lab-all");
+//        NS.viewRole = 'all';
+//        UI.updateRoleButtons?.('all');
+        window.CGTN_LOGIC?.updateListFooterInfo?.();
+        return;
+      }
 
       // --- 「付箋のみ」ボタン（上部トグル） ---
       if (el.closest('#cgpt-pin-filter')) {
+console.log("*****addEventListener cgpt-pin-filte");
         const btn  = el.closest('#cgpt-pin-filter');
         const cur  = !!(SH.getCFG()?.list?.pinOnly);
         const next = !cur;
@@ -47,19 +71,17 @@
         SH.saveSettingsPatch({ list: { ...(SH.getCFG()?.list||{}), pinOnly: next } }, () => {
           // 2) 描画（新CFGを読む）
           window.CGTN_LOGIC?.renderList?.(true);
-          // 3) フッター（新CFGを読む）
-//          window.CGTN_LOGIC?.updateListFooterInfo?.();
         });
 
         // UI状態（ARIA）は即時反映でOK
         btn.setAttribute('aria-pressed', String(next));
         return;
       }
-
+*/
       // --- 一覧トグル ---
       if (el.closest('#cgpt-list-toggle')) {
         const on = el.closest('#cgpt-list-toggle').checked;
-console.debug('bindEvents 一覧トグル [forceListPanelOffOnBoot] LG?.setListEnabled on: ',on);
+console.debug('bindEvents 一覧トグル #cgpt-list-toggle checked;: ',on);
         LG.setListEnabled?.(on);
 
         // 一覧OFFなら付箋もOFF & 無効化
