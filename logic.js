@@ -13,11 +13,12 @@
   let uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
 
   // 集計結果の置き場
-  NS.metrics: {
-    all:  { uploads: 0, downloads: 0 },
-    pins: { uploads: 0, downloads: 0 }
-  },
-  NS.viewRole: 'all',  // ← 追加：'all' | 'user' | 'assistant'
+  NS.metrics = {
+    all:   { uploads: 0, downloads: 0 },
+    pins:  { uploads: 0, downloads: 0 },
+  };
+
+  NS.viewRole = 'all';   // ここだけ追加
 
   const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
@@ -1118,7 +1119,6 @@ console.log("******logic.js refreshBtn click");
       }, { passive: true });
     }
 
-
     /* 行番号（インデックス）をCSSカウンタで表示 */
     (function ensureIndexCounterStyle(){
       try{
@@ -1319,6 +1319,35 @@ console.debug('******付箋のみ通常クリック next=%s', next);
       }, {passive:true});
     })();
     // bindPinFilter ここまで
+
+    // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
+    (function bindRoleFilter(panel){
+      const box = panel.querySelector('#cgpt-list-filter');
+      if (!box || box._cgtnBound) return;
+      box._cgtnBound = true;
+
+      const applyFromChecked = () => {
+        const checked = box.querySelector('input[name="cgtn-lv"]:checked');
+console.log("******bindRoleFilter checked:",checked);
+        if (!checked) return;
+        let role = 'all';
+        if (checked.id === 'lv-user')   role = 'user';
+        if (checked.id === 'lv-assist') role = 'assistant';
+        NS.viewRole = role;
+console.log("******bindRoleFilter role:",role);
+        try { window.CGTN_LOGIC?.updateListFooterInfo?.(); } catch(_) {}
+      };
+
+      // ラジオ変更時にフッター更新
+      box.addEventListener('change', (e) => {
+        const input = e.target && e.target.closest('input[name="cgtn-lv"]');
+        if (!input) return;
+        applyFromChecked();
+      });
+
+      // 初期状態も一度反映
+      applyFromChecked();
+    })(listBox);
 
     // 畳み/開きのバインドを安全に一度だけ行う
     function bindCollapseOnce(panel){
@@ -1815,35 +1844,6 @@ console.log("**clearListFooterInfo ");
     const foot = document.getElementById('cgpt-list-foot-info');
     if (!foot) return;
 
-    const total     = (NS?.ST?.all?.length) || 0;
-    const uploads   = Number(NS?.uploads || 0);
-    const downloads = Number(NS?.downloads || 0);
-    const pinOnly   = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
-    const count     = Number(NS?.pinsCount || 0);
-console.log("pinOnly:",pinOnly," NS?.pinsCount:",NS?.pinsCount);
-
-    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
-    if (total === 0){
-      foot.dataset.state = 'empty';
-      foot.textContent = T('list.empty') || 'リストはありません';
-      return;
-    }
-
-    foot.dataset.state = 'normal';
-    const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
-    const tpl = T(key) || '';
-    foot.textContent = tpl
-      .replace('{count}',      String(count))
-      .replace('{total}',      String(total))
-      .replace('{uploads}',    String(uploads))
-      .replace('{downloads}',  String(downloads));
-  }
-*/
-
-  function updateListFooterInfo(){
-    const foot = document.getElementById('cgpt-list-foot-info');
-    if (!foot) return;
-
     const ST = NS?.ST || {};
     const totalTurns = Array.isArray(ST.all) ? ST.all.length : 0;
 
@@ -1908,6 +1908,73 @@ console.log("★★★role:",role);
       .replace('{uploads}',   String(uploads))      // 「アップあり」
       .replace('{downloads}', String(downloads));   // 「ダウンあり」
   }
+*/
+  function updateListFooterInfo(){
+    const foot = document.getElementById('cgpt-list-foot-info');
+    if (!foot) return;
+
+    const ST = NS?.ST || {};
+    const allTurns = Array.isArray(ST.all) ? ST.all.length : 0;
+
+    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
+    if (!allTurns){
+      foot.dataset.state = 'empty';
+      foot.textContent = T('list.empty') || 'リストはありません';
+      return;
+    }
+
+    // 設定（pinOnly）
+    const cfg     = window.CGTN_SHARED?.getCFG?.() || {};
+    const pinOnly = !!cfg.list?.pinOnly;
+
+    // ---- 集計値の取得（renderList が詰めた NS.metrics を使う） ----
+    const m   = NS.metrics || {};
+    const box = pinOnly ? (m.pins || {}) : (m.all || {});
+    let uploads   = typeof box.uploads   === 'number' ? box.uploads   : Number(NS?.uploads   || 0);
+    let downloads = typeof box.downloads === 'number' ? box.downloads : Number(NS?.downloads || 0);
+
+    const pinsCount = Number(NS?.pinsCount || 0);
+
+    // ---- 現在のロール（全体 / ユーザー / アシスタント） ----
+    const role = NS?.viewRole || 'all';  // ensureListBox で 'all'|'user'|'assistant' をセット
+console.log("★★★role:",role);
+    // 運用上「ユーザー＝アップロード」「アシスタント＝ダウンロード」とみなす
+    if (role === 'user') {
+      // ユーザーのみ表示中 → ダウンロード件数は 0 扱い
+      downloads = 0;
+    } else if (role === 'assistant') {
+      // アシスタントのみ表示中 → アップロード件数は 0 扱い
+      uploads = 0;
+    }
+
+    // ---- 会話数 total の決め方 ----
+    // pinOnly=ON → 分母は全ターン数（例: 3 / 94）
+    // pinOnly=OFF → 分母は一番下の行番号（例: 94）を優先（ST.all.length とのズレ対策）
+    let totalDisplay = allTurns;
+    if (!pinOnly){
+      try {
+        const body = document.getElementById('cgpt-list-body');
+        const lastNoCell = body?.querySelector('tr:last-child td.no');
+        if (lastNoCell){
+          const n = parseInt(lastNoCell.textContent.trim(), 10);
+          if (!Number.isNaN(n) && n > 0){
+            totalDisplay = n;
+          }
+        }
+      } catch(_) {}
+    }
+
+    foot.dataset.state = 'normal';
+    const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
+    const tpl = T(key) || '';
+
+    foot.textContent = tpl
+      .replace('{count}',     String(pinsCount))
+      .replace('{total}',     String(totalDisplay))
+      .replace('{uploads}',   String(uploads))
+      .replace('{downloads}', String(downloads));
+  }
+
   NS.updateListFooterInfo = updateListFooterInfo;
 
 
