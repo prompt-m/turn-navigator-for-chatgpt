@@ -3,6 +3,8 @@
   const UI = window.CGTN_UI;
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
+
+
 //  const TURN_SEL = 'div[data-testid^="conversation-turn-"]'; // keep (legacy)
   const TURN_SEL = 'article'; // 1 <article> = 1 turn
   const SHOW_UNKNOWN_ATTACH = false; // trueにすると従来表示
@@ -11,10 +13,11 @@
   let uploads = 0, downloads = 0;// ダウンロードターン数・アップロードターン数
 
   // 集計結果の置き場
-  NS.metrics = {
-    all:   { uploads: 0, downloads: 0 },  // 「すべて表示」時
-    pins:  { uploads: 0, downloads: 0 },  // 「付箋のみ」時
-  };
+  NS.metrics: {
+    all:  { uploads: 0, downloads: 0 },
+    pins: { uploads: 0, downloads: 0 }
+  },
+  NS.viewRole: 'all',  // ← 追加：'all' | 'user' | 'assistant'
 
   const T = (k)=> window.CGTN_I18N?.t?.(k) ?? k;
 
@@ -37,7 +40,6 @@
   function isPinnedByKey(turnId){
     return !!(_pinsCache && _pinsCache[String(turnId)]);
   }
-
   NS.isPinnedByKey = isPinnedByKey;
 
   // 追加: ピン配列を chatId ごとに保存する非同期関数
@@ -1705,12 +1707,13 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
     console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
-
   function setListEnabled(on){
     const cfg = SH.getCFG();
     SH.saveSettingsPatch({ list:{ ...(cfg.list||{}), enabled: !!on } });
 
-    const panel = ensureListBox();
+    //  既存パネルがあれば拾うだけ
+    //const panel = ensureListBox();
+    const panel = document.getElementById('cgpt-list-panel');
 
     // リストが開いているかどうか
     NS._panelOpen = !!on;
@@ -1724,25 +1727,14 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 console.debug('[setListEnabled*0]再アタッチ ');
       try { installAutoSyncForTurns(); } catch {}//再アタッチ
 
-      // ①まず即時スキャン（ある程度は出る）★★★
-/*
-console.debug('[setListEnabled*1]rebuild ');
-      rebuild();
-      panel.classList.remove('collapsed');
-      const btn = panel.querySelector('#cgpt-list-collapse');
-      if (btn) { btn.textContent = '▴'; btn.setAttribute('aria-expanded','true'); }
-  
-      NS.renderList(true);
-*/
-      // ②遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
+      // 遅延スキャン（添付UIが後から差し込まれる分を回収）★★★
       //    rAF×2 でペイント後、さらに少し待ってから確定
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
 console.debug('[setListEnabled*2]rebuild/renderList ');
         setTimeout(()=>{
-console.log("logic.js rebuild call *1");
+console.log("logic.js setListEnabled rebuild call *1");
           rebuild();
           NS.renderList(true);
-//          panel.style.display = 'flex';
         }, 180);
       }));
     } else {
@@ -1750,7 +1742,9 @@ console.log("logic.js rebuild call *1");
       //OFFのとき必要？
       NS.updatePinOnlyBadge?.();
       NS.updateListChatTitle?.();
-      panel.style.display = 'none';
+      if (panel) {
+        panel.style.display = 'none';
+      }
 console.debug('[setListEnabled*4]一覧OFF');
     }
   }
