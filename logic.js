@@ -1088,13 +1088,13 @@ console.log("clearListPanelUI catch");
     CGTN_LOGIC.applyPanelWidthByChars(SH.getCFG()?.list?.maxChars || 52);
 
     // ★ フィルタラベルに辞書を適用（ナビと同じキー）
-    try{
+/*    try{
       const T = (SH.T || SH?.t || ((k)=>k)); // プロジェクトのTヘルパに合わせて
       listBox.querySelector('#lv-lab-user span').textContent  = T('user');
       listBox.querySelector('#lv-lab-asst span').textContent  = T('assistant');
       listBox.querySelector('#lv-lab-all  span').textContent  = T('all'); // ←「全体」
-    }catch{}
-
+    }catch{}*/
+    try { applyListFilterLang(); } catch {}
     // ツールチップ用titleを登録
     if (!listBox._tipsBound) {
       window.CGTN_SHARED?.applyTooltips?.({
@@ -1387,6 +1387,29 @@ console.log("******logic.js 畳む開く click");
   }
   // ensureListBox ここまで
 
+  // ★ ロールフィルタのラベルに辞書を適用 '25.11.20
+  function applyListFilterLang(){
+    try {
+      const panel = document.getElementById('cgpt-list-panel');
+      if (!panel) return;
+      const T = (SH.T || SH?.t || ((k)=>k));
+
+      const sAll  = panel.querySelector('#lv-lab-all span');
+      const sUser = panel.querySelector('#lv-lab-user span');
+      const sAsst = panel.querySelector('#lv-lab-asst span');
+
+      if (sAll)  sAll.textContent  = T('all');       // 全体
+      if (sUser) sUser.textContent = T('user');      // ユーザー
+      if (sAsst) sAsst.textContent = T('assistant'); // アシスタント
+    } catch (e) {
+      console.warn('[applyListFilterLang] failed', e);
+    }
+  }
+
+  // 外からも呼べるように公開
+  NS.applyListFilterLang = applyListFilterLang;
+
+
   // 行右端🗒️のイベントを二重で拾い、誤クリック防止
   function addPinHandlers(btn, art){
     if (!btn) return;
@@ -1527,20 +1550,33 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
       const head        = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
       const attachLine  = buildAttachmentLine(art, maxChars); // 実体ありのときだけ非空
-      const bodyLine    = extractBodySnippet(head, maxChars);
-
+//      const bodyLine    = extractBodySnippet(head, maxChars);
+      let  bodyLine     = extractBodySnippet(head, maxChars);
       // 🔖は「実体ありの添付行」か、なければ本文行に出す
       const hasRealAttach    = !!attachLine;  // ⭳/🖼/🎞 のいずれか
       const showClipOnAttach = hasRealAttach;
-      const showClipOnBody   = !hasRealAttach && !!bodyLine;
+//      const showClipOnBody   = !hasRealAttach && !!bodyLine;
+      let showClipOnBody   = !hasRealAttach && !!bodyLine;
 
       // ★追記: プレビュー用（長め）テキストを生成
       //   - 長さは 1200 文字を基準（設定があればそれを優先）
       //   - body優先、無ければattachを採用
       const PREVIEW_MAX   = Math.max(600, Math.min(2000, (SH?.getCFG?.()?.list?.previewMax || 1200)));
+//      const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
+//      const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
+//      const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
       const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
-      const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
-      const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
+      let bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
+      let previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
+
+     // ★★ 本文／添付のどちらも取れなかったターン用のフォールバック '25.11.20
+     if (!attachLine && !bodyLine) {
+       const nf = T('row.notFound') || '(not found)';
+       bodyLine   = nf;          // 本文行として (not found) を出す
+       bodyPreview = nf;
+       previewText = nf;
+       showClipOnBody = false;   // クリップは出さない（添付とはみなさない）
+     }
 
       // --- 役割判定（dataset.turn を優先し、旧属性をフォールバック） ---
       // row / row2 共通で使用するため attachLine より上に配置。
@@ -1948,20 +1984,29 @@ console.log("★★★role:",role);
     }
 
     // ---- 会話数 total の決め方 ----
-    // pinOnly=ON → 分母は全ターン数（例: 3 / 94）
-    // pinOnly=OFF → 分母は一番下の行番号（例: 94）を優先（ST.all.length とのズレ対策）
+    // 表示状態（全体 / ユーザー / アシスタント / 付箋のみ）に応じて
+    // CSS カウンタ cgtn_turn の最終値を拾う
     let totalDisplay = allTurns;
-    if (!pinOnly){
-      try {
-        const body = document.getElementById('cgpt-list-body');
-        const lastNoCell = body?.querySelector('tr:last-child td.no');
-        if (lastNoCell){
-          const n = parseInt(lastNoCell.textContent.trim(), 10);
+    try {
+      const body = document.getElementById('cgpt-list-body');
+      if (body){
+        const anchors = body.querySelectorAll('.turn-idx-anchor');
+        for (let i = anchors.length - 1; i >= 0; i--){
+          const el = anchors[i];
+          const cs = getComputedStyle(el, '::before');
+          if (!cs) continue;
+          let content = cs.getPropertyValue('content') || '';
+          // content は '"128"' のような形なので、前後の " を削って数値化
+          content = content.replace(/^["']|["']$/g, '').trim();
+          const n = parseInt(content, 10);
           if (!Number.isNaN(n) && n > 0){
             totalDisplay = n;
+            break;
           }
         }
-      } catch(_) {}
+      }
+    } catch(e){
+      console.warn('[updateListFooterInfo] counter read failed', e);
     }
 
     foot.dataset.state = 'normal';

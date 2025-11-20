@@ -1035,9 +1035,10 @@ console.log("content.js rebuild call *5");
       }, 300); // 300msデバウンス
     };
 console.log("installAutoSyncForTurns 3");
-
     _turnObs = new MutationObserver((muts)=>{
-      if (!SH.isListOpen?.()) return;
+
+      // リストが閉じていてもナビの ST 更新が必要なので常に監視する '25.11.20
+      //if (!SH.isListOpen?.()) return;
       for (const m of muts){
         if (inOwnUI(m.target)) continue;
 

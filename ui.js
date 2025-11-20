@@ -754,6 +754,13 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
     // プレビュータイトル
     const h = document.querySelector('#cgtn-preview-title');
     if (h) h.textContent = T('preview');
+
+    // リストパネルのロールフィルタも言語を反映 '25.11.20
+    try { window.CGTN_LOGIC?.applyListFilterLang?.(); } catch {}
+    // リストパネルのフッターも言語を反映 '25.11.20
+    try { window.CGTN_LOGIC?.updateListFooterInfo?.(); } catch(_) {}
+    // リストパネルのタイトル
+    try { window.CGTN_LOGIC?.updateListChatTitle?.(); } catch(_){}
   }
 
   function toggleLang() {
