@@ -1116,7 +1116,7 @@ console.log("******logic.js refreshBtn click");
         e.preventDefault();
         e.stopPropagation();
         try { NS.renderList?.(true); } catch {}
-      }, { passive: true });
+      });
     }
 
     /* 行番号（インデックス）をCSSカウンタで表示 */
@@ -1874,77 +1874,7 @@ console.log("**clearListFooterInfo ");
   foot.textContent = T('list.empty') || 'リストはありません';
 }
 
-  // renderlistからしか呼んではいけない
-/*
-  function updateListFooterInfo(){
-    const foot = document.getElementById('cgpt-list-foot-info');
-    if (!foot) return;
-
-    const ST = NS?.ST || {};
-    const totalTurns = Array.isArray(ST.all) ? ST.all.length : 0;
-
-    // 付箋モード（全体 / 付箋のみ）
-    const pinOnly = !!(window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly);
-
-    // 集計値は renderList で詰めた NS.metrics を使う
-    const m = (NS.metrics || {});
-    const box = pinOnly ? (m.pins || {}) : (m.all || {});
-    let uploads   = Number(box.uploads   || 0);
-    let downloads = Number(box.downloads || 0);
-
-    const pinsCount = Number(NS?.pinsCount || 0);
-
-    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
-    if (!totalTurns){
-      foot.dataset.state = 'empty';
-      foot.textContent = T('list.empty') || 'リストはありません';
-      return;
-    }
-
-    // ── 現在のロール（全体 / ユーザー / アシスタント）を DOM から推定 ──
-    let role = 'all';
-    try {
-      const root =
-        document.getElementById('cgpt-role-filter')  // ロールボタンの親があれば
-        || document;                                 // なければ document 全体
-
-      // ここは実際の HTML に合わせて id / class を調整してOK
-      if (root.querySelector('[data-role="user"].active,  #cgpt-role-user.active')) {
-        role = 'user';
-      } else if (root.querySelector('[data-role="assistant"].active, #cgpt-role-asst.active')) {
-        role = 'assistant';
-      }
-    } catch(_) {}
-
-console.log("★★★role:",role);
-    // ユーザー表示中 → アップロードだけ表示
-    // アシスタント表示中 → ダウンロードだけ表示
-    if (role === 'user') {
-      downloads = 0;
-    } else if (role === 'assistant') {
-      uploads = 0;
-    }
-
-    // ── 表示用「会話数」はリストの最後の No. を引用 ──
-    let totalDisplay = totalTurns;
-    try {
-      const body = document.getElementById('cgpt-list-body');
-      const lastNoCell = body?.querySelector('tr:last-child td.no');
-      const lastNo = lastNoCell ? Number(lastNoCell.textContent.trim()) : 0;
-      if (lastNo > 0) totalDisplay = lastNo;
-    } catch(_) {}
-
-    foot.dataset.state = 'normal';
-    const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
-    const tpl = T(key) || '';
-
-    foot.textContent = tpl
-      .replace('{count}',     String(pinsCount))    // 付箋数（pinOnly 以外では無視してもOK）
-      .replace('{total}',     String(totalDisplay)) // 会話数（画面上の No. の最終値）
-      .replace('{uploads}',   String(uploads))      // 「アップあり」
-      .replace('{downloads}', String(downloads));   // 「ダウンあり」
-  }
-*/
+  // renderlistからしか呼んではいけない(日英切替え)
   function updateListFooterInfo(){
     const foot = document.getElementById('cgpt-list-foot-info');
     if (!foot) return;
@@ -1991,22 +1921,22 @@ console.log("★★★role:",role);
       const body = document.getElementById('cgpt-list-body');
       if (body){
         const anchors = body.querySelectorAll('.turn-idx-anchor');
-        for (let i = anchors.length - 1; i >= 0; i--){
-          const el = anchors[i];
-          const cs = getComputedStyle(el, '::before');
-          if (!cs) continue;
-          let content = cs.getPropertyValue('content') || '';
-          // content は '"128"' のような形なので、前後の " を削って数値化
-          content = content.replace(/^["']|["']$/g, '').trim();
-          const n = parseInt(content, 10);
-          if (!Number.isNaN(n) && n > 0){
-            totalDisplay = n;
-            break;
-          }
+        let visible = 0;
+
+        anchors.forEach(el => {
+          const row = el.closest('.row');
+          if (!row) return;
+          // ★ 非表示行はカウントしない
+          if (row.offsetParent === null) return;
+          visible++;
+        });
+
+        if (visible > 0) {
+          totalDisplay = visible;
         }
       }
     } catch(e){
-      console.warn('[updateListFooterInfo] counter read failed', e);
+      console.warn('[updateListFooterInfo] count visible failed', e);
     }
 
     foot.dataset.state = 'normal';
