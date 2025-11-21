@@ -1550,21 +1550,16 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
       const head        = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
       const attachLine  = buildAttachmentLine(art, maxChars); // 実体ありのときだけ非空
-//      const bodyLine    = extractBodySnippet(head, maxChars);
       let  bodyLine     = extractBodySnippet(head, maxChars);
       // 🔖は「実体ありの添付行」か、なければ本文行に出す
       const hasRealAttach    = !!attachLine;  // ⭳/🖼/🎞 のいずれか
       const showClipOnAttach = hasRealAttach;
-//      const showClipOnBody   = !hasRealAttach && !!bodyLine;
       let showClipOnBody   = !hasRealAttach && !!bodyLine;
 
       // ★追記: プレビュー用（長め）テキストを生成
       //   - 長さは 1200 文字を基準（設定があればそれを優先）
       //   - body優先、無ければattachを採用
       const PREVIEW_MAX   = Math.max(600, Math.min(2000, (SH?.getCFG?.()?.list?.previewMax || 1200)));
-//      const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
-//      const bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
-//      const previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
       const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || '';
       let bodyPreview   = extractBodySnippet(head, PREVIEW_MAX) || '';
       let previewText   = (bodyPreview || attachPreview).replace(/\s+\n/g, '\n').trim();
@@ -1634,6 +1629,11 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         // 付箋の色設定(初期ピン色)：配列の index で決める
         const on = !!pinsArr[index1 - 1];
         paintPinRow(row, on);
+
+        // ★ ピン付きなら data-pin="1" を付ける（footer 集計用）'25.11.21
+        if (on) row.dataset.pin = '1';
+        else row.removeAttribute('data-pin');
+
         if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.cgtn-clip-pin'), row, chatId);
 
         // 直前ガード（非同期処理のため）
@@ -1655,6 +1655,9 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         if (!anchored){
           row2.classList.add('turn-idx-anchor'); // 添付が無いときだけ本文に番号
           anchored = true;
+        }
+        if (isPinned) {  // 付箋 ON のターンかどうか
+          row2.dataset.pin = '1';
         }
         // 背景色はCSSクラスで定義（JS側はclassListで付与）
         if (isUser) row2.classList.add('user-turn');
@@ -1696,6 +1699,10 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
 
         const on2 = !!pinsArr[index1 - 1];
         paintPinRow(row2, on2);
+
+        // ピン状態を data-pin へ反映 '25.11.21
+        if (on2) row2.dataset.pin = '1';
+        else row2.removeAttribute('data-pin');
 
         if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
 
@@ -1868,11 +1875,11 @@ console.debug('[*****updatePinOnlyBadge]count0');
 
   function clearListFooterInfo(){
 console.log("**clearListFooterInfo ");
-  const foot = document.getElementById('cgpt-list-foot-info');
-  if (!foot) return;
-  foot.dataset.state = 'empty';
-  foot.textContent = T('list.empty') || 'リストはありません';
-}
+    const foot = document.getElementById('cgpt-list-foot-info');
+    if (!foot) return;
+    foot.dataset.state = 'empty';
+    foot.textContent = T('list.empty') || 'リストはありません';
+  }
 
   // renderlistからしか呼んではいけない(日英切替え)
   function updateListFooterInfo(){
@@ -1880,7 +1887,9 @@ console.log("**clearListFooterInfo ");
     if (!foot) return;
 
     const ST = NS?.ST || {};
-    const allTurns = Array.isArray(ST.all) ? ST.all.length : 0;
+    const allTurns   = Array.isArray(ST.all)       ? ST.all.length       : 0;
+    const userTurns  = Array.isArray(ST.user)      ? ST.user.length      : 0;
+    const asstTurns  = Array.isArray(ST.assistant) ? ST.assistant.length : 0;
 
     // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
     if (!allTurns){
@@ -1896,58 +1905,107 @@ console.log("**clearListFooterInfo ");
     // ---- 集計値の取得（renderList が詰めた NS.metrics を使う） ----
     const m   = NS.metrics || {};
     const box = pinOnly ? (m.pins || {}) : (m.all || {});
-    let uploads   = typeof box.uploads   === 'number' ? box.uploads   : Number(NS?.uploads   || 0);
-    let downloads = typeof box.downloads === 'number' ? box.downloads : Number(NS?.downloads || 0);
-
-    const pinsCount = Number(NS?.pinsCount || 0);
+    let uploads   = (typeof box.uploads   === 'number') ? box.uploads   : Number(NS?.uploads   || 0);
+    let downloads = (typeof box.downloads === 'number') ? box.downloads : Number(NS?.downloads || 0);
 
     // ---- 現在のロール（全体 / ユーザー / アシスタント） ----
-    const role = NS?.viewRole || 'all';  // ensureListBox で 'all'|'user'|'assistant' をセット
+    let role = NS?.viewRole || 'all';
 console.log("★★★role:",role);
-    // 運用上「ユーザー＝アップロード」「アシスタント＝ダウンロード」とみなす
-    if (role === 'user') {
-      // ユーザーのみ表示中 → ダウンロード件数は 0 扱い
-      downloads = 0;
-    } else if (role === 'assistant') {
-      // アシスタントのみ表示中 → アップロード件数は 0 扱い
-      uploads = 0;
-    }
 
-    // ---- 会話数 total の決め方 ----
-    // 表示状態（全体 / ユーザー / アシスタント / 付箋のみ）に応じて
-    // CSS カウンタ cgtn_turn の最終値を拾う
-    let totalDisplay = allTurns;
+    try {
+      const filterBox = document.getElementById('cgpt-list-filter');
+      const checked   = filterBox?.querySelector('input[name="cgtn-lv"]:checked');
+      if (checked){
+        if (checked.id === 'lv-user')      role = 'user';
+        else if (checked.id === 'lv-assist') role = 'assistant';
+        else                                role = 'all';
+      }
+    } catch(e){
+      console.warn('[updateListFooterInfo] role detection failed', e);
+    }
+    NS.viewRole = role;
+
+    // ---- DOM から「ロール別 / 付箋別」の件数を数える ----
+    let visibleForRole = 0;   // ロール条件だけ満たす可視ターン数（pinOnly=OFF のときに使う）
+    let pinsForRole    = 0;   // ロール条件＋付箋あり のターン数（pinOnly=ON の分子）
+
     try {
       const body = document.getElementById('cgpt-list-body');
       if (body){
         const anchors = body.querySelectorAll('.turn-idx-anchor');
-        let visible = 0;
-
         anchors.forEach(el => {
           const row = el.closest('.row');
           if (!row) return;
-          // ★ 非表示行はカウントしない
-          if (row.offsetParent === null) return;
-          visible++;
-        });
+          if (row.offsetParent === null) return;  // 非表示行は除外
 
-        if (visible > 0) {
-          totalDisplay = visible;
-        }
+          const r     = row.getAttribute('data-role');   // user / assistant
+          const isPin = row.getAttribute('data-pin') === '1';
+
+          const roleMatch =
+            (role === 'all') ||
+            (role === 'user'      && r === 'user') ||
+            (role === 'assistant' && r === 'assistant');
+
+          if (!roleMatch) return;
+
+          visibleForRole++;
+          if (isPin) pinsForRole++;
+        });
       }
     } catch(e){
-      console.warn('[updateListFooterInfo] count visible failed', e);
+      console.warn('[updateListFooterInfo] visible count failed', e);
     }
 
-    foot.dataset.state = 'normal';
-    const key = pinOnly ? 'list.footer.pinOnly' : 'list.footer.all';
-    const tpl = T(key) || '';
+    // ---- 会話数（分母）の決め方 ----
+    const totalByRole = {
+      all:       allTurns,
+      user:      userTurns,
+      assistant: asstTurns
+    };
 
-    foot.textContent = tpl
-      .replace('{count}',     String(pinsCount))
-      .replace('{total}',     String(totalDisplay))
-      .replace('{uploads}',   String(uploads))
-      .replace('{downloads}', String(downloads));
+    let totalDisplay;
+    let countDisplay;
+
+    if (pinOnly){
+      // 付箋のみ表示：
+      //   分母 = ロール別の総ターン数（全体 / user / assistant）
+      //   分子 = 付箋付きターン数（ロール条件も適用）
+      totalDisplay = totalByRole[role] || allTurns;
+      if (totalDisplay <= 0) totalDisplay = allTurns;  // 念のためのフォールバック
+      countDisplay = pinsForRole;
+    } else {
+      // 通常表示：
+      //   分母 = 現在のロール条件で「画面に見えているターン数」
+      totalDisplay = visibleForRole || totalByRole[role] || allTurns;
+      countDisplay = visibleForRole;
+    }
+
+    // ---- uploads / downloads をロールに合わせて整形 ----
+    // 「ユーザー＝アップロード」「アシスタント＝ダウンロード」とみなす
+    if (role === 'user') {
+      downloads = 0;
+    } else if (role === 'assistant') {
+      uploads = 0;
+    }
+
+    // ---- テンプレート適用 ----
+    foot.dataset.state = 'normal';
+
+    if (pinOnly){
+      const tpl = T('list.footer.pinOnly') || '{count}/{total}';
+      foot.textContent = tpl
+        .replace('{count}',     String(countDisplay))  // 付箋付きターン数（分子）
+        .replace('{total}',     String(totalDisplay))  // ロール別総ターン数（分母）
+        .replace('{uploads}',   String(uploads))
+        .replace('{downloads}', String(downloads));
+    } else {
+      const tpl = T('list.footer.all') || '{total}';
+      foot.textContent = tpl
+        .replace('{count}',     String(countDisplay))  // （テンプレ未使用だが一応埋める）
+        .replace('{total}',     String(totalDisplay))  // 現在ロールでの可視ターン数
+        .replace('{uploads}',   String(uploads))
+        .replace('{downloads}', String(downloads));
+    }
   }
 
   NS.updateListFooterInfo = updateListFooterInfo;
