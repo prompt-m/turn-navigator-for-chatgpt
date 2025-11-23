@@ -156,6 +156,12 @@ const LIST_CSS = `
   display:flex; gap:8px; align-items:center; flex-wrap:wrap;
   padding:6px 8px; border-top:1px solid rgba(0,0,0,.08)
 }
+#cgpt-pin-all-on,
+#cgpt-pin-all-off{
+  padding:2px 6px;
+  font-size:11px;
+  line-height:1.4;
+}
 #cgpt-list-foot[data-state="empty"] .ja,
 #cgpt-list-foot[data-state="empty"] .en{
   opacity:.8; 

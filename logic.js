@@ -657,36 +657,32 @@ console.log("scrollListToTurn*6 top",top);
     clip.textContent = '🔖\uFE0E';
   }
 
-  function bindClipPinByIndex(clipEl, rowEl, chatId){ 
+
+  function bindClipPinByIndex(clipEl, rowEl, chatId){
     clipEl.addEventListener('click', async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       const idx1 = Number(rowEl?.dataset?.idx);
       if (!Number.isFinite(idx1) || idx1 < 1) return;
 
-        // Promise の可能性があるので await。戻り形式の差異にも耐性を持たせる
-        // togglePinByIndex() は Promise を返す（await 必須）
-        // 返り値が boolean 以外でも動くように型ガード
-        const ret = await SH.togglePinByIndex?.(idx1, chatId);
-        let next;
-        if (typeof ret === 'boolean') {
-          next = ret;
-        } else if (ret && typeof ret === 'object') {
-          // {on:true}/{pinned:true} などにも対応
-          next = ('on' in ret) ? !!ret.on
-               : ('pinned' in ret) ? !!ret.pinned
-               : undefined;
-        }
-        // フォールバック：ストレージ反映後の実状態を読む
-        if (typeof next === 'undefined') {
-          next = !!(await SH.isPinnedByIndex?.(idx1, chatId));
-        }
-        paintPinRow(rowEl, next);
-
-      // pinOnly 表示中は再描画したい場合 ↓を有効化
-      // const cfg = SH.getCFG() || {};
-      // if (cfg.list?.pinOnly) NS.renderList?.(true);
-//    }, { passive:false });
+      // Promise の可能性があるので await。戻り形式の差異にも耐性を持たせる
+      // togglePinByIndex() は Promise を返す（await 必須）
+      // 返り値が boolean 以外でも動くように型ガード
+      const ret = await SH.togglePinByIndex?.(idx1, chatId);
+      let next;
+      if (typeof ret === 'boolean') {
+        next = ret;
+      } else if (ret && typeof ret === 'object') {
+        // {on:true}/{pinned:true} などにも対応
+        next = ('on' in ret) ? !!ret.on
+             : ('pinned' in ret) ? !!ret.pinned
+             : undefined;
+      }
+      // フォールバック：ストレージ反映後の実状態を読む
+      if (typeof next === 'undefined') {
+        next = !!(await SH.isPinnedByIndex?.(idx1, chatId));
+      }
+      paintPinRow(rowEl, next);
 
       // 付箋数とフッターの同期もここで安全側更新
       try{
@@ -702,7 +698,9 @@ console.log("scrollListToTurn*6 top",top);
     }, { passive:false });
   }
 
-  // 相方行のUI更新（ここ変えたよ：強制値を優先）
+
+
+  // 相方行のUI更新（強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){
     const state = (typeof forcedState === 'boolean') ? forcedState : isPinnedByKey(turnKey);
 
@@ -716,6 +714,72 @@ console.log("scrollListToTurn*6 top",top);
   }
 
 
+  // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）'25.11.23
+  NS.bulkSetPins = async function bulkSetPins(mode){
+    const cfg     = SH.getCFG?.() || {};
+    const enabled = !!cfg.list?.enabled;
+    const pinOnly = !!cfg.list?.pinOnly;
+
+    if (!enabled) return;
+    // pinOnly中の全ONは禁止（UI側でも disable 済みだが念のため）
+    if (pinOnly && mode === 'on') return;
+
+    const cid = SH.getChatId?.();
+    if (!cid) return;
+
+    const body = document.getElementById('cgpt-list-body');
+    if (!body) return;
+
+    const role = NS.viewRole || 'all';  // all / user / assistant
+
+    const rows = body.querySelectorAll('.row');
+    const seen = new Set();
+    const targets = [];
+
+    rows.forEach(row => {
+      if (row.offsetParent === null) return; // CSSフィルタで非表示の行は対象外
+
+      const idx1 = getIndex1FromRow(row);
+      if (!idx1 || seen.has(idx1)) return;
+      seen.add(idx1);
+
+      const r     = row.getAttribute('data-role');   // user / assistant
+      const isPin = row.getAttribute('data-pin') === '1';
+
+      // ロールフィルタ適用
+      if (role === 'user'      && r !== 'user')      return;
+      if (role === 'assistant' && r !== 'assistant') return;
+      // role === 'all' は全許可
+
+      if (pinOnly){
+        // 付箋のみモード中：全OFFだけ有効
+        if (mode === 'off' && isPin){
+          targets.push(idx1);
+        }
+        return;
+      }
+
+      // 通常モード
+      if (mode === 'on'  && !isPin) targets.push(idx1);
+      if (mode === 'off' &&  isPin) targets.push(idx1);
+    });
+
+    if (!targets.length) return;
+
+    try{
+      for (const idx1 of targets){
+        // togglePinByIndex(idx1, chatId) 形式（bindClipPinByIndex と同じ）
+        await SH.togglePinByIndex?.(idx1, cid);
+      }
+    } catch(e){
+      console.warn('[bulkSetPins] toggle failed', e);
+    }
+
+    // まとめて反映（バッジ/フッタ/件数/フィルタ全部）
+    try { NS.renderList?.(true); } catch(e){
+      console.warn('[bulkSetPins] renderList failed', e);
+    }
+  };
 
   const NAV_SNAP = { smoothMs: 220, idleFrames: 2, maxTries: 5, epsPx: 0.75 };
   const nextFrame = () => new Promise(r => requestAnimationFrame(r));
@@ -1074,10 +1138,12 @@ console.log("clearListPanelUI catch");
         <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span></span></label>
         <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span></span></label>
       </div>
-
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot">
         <button id="cgpt-list-refresh" class="cgtn-mini-btn" type="button">↻</button>
+        <!-- ★ 付箋 全ON/全OFF -->
+        <button id="cgpt-pin-all-on"  class="cgtn-mini-btn" type="button">◎</button>
+        <button id="cgpt-pin-all-off" class="cgtn-mini-btn" type="button">×</button>
         <div id="cgpt-list-foot-info" style="margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;"></div>
       </div>
     `;
@@ -1095,13 +1161,15 @@ console.log("clearListPanelUI catch");
       listBox.querySelector('#lv-lab-all  span').textContent  = T('all'); // ←「全体」
     }catch{}*/
     try { applyListFilterLang(); } catch {}
-    // ツールチップ用titleを登録
+    // ツールチップ用titleを登録 '25.11.23
     if (!listBox._tipsBound) {
       window.CGTN_SHARED?.applyTooltips?.({
         '#cgpt-list-collapse'          : 'list.collapse',
         '#cgpt-pin-filter'             : 'list.pinonly',
         '#cgpt-list-grip'              : 'nav.drag',
-        '#cgpt-list-refresh'           : 'list.refresh'
+        '#cgpt-list-refresh'           : 'list.refresh',
+        '#cgpt-pin-all-on'             : 'list.pinAllOn',
+        '#cgpt-pin-all-off'            : 'list.pinAllOff'
       }, listBox);
       listBox._tipsBound = true; // ★重複登録防止
     }
@@ -1118,6 +1186,32 @@ console.log("******logic.js refreshBtn click");
         try { NS.renderList?.(true); } catch {}
       });
     }
+
+    // ★ 全ON/全OFF ボタン（バルク付箋切替）'25.11.23
+    (function bindBulkPinButtons(){
+      const onBtn  = listBox.querySelector('#cgpt-pin-all-on');
+      const offBtn = listBox.querySelector('#cgpt-pin-all-off');
+      if (!onBtn && !offBtn) return;
+      if (listBox._bulkPinsBound) return;
+      listBox._bulkPinsBound = true;
+
+      if (onBtn){
+        onBtn.addEventListener('click', (ev)=>{
+          ev.preventDefault();
+          ev.stopPropagation();
+          try { NS.bulkSetPins?.('on'); } catch(e){ console.warn('[bulkPins on]', e); }
+        });
+      }
+      if (offBtn){
+        offBtn.addEventListener('click', (ev)=>{
+          ev.preventDefault();
+          ev.stopPropagation();
+          try { NS.bulkSetPins?.('off'); } catch(e){ console.warn('[bulkPins off]', e); }
+        });
+      }
+
+      try { NS.updateBulkPinButtonsState?.(); } catch{}
+    })();
 
     /* 行番号（インデックス）をCSSカウンタで表示 */
     (function ensureIndexCounterStyle(){
@@ -1867,7 +1961,34 @@ console.debug('[*****updatePinOnlyBadge]count0');
     } catch (e) {
       console.warn('[updatePinOnlyBadge]', e);
     }
+
+    // ★ 付箋モード変更時に一括ボタンの状態も更新 '25.11.23
+    try { updateBulkPinButtonsState(); } catch{}
   }
+
+  // ★ 全ON/全OFFボタンの活性/非活性制御 '25.11.23
+  function updateBulkPinButtonsState(){
+    try{
+      const cfg     = SH.getCFG?.() || {};
+      const enabled = !!cfg.list?.enabled;
+      const pinOnly = !!cfg.list?.pinOnly;
+
+      const onBtn  = document.getElementById('cgpt-pin-all-on');
+      const offBtn = document.getElementById('cgpt-pin-all-off');
+
+      if (onBtn){
+        // リストOFF か pinOnly 中は All ON 無効
+        onBtn.disabled = !enabled || pinOnly;
+      }
+      if (offBtn){
+        // リストOFF のときだけ無効。pinOnly中は OFF だけ有効。
+        offBtn.disabled = !enabled;
+      }
+    } catch(e){
+      console.warn('[updateBulkPinButtonsState]', e);
+    }
+  }
+  NS.updateBulkPinButtonsState = updateBulkPinButtonsState;
 
 
   // === フッターの件数を即時クリア（リスト無し表示） ===
@@ -1880,6 +2001,30 @@ console.log("**clearListFooterInfo ");
     foot.dataset.state = 'empty';
     foot.textContent = T('list.empty') || 'リストはありません';
   }
+
+  // ★ 全ON/全OFFボタンの活性/非活性制御 '23.11.23
+  function updateBulkPinButtonsState(){
+    try{
+      const cfg = SH.getCFG?.() || {};
+      const enabled = !!cfg.list?.enabled;
+      const pinOnly = !!cfg.list?.pinOnly;
+
+      const onBtn  = document.getElementById('cgpt-pin-all-on');
+      const offBtn = document.getElementById('cgpt-pin-all-off');
+
+      if (onBtn){
+        // リストOFF か pinOnly 中は All ON 無効
+        onBtn.disabled = !enabled || pinOnly;
+      }
+      if (offBtn){
+        // リストOFF のときだけ無効。pinOnly中は OFF だけ有効にする仕様。
+        offBtn.disabled = !enabled;
+      }
+    } catch(e){
+      console.warn('[updateBulkPinButtonsState]', e);
+    }
+  }
+  NS.updateBulkPinButtonsState = updateBulkPinButtonsState;
 
   // renderlistからしか呼んではいけない(日英切替え)
   function updateListFooterInfo(){
@@ -2006,6 +2151,8 @@ console.log("★★★role:",role);
         .replace('{uploads}',   String(uploads))
         .replace('{downloads}', String(downloads));
     }
+    // ★ フッター更新タイミングでボタン状態も同期 '25.11.23
+    try { NS.updateBulkPinButtonsState?.(); } catch{}
   }
 
   NS.updateListFooterInfo = updateListFooterInfo;
