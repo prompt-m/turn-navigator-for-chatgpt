@@ -716,6 +716,7 @@ console.log("scrollListToTurn*6 top",top);
 
   // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）'25.11.23
   NS.bulkSetPins = async function bulkSetPins(mode){
+console.log("=== bulkSetPins START ===", mode);
     const cfg     = SH.getCFG?.() || {};
     const enabled = !!cfg.list?.enabled;
     const pinOnly = !!cfg.list?.pinOnly;
@@ -746,6 +747,13 @@ console.log("scrollListToTurn*6 top",top);
       const r     = row.getAttribute('data-role');   // user / assistant
       const isPin = row.getAttribute('data-pin') === '1';
 
+      const vis   = (row.offsetParent !== null);
+console.log("check row", {idx1, role:r, isPin, visible:vis});
+      if (row.offsetParent === null) {
+        console.log(" skip: display:none", idx1);
+      return;
+      }
+
       // ロールフィルタ適用
       if (role === 'user'      && r !== 'user')      return;
       if (role === 'assistant' && r !== 'assistant') return;
@@ -754,27 +762,40 @@ console.log("scrollListToTurn*6 top",top);
       if (pinOnly){
         // 付箋のみモード中：全OFFだけ有効
         if (mode === 'off' && isPin){
+console.log(" ADD target(pinOnly/off)", idx1);
           targets.push(idx1);
+        } else {
+console.log(" skip(pinOnly)", idx1, "isPin=", isPin);
         }
         return;
       }
 
       // 通常モード
-      if (mode === 'on'  && !isPin) targets.push(idx1);
-      if (mode === 'off' &&  isPin) targets.push(idx1);
+      if (mode === 'on'  && !isPin) {
+        console.log(" ADD target(on)", idx1);
+        targets.push(idx1);
+      }
+      if (mode === 'off' &&  isPin) {
+        console.log(" ADD target(off)", idx1);
+        targets.push(idx1);
+      }
+
     });
 
     if (!targets.length) return;
 
+console.log("TOGGLE START targets=", targets);
     try{
       for (const idx1 of targets){
         // togglePinByIndex(idx1, chatId) 形式（bindClipPinByIndex と同じ）
-        await SH.togglePinByIndex?.(idx1, cid);
+        console.log(" toggling idx=", idx1);
+        const ret = await SH.togglePinByIndex?.(idx1, cid);
+        console.log(" toggled idx=", idx1, "ret=", ret);
       }
     } catch(e){
       console.warn('[bulkSetPins] toggle failed', e);
     }
-
+console.log("=== RENDER after bulkSetPins ===");
     // まとめて反映（バッジ/フッタ/件数/フィルタ全部）
     try { NS.renderList?.(true); } catch(e){
       console.warn('[bulkSetPins] renderList failed', e);
@@ -1545,7 +1566,7 @@ console.log("******logic.js 畳む開く click");
 
   let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
-console.log('[renderList 冒頭]');
+//console.log('[renderList 冒頭]');
     const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
     // 0) Shared 初期化待ち（最大4秒で打ち切り）
@@ -1557,14 +1578,14 @@ console.log('[renderList 冒頭]');
         ]);
       } catch(_) {}
     }
-console.log('[renderList *1]');
+//console.log('[renderList *1]');
 
     // 1) チャットページかどうか（getPageInfo → URL フォールバック）
     const info = SH?.getPageInfo?.() || {};
     const kind = info.kind || (location.pathname.includes('/c/') ? 'chat' : 'other');
     if (kind !== 'chat') {
       LG?.clearListPanelUI?.();
-console.log('[renderList *2]');
+//console.log('[renderList *2]');
       return;
     }
 
@@ -1585,17 +1606,17 @@ console.log('[renderList *2]');
     panel.style.display = 'flex';          // CSS 既定の display:none を解除
     panel.style.visibility = 'hidden';     // レイアウト確定まで
 
-console.log('[renderList *3 panel.style.display:]',panel.style.display);
+//console.log('[renderList *3 panel.style.display:]',panel.style.display);
 
     // 3) 競合キャンセル用チケット（待機後に採番）
     const my = ++_renderTicket;
-console.log('[renderList*4] my:',my);
+//console.log('[renderList*4] my:',my);
 
     // 4) ST が空なら一度だけ再構築
     if (!LG?.ST?.all?.length) {
       LG?.rebuild?.();
       if (!LG?.ST?.all?.length) {
-console.log('[renderList *5]');
+//console.log('[renderList *5]');
         return;
       }
     }
@@ -1868,8 +1889,8 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
       panel.style.visibility = 'visible'; // 最後に見せる（任意）
     }
 
-    console.debug('[renderList 末尾] panel.style.display:',panel.style.display);
-    console.debug('[renderList 末尾] panel.style.visibility:',panel.style.visibility);
+//    console.debug('[renderList 末尾] panel.style.display:',panel.style.display);
+//    console.debug('[renderList 末尾] panel.style.visibility:',panel.style.visibility);
     console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
@@ -1916,7 +1937,7 @@ console.debug('[setListEnabled*4]一覧OFF');
   }
 
   function updatePinOnlyBadge(){
-console.debug('[*****updatePinOnlyBadge]');
+//console.debug('[*****updatePinOnlyBadge]');
 
     try {
       const btn = document.getElementById('cgpt-pin-filter');
@@ -1925,7 +1946,7 @@ console.debug('[*****updatePinOnlyBadge]');
       if (!badge) return;
 
       if ((CGTN_LOGIC.ST?.all?.length ?? 0) === 0) {
-console.debug('[*****updatePinOnlyBadge] zero');
+//console.debug('[*****updatePinOnlyBadge] zero');
         badge.hidden = true;
         badge.textContent='';
         return; 
@@ -1934,7 +1955,7 @@ console.debug('[*****updatePinOnlyBadge] zero');
       // ★ articleゼロ件なら非表示
       const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
       if (turns === 0) {
-console.debug('[*****updatePinOnlyBadge] turn0');
+//console.debug('[*****updatePinOnlyBadge] turn0');
         badge.hidden = true;
         badge.textContent = '';
         return;
@@ -1942,14 +1963,14 @@ console.debug('[*****updatePinOnlyBadge] turn0');
 
       const cid = SH.getChatId?.();
       const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
-console.debug('[*****updatePinOnlyBadge]cid',cid," count:",count);
+//console.debug('[*****updatePinOnlyBadge]cid',cid," count:",count);
       // 表示制御
       if (count > 0) {
 //        badge.textContent = count > 99 ? '99+' : count;
         badge.textContent = count;
         badge.hidden = false;
       } else {
-console.debug('[*****updatePinOnlyBadge]count0');
+//console.debug('[*****updatePinOnlyBadge]count0');
         badge.hidden = true;
       }
 
@@ -2091,8 +2112,10 @@ console.log("★★★role:",role);
             (role === 'user'      && r === 'user') ||
             (role === 'assistant' && r === 'assistant');
 
-          if (!roleMatch) return;
-
+          if (!roleMatch) {
+            console.log(" skip: role mismatch", idx1, "→ need:", role, "have:", r);
+            return;
+          }
           visibleForRole++;
           if (isPin) pinsForRole++;
         });
