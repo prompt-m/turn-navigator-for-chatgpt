@@ -745,112 +745,104 @@ console.log("scrollListToTurn*6 top",top);
   }
 
   // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）'25.11.23
-  // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）
+  //    ただし DOM 判定は使用せず、ST.* に基づく安定ロール抽出方式
   NS.bulkSetPins = async function bulkSetPins(mode){
-
     const SH  = window.CGTN_SHARED;
+    const ST  = NS.ST || {};
     if (!SH) return;
-console.log("=== bulkSetPins START ===", mode);
 
     const cfg     = SH.getCFG?.() || {};
     const enabled = !!cfg.list?.enabled;
     const pinOnly = !!cfg.list?.pinOnly;
 
     if (!enabled) return;
-    // pinOnly中の全ONは禁止（UI側でも disable しているが念のため）
+
+    // pinOnly 中の ALL ON は禁止（UI 側でも disable）
     if (pinOnly && mode === 'on') return;
 
     const cid = SH.getChatId?.();
     if (!cid) return;
 
-    const body = document.getElementById('cgpt-list-body');
-    if (!body) return;
-
     const role = NS.viewRole || 'all';  // all / user / assistant
+    const doPinOn = (mode === 'on');    // ★ これが必要だった！
 
-    // 1) 対象インデックス（1始まり）を DOM から集める
-    const rows    = body.querySelectorAll('.row');
-    const seen    = new Set();
+    //----------------------------------------------------------
+    // 1) ロールと pinOnly に基づき、対象 idx1 を ST.* から収集する
+    //----------------------------------------------------------
+    function collectTargetsForBulk(role, doPinOn, pinOnlyMode, ST){
+      const list =
+          role === 'user'      ? ST.user
+        : role === 'assistant' ? ST.assistant
+        :                        ST.all;
 
-    const targets = collectTargetsForBulk(
-      role,          // 現在のロール all/user/assistant
-      doPinOn,       // true=ALL ON, false=ALL OFF
-      pinOnly,       // pinOnly モード中か？
-      ST
-    );
+      const out = [];
 
-/*
-    const targets = [];
+      for (const art of list){
+        const key  = NS.getTurnKey(art);                 // "turn:12"
+        const idx1 = getIndex1FromTurnKey(key);          // → 12
+        if (!idx1) continue;
 
-    rows.forEach(row => {
-      if (row.offsetParent === null) return; // CSSフィルタで非表示の行は対象外
+        const pinned = SH.isPinnedByIndex?.(idx1);
 
-      const idx1 = Number(row.dataset?.idx);
-      if (!Number.isFinite(idx1) || idx1 < 1 || seen.has(idx1)) return;
-      seen.add(idx1);
+        if (pinOnlyMode){
+          if (doPinOn  && pinned)  continue;   // ALL ON → 既に ON は対象外
+          if (!doPinOn && !pinned) continue;   // ALL OFF → 既に OFF は対象外
+        }
 
-      const r = row.getAttribute('data-role') || '';  // user / assistant / ""
+        out.push(idx1);
+      }
+      return out;
+    }
 
-      // ロールフィルタ適用
-      if (role === 'user'      && r !== 'user')      return;
-      if (role === 'assistant' && r !== 'assistant') return;
-      // role === 'all' は全許可
-
-      // pinOnly かどうかは「どこまでゼロ／イチにするか」の範囲だけに効かせる。
-      // ALL ON / ALL OFF なので、いま見えている行は全部対象で良い。
-      targets.push(idx1);
-    });
-
+    const targets = collectTargetsForBulk(role, doPinOn, pinOnly, ST);
     if (!targets.length) return;
-*/
-    // 2) 既存 pins 配列を取得（なければ新規で作る）
-    const ST       = NS.ST || {};
-    const turnLen  = Array.isArray(ST.all) ? ST.all.length : 0;
+
+    //----------------------------------------------------------
+    // 2) pinsArr を取得・不足分は埋める
+    //----------------------------------------------------------
+    const turnLen = Array.isArray(ST.all) ? ST.all.length : 0;
 
     let pinsArr = SH.getPinsForChat?.(cid);
-    if (!Array.isArray(pinsArr)) {
-      // 旧形式や壊れかけの場合にフォールバック
+    if (!Array.isArray(pinsArr)){
       const cfgAll = SH.getCFG?.() || {};
       const entry  = cfgAll.pinsByChat?.[cid];
       pinsArr = Array.isArray(entry?.pins) ? entry.pins.slice() : [];
     }
-
-    if (pinsArr.length < turnLen) {
-      // 足りない分は false で埋める
-      const extra = new Array(turnLen - pinsArr.length).fill(false);
-      pinsArr = pinsArr.concat(extra);
+    if (pinsArr.length < turnLen){
+      pinsArr = pinsArr.concat(new Array(turnLen - pinsArr.length).fill(false));
     }
 
-    if (!turnLen && !pinsArr.length) return;
-
-    // 3) 対象インデックスだけ 0/1 を上書き（ALL ON / ALL OFF）
-    const nextVal = (mode === 'on');
-    for (const idx1 of targets) {
+    //----------------------------------------------------------
+    // 3) ALL ON / ALL OFF 上書き（ST由来の target のみ）
+    //----------------------------------------------------------
+    for (const idx1 of targets){
       const i0 = idx1 - 1;
-      if (i0 < 0) continue;
-      pinsArr[i0] = nextVal;
+      if (i0 >= 0) pinsArr[i0] = doPinOn;
     }
 
-    // 4) 1回だけストレージ書き込み
+    //----------------------------------------------------------
+    // 4) 1発だけストレージ書き込み
+    //----------------------------------------------------------
     try{
       const ok = await SH.savePinsArrAsync?.(pinsArr, cid);
-      if (!ok) {
+      if (!ok){
         console.warn('[bulkSetPins] savePinsArrAsync returned falsy');
         return;
       }
-    } catch(e){
-      console.warn('[bulkSetPins] savePinsArrAsync failed', e);
+    }catch(e){
+      console.warn('[bulkSetPins] savePinsArrAsync failed:', e);
       return;
     }
 
-    // 5) 件数＆フッター更新 → 再描画
+    //----------------------------------------------------------
+    // 5) 件数更新 → フッター → 再描画
+    //----------------------------------------------------------
     try{
-      const pinsCount = pinsArr.filter(Boolean).length;
-      NS.pinsCount = pinsCount;
-    }catch(e){}
+      NS.pinsCount = pinsArr.filter(Boolean).length;
+    }catch{}
 
-    try { NS.updateListFooterInfo?.(); } catch(e){}
-    try { NS.renderList?.(true); }       catch(e){}
+    try{ NS.updateListFooterInfo?.(); }catch{}
+    try{ NS.renderList?.(true); }catch{}
   };
 
 /*
