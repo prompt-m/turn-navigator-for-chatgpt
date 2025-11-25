@@ -713,8 +713,147 @@ console.log("scrollListToTurn*6 top",top);
     });
   }
 
+  //----------------------------------------------------------
+  // ★ ロールフィルタと pinOnly に基づいて対象 idx を確定する
+  //----------------------------------------------------------
+  function collectTargetsForBulk(role, doPinOn, pinOnlyMode, ST) {
+    const list =
+        role === 'user'      ? ST.user
+      : role === 'assistant' ? ST.assistant
+      :                        ST.all;
+
+    const out = [];
+
+    for (const art of list) {
+      const key  = NS.getTurnKey(art);
+      const idx1 = getIndex1FromTurnKey(key);
+      if (!idx1) continue;
+
+      // pinOnly モードの場合：
+      // 　ON → 付箋無しだけ対象
+      // 　OFF → 付箋有りだけ対象
+      if (pinOnlyMode) {
+        const pinned = SH.isPinnedByIndex?.(idx1);
+        if (doPinOn && pinned) continue;   // すでに ON のものは対象外
+        if (!doPinOn && !pinned) continue; // すでに OFF のものは対象外
+      }
+
+      out.push(idx1);
+    }
+
+    return out;
+  }
 
   // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）'25.11.23
+  // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）
+  NS.bulkSetPins = async function bulkSetPins(mode){
+
+    const SH  = window.CGTN_SHARED;
+    if (!SH) return;
+console.log("=== bulkSetPins START ===", mode);
+
+    const cfg     = SH.getCFG?.() || {};
+    const enabled = !!cfg.list?.enabled;
+    const pinOnly = !!cfg.list?.pinOnly;
+
+    if (!enabled) return;
+    // pinOnly中の全ONは禁止（UI側でも disable しているが念のため）
+    if (pinOnly && mode === 'on') return;
+
+    const cid = SH.getChatId?.();
+    if (!cid) return;
+
+    const body = document.getElementById('cgpt-list-body');
+    if (!body) return;
+
+    const role = NS.viewRole || 'all';  // all / user / assistant
+
+    // 1) 対象インデックス（1始まり）を DOM から集める
+    const rows    = body.querySelectorAll('.row');
+    const seen    = new Set();
+
+    const targets = collectTargetsForBulk(
+      role,          // 現在のロール all/user/assistant
+      doPinOn,       // true=ALL ON, false=ALL OFF
+      pinOnly,       // pinOnly モード中か？
+      ST
+    );
+
+/*
+    const targets = [];
+
+    rows.forEach(row => {
+      if (row.offsetParent === null) return; // CSSフィルタで非表示の行は対象外
+
+      const idx1 = Number(row.dataset?.idx);
+      if (!Number.isFinite(idx1) || idx1 < 1 || seen.has(idx1)) return;
+      seen.add(idx1);
+
+      const r = row.getAttribute('data-role') || '';  // user / assistant / ""
+
+      // ロールフィルタ適用
+      if (role === 'user'      && r !== 'user')      return;
+      if (role === 'assistant' && r !== 'assistant') return;
+      // role === 'all' は全許可
+
+      // pinOnly かどうかは「どこまでゼロ／イチにするか」の範囲だけに効かせる。
+      // ALL ON / ALL OFF なので、いま見えている行は全部対象で良い。
+      targets.push(idx1);
+    });
+
+    if (!targets.length) return;
+*/
+    // 2) 既存 pins 配列を取得（なければ新規で作る）
+    const ST       = NS.ST || {};
+    const turnLen  = Array.isArray(ST.all) ? ST.all.length : 0;
+
+    let pinsArr = SH.getPinsForChat?.(cid);
+    if (!Array.isArray(pinsArr)) {
+      // 旧形式や壊れかけの場合にフォールバック
+      const cfgAll = SH.getCFG?.() || {};
+      const entry  = cfgAll.pinsByChat?.[cid];
+      pinsArr = Array.isArray(entry?.pins) ? entry.pins.slice() : [];
+    }
+
+    if (pinsArr.length < turnLen) {
+      // 足りない分は false で埋める
+      const extra = new Array(turnLen - pinsArr.length).fill(false);
+      pinsArr = pinsArr.concat(extra);
+    }
+
+    if (!turnLen && !pinsArr.length) return;
+
+    // 3) 対象インデックスだけ 0/1 を上書き（ALL ON / ALL OFF）
+    const nextVal = (mode === 'on');
+    for (const idx1 of targets) {
+      const i0 = idx1 - 1;
+      if (i0 < 0) continue;
+      pinsArr[i0] = nextVal;
+    }
+
+    // 4) 1回だけストレージ書き込み
+    try{
+      const ok = await SH.savePinsArrAsync?.(pinsArr, cid);
+      if (!ok) {
+        console.warn('[bulkSetPins] savePinsArrAsync returned falsy');
+        return;
+      }
+    } catch(e){
+      console.warn('[bulkSetPins] savePinsArrAsync failed', e);
+      return;
+    }
+
+    // 5) 件数＆フッター更新 → 再描画
+    try{
+      const pinsCount = pinsArr.filter(Boolean).length;
+      NS.pinsCount = pinsCount;
+    }catch(e){}
+
+    try { NS.updateListFooterInfo?.(); } catch(e){}
+    try { NS.renderList?.(true); }       catch(e){}
+  };
+
+/*
   NS.bulkSetPins = async function bulkSetPins(mode){
 console.log("=== bulkSetPins START ===", mode);
     const cfg     = SH.getCFG?.() || {};
@@ -801,7 +940,7 @@ console.log("=== RENDER after bulkSetPins ===");
       console.warn('[bulkSetPins] renderList failed', e);
     }
   };
-
+*/
   const NAV_SNAP = { smoothMs: 220, idleFrames: 2, maxTries: 5, epsPx: 0.75 };
   const nextFrame = () => new Promise(r => requestAnimationFrame(r));
   async function waitIdleFrames(n){ while(n-->0) await nextFrame(); }
