@@ -758,7 +758,8 @@ console.log("★★★★★bulkSetPins");
     const cid = SH.getChatId?.();
     if (!cid) return;
 
-    const doPinOn = (mode === 'on');   // true: ALL ON, false: ALL OFF
+//    const doPinOn = (mode === 'on');   // true: ALL ON, false: ALL OFF
+    const doPinOn = (mode === true);   // true: ALL ON, false: ALL OFF
 
     // ★ 今のロールを取得（ラジオ優先、なければ NS.viewRole）
     let role = NS.viewRole || 'all';
