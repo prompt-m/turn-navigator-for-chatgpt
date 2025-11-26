@@ -744,195 +744,97 @@ console.log("scrollListToTurn*6 top",top);
     return out;
   }
 
-  // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）'25.11.23
+  // ★ 全ON/全OFF（現在ロール＆絞り込みで「見えている行」だけ対象）'25.11.26
   //    ただし DOM 判定は使用せず、ST.* に基づく安定ロール抽出方式
-  NS.bulkSetPins = async function bulkSetPins(mode){
-    const SH  = window.CGTN_SHARED;
-    const ST  = NS.ST || {};
-    if (!SH) return;
+  // ======================================================
+  // 付箋 全ON / 全OFF（現在のロール & 絞り込みに従って一括上書き）
+  // ======================================================
 
-    const cfg     = SH.getCFG?.() || {};
-    const enabled = !!cfg.list?.enabled;
-    const pinOnly = !!cfg.list?.pinOnly;
-
-    if (!enabled) return;
-
-    // pinOnly 中の ALL ON は禁止（UI 側でも disable）
-    if (pinOnly && mode === 'on') return;
-
+  // --- 付箋一括 ON / OFF ---
+  // mode: 'on' | 'off' （呼び出し側はこの2つだけ渡す）
+  async function bulkSetPins(mode){
+console.log("★★★★★bulkSetPins");
+    const SH = window.CGTN_SHARED || {};
     const cid = SH.getChatId?.();
     if (!cid) return;
 
-    const role = NS.viewRole || 'all';  // all / user / assistant
-    const doPinOn = (mode === 'on');    // ★ これが必要だった！
+    const doPinOn = (mode === 'on');   // true: ALL ON, false: ALL OFF
 
-    //----------------------------------------------------------
-    // 1) ロールと pinOnly に基づき、対象 idx1 を ST.* から収集する
-    //----------------------------------------------------------
-    function collectTargetsForBulk(role, doPinOn, pinOnlyMode, ST){
-      const list =
-          role === 'user'      ? ST.user
-        : role === 'assistant' ? ST.assistant
-        :                        ST.all;
-
-      const out = [];
-
-      for (const art of list){
-        const key  = NS.getTurnKey(art);                 // "turn:12"
-        const idx1 = getIndex1FromTurnKey(key);          // → 12
-        if (!idx1) continue;
-
-        const pinned = SH.isPinnedByIndex?.(idx1);
-
-        if (pinOnlyMode){
-          if (doPinOn  && pinned)  continue;   // ALL ON → 既に ON は対象外
-          if (!doPinOn && !pinned) continue;   // ALL OFF → 既に OFF は対象外
-        }
-
-        out.push(idx1);
+    // ★ 今のロールを取得（ラジオ優先、なければ NS.viewRole）
+    let role = NS.viewRole || 'all';
+    try {
+      const filterBox = document.getElementById('cgpt-list-filter');
+      const checked   = filterBox?.querySelector('input[name="cgtn-lv"]:checked');
+      if (checked){
+        if (checked.id === 'lv-user')        role = 'user';
+        else if (checked.id === 'lv-assist') role = 'assistant';
+        else                                 role = 'all';
       }
-      return out;
-    }
+    } catch(_) {}
 
-    const targets = collectTargetsForBulk(role, doPinOn, pinOnly, ST);
-    if (!targets.length) return;
-
-    //----------------------------------------------------------
-    // 2) pinsArr を取得・不足分は埋める
-    //----------------------------------------------------------
-    const turnLen = Array.isArray(ST.all) ? ST.all.length : 0;
-
-    let pinsArr = SH.getPinsForChat?.(cid);
-    if (!Array.isArray(pinsArr)){
-      const cfgAll = SH.getCFG?.() || {};
-      const entry  = cfgAll.pinsByChat?.[cid];
-      pinsArr = Array.isArray(entry?.pins) ? entry.pins.slice() : [];
-    }
-    if (pinsArr.length < turnLen){
-      pinsArr = pinsArr.concat(new Array(turnLen - pinsArr.length).fill(false));
-    }
-
-    //----------------------------------------------------------
-    // 3) ALL ON / ALL OFF 上書き（ST由来の target のみ）
-    //----------------------------------------------------------
-    for (const idx1 of targets){
-      const i0 = idx1 - 1;
-      if (i0 >= 0) pinsArr[i0] = doPinOn;
-    }
-
-    //----------------------------------------------------------
-    // 4) 1発だけストレージ書き込み
-    //----------------------------------------------------------
-    try{
-      const ok = await SH.savePinsArrAsync?.(pinsArr, cid);
-      if (!ok){
-        console.warn('[bulkSetPins] savePinsArrAsync returned falsy');
-        return;
-      }
-    }catch(e){
-      console.warn('[bulkSetPins] savePinsArrAsync failed:', e);
-      return;
-    }
-
-    //----------------------------------------------------------
-    // 5) 件数更新 → フッター → 再描画
-    //----------------------------------------------------------
-    try{
-      NS.pinsCount = pinsArr.filter(Boolean).length;
-    }catch{}
-
-    try{ NS.updateListFooterInfo?.(); }catch{}
-    try{ NS.renderList?.(true); }catch{}
-  };
-
-/*
-  NS.bulkSetPins = async function bulkSetPins(mode){
-console.log("=== bulkSetPins START ===", mode);
-    const cfg     = SH.getCFG?.() || {};
-    const enabled = !!cfg.list?.enabled;
-    const pinOnly = !!cfg.list?.pinOnly;
-
-    if (!enabled) return;
-    // pinOnly中の全ONは禁止（UI側でも disable 済みだが念のため）
-    if (pinOnly && mode === 'on') return;
-
-    const cid = SH.getChatId?.();
-    if (!cid) return;
+    // ★ pins 配列をストレージから取得
+    let pinsArr = await SH.getPinsArrAsync?.(cid);
+    if (!Array.isArray(pinsArr)) pinsArr = [];
 
     const body = document.getElementById('cgpt-list-body');
     if (!body) return;
 
-    const role = NS.viewRole || 'all';  // all / user / assistant
+    const rows = body.querySelectorAll('.row[data-idx]');
+    const seen = new Set(); // idx0 重複防止
 
-    const rows = body.querySelectorAll('.row');
-    const seen = new Set();
-    const targets = [];
+    // --- DOM から「対象ターン」を決めて、その idx だけを書き換える ---
+    for (const row of rows){
+      // CSS で非表示（ロール/付箋フィルタで隠れている）行は無視
+      if (row.offsetParent === null) continue;
 
-    rows.forEach(row => {
-      if (row.offsetParent === null) return; // CSSフィルタで非表示の行は対象外
+      const r = row.dataset.role || '';           // 'user' / 'assistant'
+      if (role !== 'all' && r !== role) continue; // ロール不一致はスキップ
 
-      const idx1 = getIndex1FromRow(row);
-      if (!idx1 || seen.has(idx1)) return;
-      seen.add(idx1);
+      const idx1 = Number(row.dataset.idx);
+      if (!Number.isFinite(idx1) || idx1 < 1) continue;
 
-      const r     = row.getAttribute('data-role');   // user / assistant
-      const isPin = row.getAttribute('data-pin') === '1';
+      const idx0 = idx1 - 1;
+      if (seen.has(idx0)) continue;
+      seen.add(idx0);
 
-      const vis   = (row.offsetParent !== null);
-console.log("check row", {idx1, role:r, isPin, visible:vis});
-      if (row.offsetParent === null) {
-        console.log(" skip: display:none", idx1);
-      return;
+      // ★ pins 配列を書き換え（ターゲットだけ）
+      pinsArr[idx0] = doPinOn;
+
+      // ★ 行の見た目も即時反映
+      if (doPinOn){
+        row.dataset.pin = '1';
+      } else {
+        delete row.dataset.pin;
       }
+      try { paintPinRow(row, doPinOn); } catch(_) {}
+    }
 
-      // ロールフィルタ適用
-      if (role === 'user'      && r !== 'user')      return;
-      if (role === 'assistant' && r !== 'assistant') return;
-      // role === 'all' は全許可
+    // --- 結果を保存＆カウント更新 ---
+    const pinsCount = (pinsArr || []).filter(Boolean).length;
 
-      if (pinOnly){
-        // 付箋のみモード中：全OFFだけ有効
-        if (mode === 'off' && isPin){
-console.log(" ADD target(pinOnly/off)", idx1);
-          targets.push(idx1);
-        } else {
-console.log(" skip(pinOnly)", idx1, "isPin=", isPin);
-        }
-        return;
-      }
-
-      // 通常モード
-      if (mode === 'on'  && !isPin) {
-        console.log(" ADD target(on)", idx1);
-        targets.push(idx1);
-      }
-      if (mode === 'off' &&  isPin) {
-        console.log(" ADD target(off)", idx1);
-        targets.push(idx1);
-      }
-
-    });
-
-    if (!targets.length) return;
-
-console.log("TOGGLE START targets=", targets);
-    try{
-      for (const idx1 of targets){
-        // togglePinByIndex(idx1, chatId) 形式（bindClipPinByIndex と同じ）
-        console.log(" toggling idx=", idx1);
-        const ret = await SH.togglePinByIndex?.(idx1, cid);
-        console.log(" toggled idx=", idx1, "ret=", ret);
+    try {
+      const ret = await SH.savePinsArrAsync?.(pinsArr, cid);
+      if (!ret?.ok){
+        console.warn('[bulkSetPins] savePinsArrAsync failed', ret);
       }
     } catch(e){
-      console.warn('[bulkSetPins] toggle failed', e);
+      console.warn('[bulkSetPins] savePinsArrAsync error', e);
     }
-console.log("=== RENDER after bulkSetPins ===");
-    // まとめて反映（バッジ/フッタ/件数/フィルタ全部）
-    try { NS.renderList?.(true); } catch(e){
-      console.warn('[bulkSetPins] renderList failed', e);
-    }
-  };
-*/
+
+    // バッジ・フッター用
+    NS.pinsCount = pinsCount;
+    try { NS.updatePinOnlyBadge?.(); } catch(_) {}
+    try { NS.updateListFooterInfo?.(); } catch(_) {}
+
+    // ★ここでは renderList() は呼ばない★
+    // DOM 上の data-pin と paintPinRow だけで見た目を保つ。
+    // （pinOnly 表示中に「全OFF」したときだけ、行が全部消える＝再描画が欲しければ
+    //   そのケースに限って NS.renderList?.(true) を呼ぶ、という選択肢もある）
+  }
+
+  // どこかの「公開テーブル」にまだ載せていなければこれも追加
+  NS.bulkSetPins = bulkSetPins;
+
   const NAV_SNAP = { smoothMs: 220, idleFrames: 2, maxTries: 5, epsPx: 0.75 };
   const nextFrame = () => new Promise(r => requestAnimationFrame(r));
   async function waitIdleFrames(n){ while(n-->0) await nextFrame(); }
@@ -1158,6 +1060,7 @@ console.log("=== RENDER after bulkSetPins ===");
     // デバッグ公開（任意）
     NS.ST = ST;
     console.debug('[rebuild] turns:', ST.all.length, 'user:', ST.user.length, 'asst:', ST.assistant.length);
+//    console.debug('[rebuild] turns:', ST.all, 'user:', ST.user, 'asst:', ST.assistant);
   }
 
 
@@ -1351,14 +1254,14 @@ console.log("******logic.js refreshBtn click");
         onBtn.addEventListener('click', (ev)=>{
           ev.preventDefault();
           ev.stopPropagation();
-          try { NS.bulkSetPins?.('on'); } catch(e){ console.warn('[bulkPins on]', e); }
+          try { NS.bulkSetPins?.(true); } catch(e){ console.warn('[bulkPins on]', e); }
         });
       }
       if (offBtn){
         offBtn.addEventListener('click', (ev)=>{
           ev.preventDefault();
           ev.stopPropagation();
-          try { NS.bulkSetPins?.('off'); } catch(e){ console.warn('[bulkPins off]', e); }
+          try { NS.bulkSetPins?.(false); } catch(e){ console.warn('[bulkPins off]', e); }
         });
       }
 
