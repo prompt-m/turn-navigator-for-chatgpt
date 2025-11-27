@@ -657,6 +657,68 @@ console.log("scrollListToTurn*6 top",top);
     clip.textContent = '🔖\uFE0E';
   }
 
+  // === 付箋ボタン（🔖）のイベント委譲版 === '25.11.27
+  function bindDelegatedClipPinHandler(){
+    const body = document.getElementById('cgpt-list-body');
+    if (!body) return;
+    if (body._cgtnClipDelegated) return; // 二重バインド防止
+    body._cgtnClipDelegated = true;
+
+    body.addEventListener('click', async (ev) => {
+      const clipEl = ev.target?.closest?.('.cgtn-clip-pin');
+      if (!clipEl) return; // 付箋ボタン以外は無視
+
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const rowEl = clipEl.closest('.row');
+      if (!rowEl) return;
+
+      const idx1 = Number(rowEl.dataset.idx);
+      if (!Number.isFinite(idx1) || idx1 < 1) return;
+
+      const chatId = SH.getChatId?.();
+      if (!chatId) return;
+
+      // --- ここからは bindClipPinByIndex と同じロジック ---
+      const ret = await SH.togglePinByIndex?.(idx1, chatId);
+      let next;
+      if (typeof ret === 'boolean') {
+        next = ret;
+      } else if (ret && typeof ret === 'object') {
+        // {on:true}/{pinned:true} などにも対応
+        next = ('on' in ret) ? !!ret.on
+             : ('pinned' in ret) ? !!ret.pinned
+             : undefined;
+      }
+      // フォールバック：ストレージ反映後の実状態を読む
+      if (typeof next === 'undefined') {
+        next = !!(await SH.isPinnedByIndex?.(idx1, chatId));
+      }
+
+      // data-pin 同期（pinOnly用）
+      if (next) rowEl.dataset.pin = '1';
+      else      rowEl.removeAttribute('data-pin');
+
+      // ピンボタンの見た目更新
+      paintPinRow(rowEl, next);
+
+      // 付箋数とフッターの同期もここで安全側更新
+      try{
+        const SHX = window.CGTN_SHARED || {};
+        let pinsArr = SHX.getPinsForChat?.(chatId);
+        if (!pinsArr) pinsArr = SHX.getCFG?.()?.pinsByChat?.[chatId]?.pins;
+        const pinsCount = Array.isArray(pinsArr)
+          ? pinsArr.filter(Boolean).length
+          : (pinsArr ? Object.values(pinsArr).filter(Boolean).length : 0);
+        NS.pinsCount = pinsCount;
+        NS.updateListFooterInfo?.();
+        NS.updatePinOnlyBadge?.();
+      }catch{}
+    }, { passive:false });
+  }
+
+  // ★ legacy: 以前の行ごとバインド方式（現在は未使用／参考用）
   // 個別の🔖クリック処理
   function bindClipPinByIndex(clipEl, rowEl, chatId){
     clipEl.addEventListener('click', async (ev) => {
@@ -711,8 +773,6 @@ console.log("scrollListToTurn*6 top",top);
       }catch{}
     }, { passive:false });
   }
-
-
 
   // 相方行のUI更新（強制値を優先）
   function refreshPinUIForTurn(turnKey, forcedState){
@@ -1342,6 +1402,9 @@ console.log("******logic.js refreshBtn click");
     })();
     /* ensureIndexCounterStyle ここまで */
 
+    // 付箋ボタンのイベント委譲をセット '25.11.27
+    try { bindDelegatedClipPinHandler(); } catch {}
+
     // === リスト側：モダリティ + パーキングでフォーカス完全排除 ===
     (function enforceNoFocusList(panel){
       if (!panel || panel._cgtnFocusGuard) return;
@@ -1809,7 +1872,8 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         if (on) row.dataset.pin = '1';
         else row.removeAttribute('data-pin');
 
-        if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.cgtn-clip-pin'), row, chatId);
+        // イベント委譲に移行したので個別バインドは不要 '25.11.27
+        //if (showClipOnAttach) bindClipPinByIndex(row.querySelector('.cgtn-clip-pin'), row, chatId);
 
         // 直前ガード（非同期処理のため）
         if (my !== _renderTicket) return;
@@ -1879,7 +1943,8 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         if (on2) row2.dataset.pin = '1';
         else row2.removeAttribute('data-pin');
 
-        if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
+        // イベント委譲に移行したので個別バインドは不要 '25.11.27
+        //if (showClipOnBody) bindClipPinByIndex(row2.querySelector('.cgtn-clip-pin'), row2, chatId);
 
         // 直前ガード（非同期処理のため）
         if (my !== _renderTicket) return;

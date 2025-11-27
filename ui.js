@@ -235,6 +235,11 @@ const LIST_CSS = `
 #cgpt-list-panel .row .clip-dummy { visibility:hidden; pointer-events:none; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] { color:#979797; }
 #cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"]  { color:#e60033; }
+/* pinOnly=ON のとき、ピンが無い行を非表示にする '25.11.27 */
+#cgpt-list-panel.pinonly .row:not([data-pin="1"]) {
+    display: none !important;
+}
+
 /* ★ 添付ラベルの視認性（最小差分） */
 #cgpt-list-panel .row .attach {
   margin-left: .5em;
