@@ -657,7 +657,7 @@ console.log("scrollListToTurn*6 top",top);
     clip.textContent = '🔖\uFE0E';
   }
 
-
+  // 個別の🔖クリック処理
   function bindClipPinByIndex(clipEl, rowEl, chatId){
     clipEl.addEventListener('click', async (ev) => {
       ev.preventDefault();
@@ -668,6 +668,7 @@ console.log("scrollListToTurn*6 top",top);
       // Promise の可能性があるので await。戻り形式の差異にも耐性を持たせる
       // togglePinByIndex() は Promise を返す（await 必須）
       // 返り値が boolean 以外でも動くように型ガード
+      // 付箋データ更新
       const ret = await SH.togglePinByIndex?.(idx1, chatId);
       let next;
       if (typeof ret === 'boolean') {
@@ -682,9 +683,22 @@ console.log("scrollListToTurn*6 top",top);
       if (typeof next === 'undefined') {
         next = !!(await SH.isPinnedByIndex?.(idx1, chatId));
       }
+
+      // data-pin を個別クリック時にも同期 '25.11.29
+      if (next) rowEl.dataset.pin = '1';
+      else      rowEl.removeAttribute('data-pin');
+      // pinOnly モード中なら、表示も更新
+      try {
+        const cfg = SH.getCFG?.() || {};
+        if (cfg.list?.pinOnly) {
+          NS.updatePinOnlyView?.();
+        }
+      } catch {}
+
+      // ボタン色などを更新
       paintPinRow(rowEl, next);
 
-      // 付箋数とフッターの同期もここで安全側更新
+      // バッジ・フッターの再計算
       try{
         const SHX = window.CGTN_SHARED || {};
         let pinsArr = SHX.getPinsForChat?.(chatId);
@@ -1171,7 +1185,8 @@ console.log("clearListPanelUI catch");
                   padding:2px 6px 3px;
                   border-bottom:1px solid rgba(0,0,0,0.15);
                   background:rgba(255,255,255,0.95);backdrop-filter:blur(4px);
-                  position:sticky;top:0;z-index:1;">        <div id="cgpt-list-grip"></div>
+                  position:sticky;top:0;z-index:1;">
+        <div id="cgpt-list-grip"></div>
         <!-- ★ チャット名（つまみの下＝ヘッダ中央）。幅はパネル内に収めて…省略 -->
         <div id="cgpt-chat-title-wrap" style="order:2;flex:1 0 100%;min-width:0">
          <div id="cgpt-chat-title"
@@ -1269,16 +1284,15 @@ console.log("******logic.js refreshBtn click");
       try { NS.updateBulkPinButtonsState?.(); } catch{}
     })();
 
-    /* 行番号（インデックス）をCSSカウンタで表示 */
+    // 行番号（インデックス）をCSSカウンタで表示 
     (function ensureIndexCounterStyle(){
       try{
         if (document.getElementById('cgtn-idx-style')) return;
         const st = document.createElement('style');
         st.id = 'cgtn-idx-style';
         // 旧: align-items:flex-start だと本文と微ズレが出ることがある
-        /* ここから追加 */
         st.textContent = `
-          /* --- フィルタUIの見た目 --- */
+          // --- フィルタUIの見た目 --- 
           #cgpt-list-filter label { user-select:none; cursor:pointer; }
           #cgpt-list-filter input { display:none; }
           #cgpt-list-filter label span{
@@ -1287,13 +1301,18 @@ console.log("******logic.js refreshBtn click");
           #cgpt-list-filter label:has(input:checked) span{
             background:#222; color:#fff; border-color:#222;
           }
-          /* --- 絞り込み（CSSのみ）--- */
+          // --- 絞り込み（CSSのみ）--- 
           #cgpt-list-filter:has(#lv-all:checked)    + #cgpt-list-body .row{ display:flex; }
           #cgpt-list-filter:has(#lv-user:checked)   + #cgpt-list-body .row:not([data-role="user"])      { display:none; }
           #cgpt-list-filter:has(#lv-assist:checked) + #cgpt-list-body .row:not([data-role="assistant"]) { display:none; }
           #cgpt-list-body { counter-reset: cgtn_turn; }
-
-          /* 全行：左側に固定幅のダミーを置いて揃える（ベースライン揃え） */
+          // 付箋のみ表示（ピン無し行を非表示） '25.11.27 
+          // aria-pressed="true" なときだけ 
+          // data-pin="1" 以外の .row が全部 display:none になる。
+          #cgpt-list-panel:has(#cgpt-pin-filter[aria-pressed="true"]) #cgpt-list-body .row:not([data-pin="1"]) {
+            display:none;
+          }
+          // 全行：左側に固定幅のダミーを置いて揃える（ベースライン揃え）
           #cgpt-list-body .row{
             display:flex;
             align-items: baseline;   /* ←本文の1行目と番号のベースラインを揃える */
@@ -1310,7 +1329,7 @@ console.log("******logic.js refreshBtn click");
             line-height: 1.2;                 /* 微妙な上ズレを抑える */
             //transform: translateY(1px);       /* さらに1pxだけ下げて視覚調整 */
           }
-          /* アンカー行：カウンタを進め、数字を描画 */
+          // アンカー行：カウンタを進め、数字を描画 
           #cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
           #cgpt-list-body .turn-idx-anchor::before{
             content: counter(cgtn_turn);
@@ -1455,7 +1474,7 @@ console.log("*****bindPinFilter Alt+クリック click");
           return;
         }
 
-        // 通常クリック：pinOnlyトグル → 即時反映
+        // 付箋のみONOFF pinOnlyトグル → 即時反映
         const next = !cur.list?.pinOnly;
 console.debug('******付箋のみ通常クリック next=%s', next);
         SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
@@ -1464,8 +1483,14 @@ console.debug('******付箋のみ通常クリック next=%s', next);
         const pinOnlyChk = document.getElementById('cgpt-pinonly');
         if (pinOnlyChk) pinOnlyChk.checked = next;
 
+        // 付箋バッジ / フッターを即時更新（DOM 再構築はしない） '25.11.27
+        try { NS.updatePinOnlyBadge?.(); } catch {}
+        // pinOnly DOMフィルタ（renderList禁止版） '25.11.27
+        try { NS.updatePinOnlyBadge?.(); } catch {}
+        try { NS.updateListFooterInfo?.(); } catch {}
         // ★ オーバーライドで1クリック目から絞込み／解除を確定
-        NS.renderList(true, { pinOnlyOverride: next });
+        //NS.renderList(true, { pinOnlyOverride: next });
+
       }, {passive:true});
     })();
     // bindPinFilter ここまで
@@ -1971,6 +1996,72 @@ console.debug('[setListEnabled*4]一覧OFF');
     }
   }
 
+  // === pinOnly DOMフィルタ（renderList禁止版）'25.11.27 ===
+  function updatePinOnlyView() {
+    const pinOnly = SH.getCFG()?.list?.pinOnly;
+    const rows = document.querySelectorAll('#cgpt-list-body .row');
+
+    rows.forEach(row => {
+      const pinned = (row.dataset.pin === "1");
+      row.style.display = (pinOnly && !pinned) ? "none" : "";
+    });
+  }
+  NS.updatePinOnlyView = updatePinOnlyView;
+
+  // Pinバッジ更新　'25.11.27
+  function updatePinOnlyBadge(){
+console.debug('[*****updatePinOnlyBadge]');
+
+    try {
+      const btn = document.getElementById('cgpt-pin-filter');
+      if (!btn) return;
+      const badge = btn?.querySelector('.cgtn-badge');
+      if (!badge) return;
+
+      if ((CGTN_LOGIC.ST?.all?.length ?? 0) === 0) {
+        badge.hidden = true;
+        badge.textContent='';
+        return; 
+      }
+
+      // ★ articleゼロ件なら非表示
+      const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
+      if (turns === 0) {
+        badge.hidden = true;
+        badge.textContent = '';
+        return;
+      }
+
+      const cid = SH.getChatId?.();
+      const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
+
+      // 表示制御
+      if (count > 0) {
+//        badge.textContent = count > 99 ? '99+' : count;
+        badge.textContent = count;       // ここはミキの元コードのまま温存
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+
+      // 付箋ON/OFFモードの視覚強調（既存クラス利用）
+      const cfg = SH.getCFG?.() || {};
+      const pinOnly = !!cfg.list?.pinOnly;
+
+      // ★ CSS で使う pinOnly 状態
+      btn.setAttribute('aria-pressed', String(pinOnly));
+console.debug('[*****updatePinOnlyBadge]　aria-pressed:',String(pinOnly));
+      btn.classList.toggle('active', pinOnly);
+
+    } catch (e) {
+      console.warn('[updatePinOnlyBadge]', e);
+    }
+
+    // ★ 付箋モード変更時に一括ボタンの状態も更新 '25.11.23
+    try { updateBulkPinButtonsState(); } catch{}
+  }
+
+/*
   function updatePinOnlyBadge(){
 //console.debug('[*****updatePinOnlyBadge]');
 
@@ -2021,7 +2112,7 @@ console.debug('[setListEnabled*4]一覧OFF');
     // ★ 付箋モード変更時に一括ボタンの状態も更新 '25.11.23
     try { updateBulkPinButtonsState(); } catch{}
   }
-
+*/
   // ★ 全ON/全OFFボタンの活性/非活性制御 '25.11.23
   function updateBulkPinButtonsState(){
     try{
@@ -2111,7 +2202,7 @@ console.log("**clearListFooterInfo ");
 
     // ---- 現在のロール（全体 / ユーザー / アシスタント） ----
     let role = NS?.viewRole || 'all';
-console.log("★★★role:",role);
+console.log("★★★ updateListFooterInfo role:",role);
 
     try {
       const filterBox = document.getElementById('cgpt-list-filter');
@@ -2222,7 +2313,7 @@ console.log("★★★role:",role);
     try { NS?.updateListChatTitle?.(); } catch {}
   });
 
-  /* ここから追加：③ 保存失敗時のロールバック（再読込→再描画） */
+  /* 保存失敗時のロールバック（再読込→再描画） */
   window.addEventListener('cgtn:save-error', (ev)=>{
     try{
       const cid = ev?.detail?.chatId || SH.getChatId?.();
@@ -2231,18 +2322,21 @@ console.log("★★★role:",role);
       UI?.toast?.('保存に失敗しました（容量または通信エラー）', 'error');
     }catch{}
   });
-  /* ここまで */
 
   window.addEventListener('cgtn:pins-updated', (ev) => {
     const { chatId, count } = ev.detail || {};
 
+/*
     // 「付箋のみ表示」モード中は見た目も即時反映
     const pinOnly = document.querySelector('#cgpt-pin-filter[aria-pressed="true"]');
     if (pinOnly) {
       // いちばん堅いのは全体再描画
       NS.renderList?.(true);
-
     }
+*/
+    // renderListは呼ばない '25.11.27
+    // 付箋モード変更時も、DOM 再描画はせずバッジ/タイトルだけ更新
+    // （data-pin と aria-pressed に基づき CSS 側で表示が切り替わる）
     //付箋バッジ更新
     NS?.updatePinOnlyBadge?.();
     //チャット名

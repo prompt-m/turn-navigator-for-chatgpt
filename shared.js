@@ -638,7 +638,7 @@ console.log("付箋データ削除deletePinsForChat chatId:",chatId);
      return true;
    };
 
-  // トグル（1始まり）
+  // トグル（1始まり）付箋データ更新
   SH.togglePinByIndex = async function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
     if (!Number.isFinite(index1) || index1 < 1) return false;
     const arr = await SH.getPinsArrAsync(chatId);
@@ -658,53 +658,6 @@ console.log("付箋データ削除deletePinsForChat chatId:",chatId);
     return !!next;
   };
 
-/*
-  // idx1: 1 始まりのターン番号
-  SH.togglePinByIndex = async function togglePinByIndex(idx1, chatId){
-    chatId = chatId || SH.getChatId?.();
-    const idx0 = Number(idx1) - 1;
-    if (!chatId || !Number.isFinite(idx0) || idx0 < 0) return false;
-
-    const cfg = SH.getCFG?.() || {};
-    const map = (cfg.pinsByChat = cfg.pinsByChat || {});
-    const rec = map[chatId] || { pins: [] };
-
-    const pinsArr = Array.isArray(rec.pins) ? rec.pins.slice() : [];
-console.log("◆togglePinByIndex*1 pinsArr:",pinsArr);
-    const cur  = !!pinsArr[idx0];
-    const next = !cur;
-    pinsArr[idx0] = next ? 1 : 0;
-console.log("◆togglePinByIndex*2 pinsArr:",pinsArr);
-    // タイトル／更新日時もここで更新しておく
-    const title = rec.title
-      || SH.getChatTitle?.()   // 現在タブのタイトル
-      || '';
-    map[chatId] = {
-      ...rec,
-      pins: pinsArr,
-      title,
-      updatedAt: Date.now()
-    };
-
-    // メモリ上の CFG を更新（即座に参照される系用）
-    SH.setCFG?.(cfg);
-
-    // 実保存はバッファリング（quota 対策）
-    scheduleBufferedPinsSave(chatId, pinsArr);
-
-    return next;   // 次状態 true=ON / false=OFF
-  };
-
-  SH.isPinnedByIndex = function isPinnedByIndex(idx1, chatId){
-    chatId = chatId || SH.getChatId?.();
-    const idx0 = Number(idx1) - 1;
-    if (!chatId || !Number.isFinite(idx0) || idx0 < 0) return false;
-    const cfg = SH.getCFG?.() || {};
-    const rec = cfg.pinsByChat?.[chatId];
-    const arr = Array.isArray(rec?.pins) ? rec.pins : [];
-    return !!arr[idx0];
-  };
-*/
   // 件数ヘルパ（配列方式に合わせて修正）
   SH.countPinsForChat = function(chatId = SH.getChatId()){
     try{
