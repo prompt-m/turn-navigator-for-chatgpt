@@ -101,7 +101,7 @@
       'row.previewBtn': 'クリックでプレビューを表示／もう一度クリックで閉じます',
       'row.notFound': '（本文を取得できませんでした）',
       'row.pin': 'このターンを付箋 ON/OFF',
-      'list.pinonly': '付箋のみ表示（Altでテーマ）'
+      'list.pinonly': '付箋'
     },
     en: {
       // ===== Common UI =====
@@ -201,7 +201,7 @@
       'row.previewBtn': 'Click to show preview / Click again to close',
       'row.notFound': '(not found)',
       'row.pin': 'Toggle pin for this turn',
-      'list.pinonly': 'Pinned only (Alt for theme)'
+      'list.pinonly': 'Pinned'
     }
   };
 

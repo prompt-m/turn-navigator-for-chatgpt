@@ -1186,8 +1186,12 @@ console.log("clearListPanelUI el.textContent:",el.textContent);
         el.textContent = '';
         el.title = ''; 
       }
-      const badge = document.querySelector('#cgpt-pin-filter .cgtn-badge');
+      //const badge = document.querySelector('#cgpt-pin-filter .cgtn-badge');
+      //if (badge) { badge.textContent = ''; badge.hidden = true; }
+      // バッジの場所を変更 '25.11.28
+      const badge = document.querySelector('#lv-lab-pin .cgtn-badge');
       if (badge) { badge.textContent = ''; badge.hidden = true; }
+
       // ← フッターは DOM を壊さず「空状態」にする（ボタンは残す）
       try { NS.clearListFooterInfo?.(); } catch {}
     } catch(e){
@@ -1268,6 +1272,10 @@ console.log("clearListPanelUI catch");
         <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span></span></label>
         <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span></span></label>
         <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span></span></label>
+        <label id="lv-lab-pin" class="cgtn-badgehost">
+          <input type="radio" name="cgtn-lv" id="lv-pin"><span></span><span class="cgtn-badge"></span>
+        </label>
+
       </div>
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot">
@@ -1365,6 +1373,7 @@ console.log("******logic.js refreshBtn click");
           #cgpt-list-filter:has(#lv-all:checked)    + #cgpt-list-body .row{ display:flex; }
           #cgpt-list-filter:has(#lv-user:checked)   + #cgpt-list-body .row:not([data-role="user"])      { display:none; }
           #cgpt-list-filter:has(#lv-assist:checked) + #cgpt-list-body .row:not([data-role="assistant"]) { display:none; }
+          #cgpt-list-filter:has(#lv-pin:checked)    + #cgpt-list-body .row:not([data-pin="1"]) { display:none; }
           #cgpt-list-body { counter-reset: cgtn_turn; }
           // 付箋のみ表示（ピン無し行を非表示） '25.11.28
           // パネルに .pinonly が付いている間だけ、
@@ -1608,8 +1617,13 @@ console.log("******logic.js 畳む開く click");
       const st = document.createElement('style');
       st.id = 'cgtn-pinonly-style';
       st.textContent = `
-        #cgpt-pin-filter[aria-pressed="true"]{
-          color: #e60033 !important;
+//        #cgpt-pin-filter[aria-pressed="true"]{
+//          color: #e60033 !important;
+//        }
+        /* 付箋モードONのとき、ラベル文字を強調 */
+        #lv-lab-pin.active > span:first-of-type{
+          color:#e60033 !important;
+          font-weight:600;
         }
       `;
       document.head.appendChild(st);
@@ -1635,10 +1649,12 @@ console.log("******logic.js 畳む開く click");
       const sAll  = panel.querySelector('#lv-lab-all span');
       const sUser = panel.querySelector('#lv-lab-user span');
       const sAsst = panel.querySelector('#lv-lab-asst span');
-
+      const sPin = panel.querySelector('#lv-lab-pin span');
       if (sAll)  sAll.textContent  = T('all');       // 全体
       if (sUser) sUser.textContent = T('user');      // ユーザー
       if (sAsst) sAsst.textContent = T('assistant'); // アシスタント
+      if (sPin) sPin.textContent = T('list.pinonly'); // 付箋
+
     } catch (e) {
       console.warn('[applyListFilterLang] failed', e);
     }
@@ -2077,20 +2093,57 @@ console.debug('[setListEnabled*4]一覧OFF');
   }
   NS.updatePinOnlyView = updatePinOnlyView;
 
-/*
-  // === pinOnly DOMフィルタ（renderList禁止版）'25.11.27 ===
-  function updatePinOnlyView() {
-    const pinOnly = SH.getCFG()?.list?.pinOnly;
-    const rows = document.querySelectorAll('#cgpt-list-body .row');
-
-    rows.forEach(row => {
-      const pinned = (row.dataset.pin === "1");
-      row.style.display = (pinOnly && !pinned) ? "none" : "";
-    });
-  }
-*/
-
   // Pinバッジ更新　'25.11.27
+  function updatePinOnlyBadge(){
+    console.debug('[*****updatePinOnlyBadge]');
+
+    try {
+      // ★ ターゲットを正しい位置に変更
+      const btn   = document.getElementById('lv-lab-pin'); // ←ここだけ変更
+      if (!btn) return;
+
+      //const badge = document.querySelector('#lv-lab-pin .cgtn-badge');
+      const badge = btn.querySelector('.cgtn-badge');      // ←ここも変更
+      if (!badge) return;
+
+      const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
+
+      // ★ articleゼロ件なら非表示
+      if (turns === 0) {
+        badge.hidden = true;
+        badge.textContent = '';
+        return;
+      }
+
+      const cid = SH.getChatId?.();
+      const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
+
+      // 表示制御
+      if (count > 0) {
+        badge.textContent = count;       // 数字そのまま表示
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+        badge.textContent = '';
+      }
+    console.debug('[*****updatePinOnlyBadge] count:',count);
+
+      // 付箋ON/OFFモードの視覚強調（既存ロジック維持）
+      const cfg = SH.getCFG?.() || {};
+      const pinOnly = !!cfg.list?.pinOnly;
+
+      btn.setAttribute('aria-pressed', String(pinOnly));
+      btn.classList.toggle('active', pinOnly);
+
+    } catch (e) {
+      console.warn('[updatePinOnlyBadge]', e);
+    }
+
+    // 一括ボタンの状態同期
+    try { updateBulkPinButtonsState(); } catch{}
+  }
+
+/*
   function updatePinOnlyBadge(){
 console.debug('[*****updatePinOnlyBadge]');
 
@@ -2142,6 +2195,7 @@ console.debug('[*****updatePinOnlyBadge]　aria-pressed:',String(pinOnly));
     // ★ 付箋モード変更時に一括ボタンの状態も更新 '25.11.23
     try { updateBulkPinButtonsState(); } catch{}
   }
+*/
 
   // ★ 全ON/全OFFボタンの活性/非活性制御 '25.11.23
   function updateBulkPinButtonsState(){

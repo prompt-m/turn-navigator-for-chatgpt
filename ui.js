@@ -483,9 +483,11 @@ const MISC_CSS = `
 }
 
 /* 付箋のみONのときはバッジ色を反転 */
+/*
 .cgtn-iconbtn.active .cgtn-badge {
   background: #0a84ff;
-}
+}*/
+.cgtn-badgehost.active .cgtn-badge{ background:#0a84ff; }
 
 
 
