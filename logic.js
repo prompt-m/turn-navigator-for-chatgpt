@@ -1881,16 +1881,19 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           </div>
         `;
         row.querySelector('.txt').textContent = attachLine;
-        row.addEventListener('click', () => scrollToHead(art));
+        //row.addEventListener('click', () => scrollToHead(art));
         row.addEventListener('click', (ev) =>{
-          scrollToHead(art);
-           // 他のUIパーツやリンクはスルー
+          //scrollToHead(art);
+          // 他のUIパーツやリンクはスルー
           if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
           const txt = ev.target.closest('.txt');
-          if (!txt) return;
+          if(txt){
+              scrollToHead(art);
+          } else {
+            return;
+          }
           const row = txt.closest('.row');
           if (!row) return;
-          scrollToHead(art);
         }); 
         row.dataset.preview = previewText || attachLine || '';
         row.dataset.role = isUser ? 'user' : 'assistant';
@@ -2019,18 +2022,6 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         }
       });
 
-/*
-      empty.querySelector('.show-all')?.addEventListener('click', () => {
-        try {
-          const cfg2 = SH.getCFG() || {};
-          SH.saveSettingsPatch({ list: { ...(cfg2.list || {}), pinOnly: false } });
-          document.querySelector('#cgpt-pin-filter')?.setAttribute('aria-pressed', 'false');
-          NS.renderList?.(true, { pinOnlyOverride: false });
-        } catch (e) {
-          console.warn('show-all click failed', e);
-        }
-      });
-*/
     }
     const rowsCount = body.querySelectorAll('.row').length;   // ← 空行は .row じゃないので除外される
     NS._lastVisibleRows = rowsCount;
@@ -2292,7 +2283,154 @@ console.log("**clearListFooterInfo ");
   }
   NS.updateBulkPinButtonsState = updateBulkPinButtonsState;
 
-  // renderlistからしか呼んではいけない(日英切替え)
+  // フッター更新 '25.11.28変更
+  function updateListFooterInfo(){
+    const foot = document.getElementById('cgpt-list-foot-info');
+    if (!foot) return;
+
+    const ST = NS?.ST || {};
+    const allTurns   = Array.isArray(ST.all)       ? ST.all.length       : 0;
+    const userTurns  = Array.isArray(ST.user)      ? ST.user.length      : 0;
+    const asstTurns  = Array.isArray(ST.assistant) ? ST.assistant.length : 0;
+
+    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
+    if (!allTurns){
+      foot.dataset.state = 'empty';
+      foot.textContent = T('list.empty') || 'リストはありません';
+      return;
+    }
+
+    // 設定（pinOnly）
+    const cfg     = window.CGTN_SHARED?.getCFG?.() || {};
+    const pinOnly = !!cfg.list?.pinOnly;
+
+    // ---- 集計値の取得（renderList が詰めた NS.metrics を使う） ----
+    const m   = NS.metrics || {};
+    const box = pinOnly ? (m.pins || {}) : (m.all || {});
+    let uploads   = (typeof box.uploads   === 'number') ? box.uploads   : Number(NS?.uploads   || 0);
+    let downloads = (typeof box.downloads === 'number') ? box.downloads : Number(NS?.downloads || 0);
+
+    // ---- 現在のロール（全体 / ユーザー / アシスタント） ----
+    let role = NS?.viewRole || 'all';
+    try {
+      const filterBox = document.getElementById('cgpt-list-filter');
+      const checked   = filterBox?.querySelector('input[name="cgtn-lv"]:checked');
+      if (checked){
+        if (checked.id === 'lv-user')        role = 'user';
+        else if (checked.id === 'lv-assist') role = 'assistant';
+        else                                 role = 'all';
+      }
+    } catch(e){
+      console.warn('[updateListFooterInfo] role detection failed', e);
+    }
+    NS.viewRole = role;
+
+    // ---- DOM から「ロール別 / 付箋別」の件数を数える ----
+    let visibleForRole = 0;   // ロール条件だけ満たす可視ターン数（pinOnly=OFF のときに使う）
+    let pinsForRole    = 0;   // ロール条件＋付箋あり のターン数（pinOnly=ON の分子）
+
+    try {
+      const body = document.getElementById('cgpt-list-body');
+      if (body){
+        const anchors = body.querySelectorAll('.turn-idx-anchor');
+        anchors.forEach(el => {
+          const row = el.closest('.row');
+          if (!row) return;
+          if (row.offsetParent === null) return;  // 非表示行は除外
+
+          const r     = row.getAttribute('data-role');   // user / assistant
+          const isPin = row.getAttribute('data-pin') === '1';
+
+          const roleMatch =
+            (role === 'all') ||
+            (role === 'user'      && r === 'user') ||
+            (role === 'assistant' && r === 'assistant');
+
+          if (!roleMatch) return;
+
+          visibleForRole++;
+          if (isPin) pinsForRole++;
+        });
+      }
+    } catch(e){
+      console.warn('[updateListFooterInfo] visible count failed', e);
+    }
+
+    // ---- 会話数（分母）の決め方 ----
+    const totalByRole = {
+      all:       allTurns,
+      user:      userTurns,
+      assistant: asstTurns
+    };
+
+    let totalDisplay;
+    let countDisplay;
+
+    if (pinOnly){
+      // 付箋のみ表示：
+      //   分母 = ロール別の総ターン数（全体 / user / assistant）
+      //   分子 = 付箋付きターン数（ロール条件も適用）
+      totalDisplay = totalByRole[role] || allTurns;
+      if (totalDisplay <= 0) totalDisplay = allTurns;
+      countDisplay = pinsForRole;
+    } else {
+      // 通常表示：
+      //   全体表示 → 「6」
+      //   ユーザー/アシスタント → 「3/6」 のような分数表示
+      const denom = allTurns;
+
+      if (role === 'all' || !denom) {
+        // 全体表示 → 分母だけ（例: 6）
+        countDisplay = denom;
+        totalDisplay = denom;
+      } else {
+        // ユーザー/アシスタント → 分子/分母（例: 3/6）
+        countDisplay = visibleForRole;
+        totalDisplay = denom;
+      }
+    }
+
+    // ---- uploads / downloads をロールに合わせて整形 ----
+    if (role === 'user') {
+      downloads = 0;
+    } else if (role === 'assistant') {
+      uploads = 0;
+    }
+
+    // ---- テンプレート適用 ----
+    foot.dataset.state = 'normal';
+
+    if (pinOnly){
+      const tpl = T('list.footer.pinOnly') || '{count}/{total}';
+      foot.textContent = tpl
+        .replace('{count}',     String(countDisplay))  // 付箋付きターン数（分子）
+        .replace('{total}',     String(totalDisplay))  // ロール別総ターン数（分母）
+        .replace('{uploads}',   String(uploads))
+        .replace('{downloads}', String(downloads));
+    } else {
+      const tpl = T('list.footer.all') || '{total}';
+
+      let totalText;
+      if (role === 'all' || !totalDisplay) {
+        // 全体表示 → 「6」
+        totalText = String(countDisplay);
+      } else {
+        // ユーザー/アシスタント → 「3/6」
+        totalText = `${countDisplay}/${totalDisplay}`;
+      }
+
+      foot.textContent = tpl
+        .replace('{count}',     String(countDisplay))
+        .replace('{total}',     totalText)
+        .replace('{uploads}',   String(uploads))
+        .replace('{downloads}', String(downloads));
+    }
+
+    // ★ フッター更新タイミングでボタン状態も同期 '25.11.23
+    try { NS.updateBulkPinButtonsState?.(); } catch {}
+  }
+
+/*
   function updateListFooterInfo(){
     const foot = document.getElementById('cgpt-list-foot-info');
     if (!foot) return;
@@ -2387,10 +2525,28 @@ console.log("★★★ updateListFooterInfo role:",role);
       if (totalDisplay <= 0) totalDisplay = allTurns;  // 念のためのフォールバック
       countDisplay = pinsForRole;
     } else {
-      // 通常表示：
-      //   分母 = 現在のロール条件で「画面に見えているターン数」
-      totalDisplay = visibleForRole || totalByRole[role] || allTurns;
-      countDisplay = visibleForRole;
+      // ★ 全体/ユーザー/アシスタント表示用
+      const tpl = T('list.footer.all') || '{total}';
+
+      // 分母は「全体のターン数」
+      const denom = totalByRole.all || allTurns || 0;
+
+      let mainText;
+      if (role === 'all' || !denom) {
+        // 全体表示 → 分母だけ（例: 6）
+        mainText = String(denom);
+      } else {
+        // ユーザー/アシスタント → 分子/分母（例: 3/6）
+        const num = countDisplay || 0;
+        mainText = `${num}/${denom}`;
+      }
+
+      foot.textContent = tpl
+        .replace('{count}',     String(countDisplay))
+        // ★ {total} に「6」または「3/6」を流し込む
+        .replace('{total}',     mainText)
+        .replace('{uploads}',   String(uploads))
+        .replace('{downloads}', String(downloads));
     }
 
     // ---- uploads / downloads をロールに合わせて整形 ----
@@ -2422,7 +2578,7 @@ console.log("★★★ updateListFooterInfo role:",role);
     // ★ フッター更新タイミングでボタン状態も同期 '25.11.23
     try { NS.updateBulkPinButtonsState?.(); } catch{}
   }
-
+*/
   NS.updateListFooterInfo = updateListFooterInfo;
 
 
