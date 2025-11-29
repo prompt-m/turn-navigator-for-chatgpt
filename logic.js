@@ -636,6 +636,7 @@ console.log("scrollListToTurn*6 top",top);
     return Array.from(body.querySelectorAll(`.row[data-turn="${CSS.escape(turnKey)}"]`));
   }
 
+/*
   // === pin theme (gold test) ===
   function applyPinTheme(){
 
@@ -646,6 +647,7 @@ console.log("scrollListToTurn*6 top",top);
     if (theme === 'gold') btn.classList.add('golden');
     else btn.classList.remove('golden');
   }
+*/
 
   function paintPinRow(row, pinned){
     const clip = row.querySelector('.cgtn-clip-pin');
@@ -1186,26 +1188,31 @@ console.log("clearListPanelUI el.textContent:",el.textContent);
         el.textContent = '';
         el.title = ''; 
       }
-      //const badge = document.querySelector('#cgpt-pin-filter .cgtn-badge');
-      //if (badge) { badge.textContent = ''; badge.hidden = true; }
       // バッジの場所を変更 '25.11.28
-      const badge = document.querySelector('#lv-lab-pin .cgtn-badge');
+      const host  = document.getElementById('lv-lab-pin');
+      const badge = host?.querySelector('.cgtn-badge');
       if (badge) { badge.textContent = ''; badge.hidden = true; }
+      if (host) {
+        host.removeAttribute('aria-pressed');
+        host.classList.remove('active');
+      }
 
       // ← フッターは DOM を壊さず「空状態」にする（ボタンは残す）
       try { NS.clearListFooterInfo?.(); } catch {}
     } catch(e){
       console.warn('[clearListPanelUI] failed', e); 
     }
+
     // 状態も空に
     try {
 console.log("clearListPanelUI*2");
       const ST = CGTN_LOGIC.ST || (CGTN_LOGIC.ST = {});
       ST.all = []; ST.user = []; ST.assistant = [];
+
       // 付箋バッジ/フッターの表示状態も同期（早期returnを避けるため最後に）
       try { CGTN_LOGIC.updatePinOnlyBadge?.(); } catch {}
-      // ここではフッターは触らない（↑で empty に済）
-      } catch {
+      // ここではフッターは触らない（↑で empty 済）
+    } catch {
 console.log("clearListPanelUI catch");
     }
   };
@@ -1258,12 +1265,6 @@ console.log("clearListPanelUI catch");
                       text-align:center;font-weight:600;font-size:13px;opacity:.9;padding:2px 4px;">
          </div>
         </div>
-        <!-- 上段右寄せにするため margin-left:auto を付与 -->
-        <button id="cgpt-pin-filter" class="cgtn-badgehost" type="button" aria-pressed="false"
-                style="cursor:pointer;margin-left:auto">🔖\uFE0E
-
-          <span class="cgtn-badge" hidden>0</span>
-        </button>
         <button id="cgpt-list-collapse" aria-expanded="true">▴</button>
       </div>
 
@@ -1526,6 +1527,7 @@ console.log("******logic.js refreshBtn click");
     })();
     // enableDrag ここまで
 
+/*
     // つまみ横の付箋のみ（1クリック目から確実に反映）
     (function bindPinFilter(){
       const btn = listBox.querySelector('#cgpt-pin-filter');
@@ -1566,6 +1568,7 @@ console.debug('******付箋のみ通常クリック next=%s', next);
       }, {passive:true});
     })();
     // bindPinFilter ここまで
+*/
 
     // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
     (function bindRoleFilter(panel){
@@ -1577,11 +1580,22 @@ console.debug('******付箋のみ通常クリック next=%s', next);
         const checked = box.querySelector('input[name="cgtn-lv"]:checked');
 console.log("******bindRoleFilter checked:",checked);
         if (!checked) return;
+        // ---- ロール決定（User / Assistant / それ以外は All）----
         let role = 'all';
         if (checked.id === 'lv-user')   role = 'user';
         if (checked.id === 'lv-assist') role = 'assistant';
         NS.viewRole = role;
 console.log("******bindRoleFilter role:",role);
+        // ---- ★ pinOnly 状態を cfg に同期（Pinned ラジオが ON なら true）---- '25.11.28
+        try {
+          const cfg = SH.getCFG?.() || {};
+          const pinOnly = (checked.id === 'lv-pin');   // ← ここが肝
+          SH.saveSettingsPatch?.({
+            list: { ...(cfg.list || {}), pinOnly }
+          });
+        } catch(_){}
+
+        // フッターを再計算（会話数の分母/分子ロジックはこの中に既にある）
         try { window.CGTN_LOGIC?.updateListFooterInfo?.(); } catch(_) {}
       };
 
@@ -1776,9 +1790,9 @@ console.log("******logic.js 畳む開く click");
 
 console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
 
-    const pinBtn = panel.querySelector('#cgpt-pin-filter');
-    if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
-    applyPinTheme?.();
+//    const pinBtn = panel.querySelector('#cgpt-pin-filter');
+//    if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
+//    applyPinTheme?.();
 
     const chatId  = SH.getChatId?.();
     //const pinsArr = SH.getPinsArr?.(chatId) || [];
@@ -1985,7 +1999,27 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
       `;
       body.appendChild(empty);
 
-      // 「すべて表示」ボタンの動作
+
+      // 「すべて表示」ボタンの動作 '25.11.28変更
+      empty.querySelector('.show-all')?.addEventListener('click', () => {
+        try {
+          const cfg2 = SH.getCFG() || {};
+          // 設定上の pinOnly を OFF
+          SH.saveSettingsPatch({ list: { ...(cfg2.list || {}), pinOnly: false } });
+
+          // ラジオを「全体」に戻す
+          const allRadio = document.getElementById('lv-all');
+          if (allRadio) allRadio.checked = true;
+
+          // リスト再描画 & フッター更新
+          NS.renderList?.(true, { pinOnlyOverride: false });
+          NS.updateListFooterInfo?.();
+        } catch (e) {
+          console.warn('show-all click failed', e);
+        }
+      });
+
+/*
       empty.querySelector('.show-all')?.addEventListener('click', () => {
         try {
           const cfg2 = SH.getCFG() || {};
@@ -1996,6 +2030,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           console.warn('show-all click failed', e);
         }
       });
+*/
     }
     const rowsCount = body.querySelectorAll('.row').length;   // ← 空行は .row じゃないので除外される
     NS._lastVisibleRows = rowsCount;

@@ -464,33 +464,36 @@ const MISC_CSS = `
 /* フッタ系ボタンの色 */
 #cgpt-list-foot,      /* リストパネルのフッタ */
 #cgpt-list-refresh,   /* 最新にする */
-#cgpt-pin-filter,     /* 畳む/開くボタン */
+#cgpt-pin-filter,     /* 付箋のみ釦 */
 #cgpt-list-collapse { /* 付箋フィルターボタン */
   color:#000
 }
-/* 付箋フィルター　装飾 */
-.cgtn-badgehost { position: relative; }
+
+.cgtn-badgehost { position: relative; } 
+
 .cgtn-badge {
   position: absolute;
   top: -4px; right: -4px;
   min-width: 14px; height: 14px;
-  line-height: 14px; padding: 0 4px;
+  padding: 0 4px;
   border-radius: 999px;
   background: #e11; color: #fff;
   font-size: 10px; font-weight: 700;
   text-align: center;
   box-shadow: 0 0 0 2px #fff; /* 背景と縁切り */
-}
 
-/* 付箋のみONのときはバッジ色を反転 */
-/*
-.cgtn-iconbtn.active .cgtn-badge {
+  /* ★ ここから追加：数字をきっちり中央に */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+} 
+
+/* 色だけ上書きする既存ルールはそのまま残す 
+.cgtn-badge {
   background: #0a84ff;
-}*/
-.cgtn-badgehost.active .cgtn-badge{ background:#0a84ff; }
-
-
-
+}
+*/
 /* スクロールバー（WebKit系） */
 .cgtn-dock-body::-webkit-scrollbar,
 #cgpt-list-body::-webkit-scrollbar{ width: 10px; }
