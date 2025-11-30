@@ -116,42 +116,64 @@ const NAV_CSS = `
 }
 .cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{ cursor:pointer; opacity:.9 }
 
-/* --- 設定ボタン（ナビ内） --- */
-#cgtn-open-settings.cgtn-open-settings {
-  color:#111;
+/* --- 設定ボタン（ナビ内）--- */
+#cgtn-open-settings.cgtn-open-settings{
+  /* ChatGPT 側のデフォルトを一旦リセット */
   all: unset;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-#cgtn-open-settings.cgtn-open-settings:hover {
-  background: rgba(0,0,0,.08);
-}
 
-/*
-
-#cgtn-open-settings.cgtn-open-settings {
-  all: unset;
+  box-sizing: border-box;
   font: inherit;
-  font-size: 16px;
-  color: grey;
+  font-size: 14px;
+  color: var(--fg, #202124) !important;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;                       /* まるボタン */
+  border: 1px solid var(--bd, rgba(0,0,0,.12));
   background: #fff;
-  border: none;
-  box-shadow: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 28px; line-height: 1; padding: 0 8px; border-radius: 6px;
+
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);     /* ナビボタンと同系の立体感 */
   cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.10s ease;
 }
-#cgtn-open-settings.cgtn-open-settings {
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-#cgtn-open-settings.cgtn-open-settings:hover {
-  background: color-mix(in srgb, #fff 70%, var(--bd) 30%);
-  color: red;
+
+/* ホバー：少しだけ濃く＆影強め */
+#cgtn-open-settings.cgtn-open-settings:hover{
+  background: color-mix(in srgb, #fff 70%, var(--bd, rgba(0,0,0,.3)) 30%);
+  box-shadow: 0 5px 16px rgba(0,0,0,.18);
   transform: translateY(-1px);
 }
-#cgtn-open-settings.cgtn-open-settings:active { transform: translateY(0); }
-*/
+
+/* 押下中：沈み込む感じ */
+#cgtn-open-settings.cgtn-open-settings:active{
+  transform: translateY(0);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,.2) inset,
+    0 2px 6px rgba(0,0,0,.10);
+}
+
+/* ダークモード調整 */
+@media (prefers-color-scheme: dark){
+  #cgtn-open-settings.cgtn-open-settings{
+    background: #1d1f23;
+    border-color: rgba(255,255,255,.10);
+    color: #e8eaed !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+  #cgtn-open-settings.cgtn-open-settings:hover{
+    /* 暗い背景を少しだけ明るくするイメージ */
+    background: color-mix(in srgb, #1d1f23 70%, #ffffff 30%);
+  }
+}
+
 `;
 
 const LIST_CSS = `
