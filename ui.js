@@ -25,8 +25,54 @@
 const pinCurURL = chrome.runtime.getURL('assets/pin16.png');
 const prvCurURL = chrome.runtime.getURL('assets/prev16.png');
 
+
+
 /* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
 const NAV_CSS = `
+/* === 共通：丸いピル型ボタン === */
+.cgtn-pill-btn{
+  font:12px/1.1 system-ui,-apple-system,sans-serif;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 12px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 4px 14px rgba(0,0,0,.12);
+  transition:
+    background-color .15s ease,
+    box-shadow       .15s ease,
+    transform        .08s ease;
+  cursor:pointer;
+}
+
+/* ホバーで色＆影だけ少し強く */
+.cgtn-pill-btn:hover{
+  background:#f3f4f6;
+  box-shadow:0 6px 18px rgba(0,0,0,.16);
+}
+
+/* 押したときの沈み込み */
+.cgtn-pill-btn:active{
+  transform:translateY(1px);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,.18) inset,
+    0 2px 6px rgba(0,0,0,.08);
+}
+
+@media (prefers-color-scheme: dark){
+  .cgtn-pill-btn{
+    background:#1d1f23;
+    border-color:rgba(255,255,255,.06);
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    color:#e8eaed;
+  }
+  .cgtn-pill-btn:hover{
+    background:#262931;
+    box-shadow:0 8px 22px rgba(0,0,0,.45);
+  }
+}
 /* =========================
    1) NAV (ナビパネル)
 ========================= */
@@ -35,6 +81,7 @@ const NAV_CSS = `
   display:flex; flex-direction:column; gap:12px;
   z-index:2147483647
 }
+
 .cgpt-nav-group{
   width:92px; border-radius:14px; padding:10px;
   border:1px solid rgba(0,0,0,.12);
@@ -46,45 +93,48 @@ const NAV_CSS = `
   text-align:center; font-weight:600; opacity:.9;
   margin-bottom:2px; font-size:12px; color:#000
 }
+/*
 #cgpt-nav button{
-  all:unset; height:34px; border-radius:10px;
-  font:12px/1.1 system-ui,-apple-system,sans-serif;
-  display:grid; place-items:center; cursor:pointer;
-  background:#f2f2f7; color:#111; border:1px solid rgba(0,0,0,.08)
+  all:unset;
+  height:34px;
+  border-radius:10px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  background:#f2f2f7;
+  color:#111;
+  border:1px solid rgba(0,0,0,.08)
 }
 #cgpt-nav button:hover{ background:#fff }
-.cgpt-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px }
+*/
+.cgpt-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0px }
 #cgpt-nav .cgpt-lang-btn{ height:28px; margin-top:4px; color:#000 }
-#cgpt-nav input[type=checkbox] { cursor: pointer; }
+#cgpt-nav input[type=checkbox] { cursor: pointer; }  
 .cgpt-viz-toggle,.cgpt-list-toggle{
   margin-top:6px; display:flex; gap:8px; align-items:center;
   justify-content:flex-start; font-size:12px; cursor:pointer
 }
 .cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{ cursor:pointer; opacity:.9 }
 
-/* --- ナビ: ボタンに軽い立体感 --- */
-#cgpt-nav .cgpt-nav-group > button:not(.cgtn-open-settings){
-  background:#fff; border:1px solid rgba(0,0,0,.06);
-  border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,.12);
-}
-/* 押下中の沈み込み */
-#cgpt-nav .cgpt-nav-group > button:active{
-  box-shadow: 0 2px 8px rgba(0,0,0,.18) inset, 0 2px 8px rgba(0,0,0,.08);
-}
-/* ダーク時だけ少し強め */
-@media (prefers-color-scheme: dark){
-  #cgpt-nav .cgpt-nav-group > button{
-    background:#1d1f23; border-color:rgba(255,255,255,.06);
-    box-shadow:0 6px 18px rgba(0,0,0,.35); color:#e8eaed;
-  }
-}
-
 /* --- 設定ボタン（ナビ内） --- */
 #cgtn-open-settings.cgtn-open-settings {
+  color:#111;
   all: unset;
-  font: inherit;                 /* 既存のフォント系を継承 */
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+#cgtn-open-settings.cgtn-open-settings:hover {
+  background: rgba(0,0,0,.08);
+}
+
+/*
+
+#cgtn-open-settings.cgtn-open-settings {
+  all: unset;
+  font: inherit;
   font-size: 16px;
-  color: var(--fg);
+  color: grey;
   background: #fff;
   border: none;
   box-shadow: none;
@@ -96,10 +146,12 @@ const NAV_CSS = `
   transition: background 0.15s ease, transform 0.1s ease;
 }
 #cgtn-open-settings.cgtn-open-settings:hover {
-  background: color-mix(in srgb, #fff 92%, var(--bd) 8%);
-  transform: translateY(-1px);  /* クリック感をほんの少し */
+  background: color-mix(in srgb, #fff 70%, var(--bd) 30%);
+  color: red;
+  transform: translateY(-1px);
 }
 #cgtn-open-settings.cgtn-open-settings:active { transform: translateY(0); }
+*/
 `;
 
 const LIST_CSS = `
@@ -136,7 +188,6 @@ const LIST_CSS = `
 #cgpt-bias-line,#cgpt-bias-band{ pointer-events:none!important }
 .cgpt-nav-group[data-role="user"]{ background:rgba(240,246,255,.96); }
 .cgpt-nav-group[data-role="assistant"]{ background:rgba(234,255,245,.96); }
-.cgpt-nav-group button{ box-shadow:0 6px 24px; }
 
 #cgpt-list-grip{
   height:12px; border-radius:10px;
@@ -180,8 +231,9 @@ const LIST_CSS = `
 #cgpt-list-body{ flex:1; overflow:auto; padding:6px 8px; }
 
 #cgpt-list-body .row { 
-  display:flex; 
-  align-items:flex-start; 
+  display:flex;
+//  align-items:flex-start;
+  align-items:stretch; 
   gap:6px; 
   line-height:1.4;         /* 本文のline-heightと合わせる */
 }
@@ -251,14 +303,14 @@ const LIST_CSS = `
 #cgpt-list-panel .row.user-turn  { background: #F2F5F8; }
 #cgpt-list-panel .row.asst-turn  { background: #F2FFF9; }
 
-#cgpt-nav button:focus,
+/*#cgpt-nav button:focus,*/
 #cgpt-nav label:focus,
 #cgpt-list-panel button:focus,
 #cgpt-list-panel label:focus {
   outline: none !important;
   box-shadow: none !important;
 }
-#cgpt-nav button:focus-visible,
+/*#cgpt-nav button:focus-visible,*/
 #cgpt-list-panel button:focus-visible {
   outline: 2px solid rgba(0,0,0,.25);
   outline-offset: 2px;
@@ -269,8 +321,10 @@ const LIST_CSS = `
   box-shadow: none !important;
 }
 
-/* 行、無しにすると違和感あるので */
+/* 行、無しにすると違和感あるので 
 #cgpt-list-body .row { cursor: pointer; }
+*/
+
 /* 本文のみ */
 #cgpt-list-body .txt { cursor: pointer; }
 
@@ -283,9 +337,6 @@ const LIST_CSS = `
 /* リストを最新にする（ミニボタン） */
 #cgpt-list-refresh.cgtn-mini-btn{
   all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px;
-}
-#cgpt-list-refresh.cgtn-mini-btn{
-  all: unset; padding: 2px 6px; border-radius: 6px;
 }
 
 #cgpt-list-refresh.cgtn-mini-btn:hover{ background: rgba(0,0,0,.08); }
@@ -357,13 +408,6 @@ const LIST_CSS = `
   pointer-events: none;              /* ホバー中にポップに引っかからない */
 }
 .cgtn-popover[data-show="1"] { display: block; }
-
-/* 省略時「…」のトグルボタン */
-.cgtn-more {
-  border: none; background: transparent; cursor: pointer;
-  padding: 2px 6px; border-radius: 6px; font-size: 14px;
-}
-.cgtn-more:hover { background: rgba(255,255,255,.08); }
 
 /* =========================
    6) PREVIEW DOCK（常駐プレビュー）
@@ -441,18 +485,49 @@ const MISC_CSS = `
 /* =========================
    7) リスト補助（情報/色/スクロールバー）
 ========================= */
-#cgpt-list-filter{
-  display:flex;
-  gap:8px;
-  padding:6px 8px;
-  position:sticky;
-  top:34px;
-  z-index:1;
-  background:rgba(255,255,255,.85);
-  backdrop-filter:blur(4px);
-  justify-content: center;
-  align-items: center;
-}
+  #cgpt-list-filter{
+    display:flex;
+    gap:8px;
+    padding:6px 8px;
+    position:sticky;
+    top:34px;
+    z-index:1;
+    background:rgba(255,255,255,.85);
+    backdrop-filter:blur(4px);
+    justify-content: center;
+    align-items: center;
+  }
+  /* === リストフィルタ: ラベル見た目 === */
+  #cgpt-list-filter label{
+    user-select: none;
+    cursor: pointer;
+  }
+/*
+  #cgpt-list-filter label span{
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid #bbb;
+    font-size: 12px;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+*/
+
+  #cgpt-list-filter label:has(input:checked) span{
+    background:#222;
+    color:#fff;
+    border-color:#222;
+  }
+  #cgpt-list-filter label:hover span{
+    background: rgba(0,0,0,.06);
+  }
+
+  /* リストフィルタのラジオ本体は隠す（ラベルで操作） */
+  #cgpt-list-filter input[type="radio"]{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+    margin:0;
+  }
 
 #cgpt-list-foot { display:flex; align-items:center; gap:6px; }
 #cgpt-list-foot-info { margin-left:auto; }
@@ -565,19 +640,19 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
       <!-- === ユーザー === -->
       <div class="cgpt-nav-group" data-role="user">
         <div class="cgpt-nav-label" data-i18n="user"></div>
-        <button data-act="top" data-i18n="top"></button>
-        <button data-act="prev" data-i18n="prev"></button>
-        <button data-act="next" data-i18n="next"></button>
-        <button data-act="bottom" data-i18n="bottom"></button>
+        <button class="cgtn-pill-btn" data-act="top" data-i18n="top"></button>
+        <button class="cgtn-pill-btn" data-act="prev" data-i18n="prev"></button>
+        <button class="cgtn-pill-btn" data-act="next" data-i18n="next"></button>
+        <button class="cgtn-pill-btn" data-act="bottom" data-i18n="bottom"></button>
       </div>
 
       <!-- === アシスタント === -->
       <div class="cgpt-nav-group" data-role="assistant">
         <div class="cgpt-nav-label" data-i18n="assistant"></div>
-        <button data-act="top" data-i18n="top"></button>
-        <button data-act="prev" data-i18n="prev"></button>
-        <button data-act="next" data-i18n="next"></button>
-        <button data-act="bottom" data-i18n="bottom"></button>
+        <button class="cgtn-pill-btn" data-act="top" data-i18n="top"></button>
+        <button class="cgtn-pill-btn" data-act="prev" data-i18n="prev"></button>
+        <button class="cgtn-pill-btn" data-act="next" data-i18n="next"></button>
+        <button class="cgtn-pill-btn" data-act="bottom" data-i18n="bottom"></button>
       </div>
 
       <!-- === 全体ナビ + 設定 === -->
@@ -585,12 +660,12 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
         <div class="cgpt-nav-label" data-i18n="all"></div>
 
         <div class="cgpt-grid2">
-          <button data-act="top">▲</button>
-          <button data-act="bottom">▼</button>
+          <button class="cgtn-pill-btn" data-act="top">▲</button>
+          <button class="cgtn-pill-btn" data-act="bottom">▼</button>
         </div>
 
         <!-- 言語切替 -->
-        <button class="cgpt-lang-btn"></button>
+        <button class="cgtn-pill-btn cgpt-lang-btn"></button>
 
         <!-- 基準線トグル（非表示） -->
         <label class="cgpt-viz-toggle" style="display:none !important;">

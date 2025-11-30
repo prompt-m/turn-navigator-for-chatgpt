@@ -1270,11 +1270,11 @@ console.log("clearListPanelUI catch");
 
       <!-- ★ 表示切替（CSSだけで絞り込み） -->
       <div id="cgpt-list-filter" role="group" aria-label="Filter">
-        <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span></span></label>
-        <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span></span></label>
-        <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span></span></label>
+        <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span class="cgtn-pill-btn"></span></label>
+        <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span class="cgtn-pill-btn"></span></label>
+        <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span class="cgtn-pill-btn"></span></label>
         <label id="lv-lab-pin" class="cgtn-badgehost">
-          <input type="radio" name="cgtn-lv" id="lv-pin"><span></span><span class="cgtn-badge"></span>
+          <input type="radio" name="cgtn-lv" id="lv-pin"><span class="cgtn-pill-btn"></span><span class="cgtn-badge"></span>
         </label>
 
       </div>
@@ -1293,13 +1293,6 @@ console.log("clearListPanelUI catch");
     // リスト幅 文字数から算出
     CGTN_LOGIC.applyPanelWidthByChars(SH.getCFG()?.list?.maxChars || 52);
 
-    // ★ フィルタラベルに辞書を適用（ナビと同じキー）
-/*    try{
-      const T = (SH.T || SH?.t || ((k)=>k)); // プロジェクトのTヘルパに合わせて
-      listBox.querySelector('#lv-lab-user span').textContent  = T('user');
-      listBox.querySelector('#lv-lab-asst span').textContent  = T('assistant');
-      listBox.querySelector('#lv-lab-all  span').textContent  = T('all'); // ←「全体」
-    }catch{}*/
     try { applyListFilterLang(); } catch {}
     // ツールチップ用titleを登録 '25.11.23
     if (!listBox._tipsBound) {
@@ -1309,7 +1302,11 @@ console.log("clearListPanelUI catch");
         '#cgpt-list-grip'              : 'nav.drag',
         '#cgpt-list-refresh'           : 'list.refresh',
         '#cgpt-pin-all-on'             : 'list.pinAllOn',
-        '#cgpt-pin-all-off'            : 'list.pinAllOff'
+        '#cgpt-pin-all-off'            : 'list.pinAllOff',
+        '#lv-lab-all'                  : 'listFilter.all',
+        '#lv-lab-user'                 : 'listFilter.user',
+        '#lv-lab-asst'                 : 'listFilter.asst',
+        '#lv-lab-pin'                  : 'listFilter.pin'
       }, listBox);
       listBox._tipsBound = true; // ★重複登録防止
     }
@@ -1361,49 +1358,17 @@ console.log("******logic.js refreshBtn click");
         st.id = 'cgtn-idx-style';
         // 旧: align-items:flex-start だと本文と微ズレが出ることがある
         st.textContent = `
-          // --- フィルタUIの見た目 --- 
-          #cgpt-list-filter label { user-select:none; cursor:pointer; }
-          #cgpt-list-filter input { display:none; }
-          #cgpt-list-filter label span{
-            padding:3px 10px; border-radius:999px; border:1px solid #bbb; font-size:12px;
-          }
-          #cgpt-list-filter label:has(input:checked) span{
-            background:#222; color:#fff; border-color:#222;
-          }
-          // --- 絞り込み（CSSのみ）--- 
+          /* --- 絞り込み（CSSのみ）--- */
           #cgpt-list-filter:has(#lv-all:checked)    + #cgpt-list-body .row{ display:flex; }
           #cgpt-list-filter:has(#lv-user:checked)   + #cgpt-list-body .row:not([data-role="user"])      { display:none; }
           #cgpt-list-filter:has(#lv-assist:checked) + #cgpt-list-body .row:not([data-role="assistant"]) { display:none; }
           #cgpt-list-filter:has(#lv-pin:checked)    + #cgpt-list-body .row:not([data-pin="1"]) { display:none; }
           #cgpt-list-body { counter-reset: cgtn_turn; }
-          // 付箋のみ表示（ピン無し行を非表示） '25.11.28
-          // パネルに .pinonly が付いている間だけ、
-          // data-pin="1" 以外の .row が全部 display:none になる。
+          /* 付箋のみ表示（ピン無し行を非表示） '25.11.28
+           パネルに .pinonly が付いている間だけ、
+           data-pin="1" 以外の .row が全部 display:none になる。*/
           #cgpt-list-panel.pinonly #cgpt-list-body .row:not([data-pin="1"]) {
             display:none;
-          }
-          // 全行：左側に固定幅のダミーを置いて揃える（ベースライン揃え）
-          #cgpt-list-body .row{
-            display:flex;
-            align-items: baseline;   /* ←本文の1行目と番号のベースラインを揃える */
-            gap:6px;
-          }
-          #cgpt-list-body .row::before{
-            content: "";                      /* デフォは空（スペーサ） */
-            display:inline-block;
-            min-width: 2.2em;                 /* 2桁～3桁を見越してやや広めに */
-            margin-right: 8px;
-            text-align: right;
-            opacity: 0;                       /* 見えないだけで場所は確保 */
-            font-size: inherit;               /* 行の文字サイズに追従 */
-            line-height: 1.2;                 /* 微妙な上ズレを抑える */
-            //transform: translateY(1px);       /* さらに1pxだけ下げて視覚調整 */
-          }
-          // アンカー行：カウンタを進め、数字を描画 
-          #cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
-          #cgpt-list-body .turn-idx-anchor::before{
-            content: counter(cgtn_turn);
-            opacity: .75;
           }
         `;
         /* ここまで */
@@ -1956,16 +1921,19 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
           if(isAsst) downloads++; //←ダウンロードターン数
         }
 
-        row2.addEventListener('click', () => scrollToHead(art));
+//        row2.addEventListener('click', () => scrollToHead(art));
         row2.addEventListener('click', (ev) =>{
            // 他のUIパーツやリンクはスルー
           if (ev.target.closest('.cgtn-preview-btn, .cgtn-clip-pin, a')) return;
           //const txt = ev.target.closest('.txt');
           const txt = ev.target.closest('.txt, .attach'); // ★ .attach もクリックでジャンプ
-          if (!txt) return;
+          if(txt){
+              scrollToHead(art);
+          } else {
+            return;
+          }
           const row = txt.closest('.row');
           if (!row) return;
-          scrollToHead(art);
         }); 
         row2.dataset.preview = previewText || bodyLine || '';
 
