@@ -1297,11 +1297,51 @@ console.log("clearListPanelUI catch");
       </div>
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot">
-        <button id="cgpt-list-refresh" class="cgtn-mini-btn" type="button">↻</button>
-        <!-- ★ 付箋 全ON/全OFF -->
-        <button id="cgpt-pin-all-on"  class="cgtn-mini-btn" type="button">◎</button>
-        <button id="cgpt-pin-all-off" class="cgtn-mini-btn" type="button">×</button>
-        <div id="cgpt-list-foot-info" style="margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;"></div>
+        <button id="cgpt-list-refresh" class="cgtn-mini-btn" type="button"
+                title="${T('list.refresh')}" aria-label="${T('list.refresh')}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 8a7 7 0 0 1 11.5-2.5"
+                  fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round" />
+            <path d="M17 3.5v4.2h-4.2"
+                  fill="none" stroke="#111" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M18 16a7 7 0 0 1-11.5 2.5"
+                  fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+
+        <!-- ★ 付箋 全ON -->
+        <button id="cgpt-pin-all-on" class="cgtn-mini-btn" type="button"
+                title="${T('list.pinAllOn')}" aria-label="${T('list.pinAllOn')}">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <text x="16" y="11"
+                  text-anchor="middle"
+                  font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                  font-size="10" font-weight="700" fill="#000">
+              ALL
+            </text>
+            <path d="M10 12h12v14l-6-4.8L10 26z"
+                  fill="#ff3a30" stroke="#111" stroke-width="1.6" stroke-linejoin="miter" />
+          </svg>
+        </button>
+
+        <!-- ★ 付箋 全OFF -->
+        <button id="cgpt-pin-all-off" class="cgtn-mini-btn" type="button"
+                title="${T('list.pinAllOff')}" aria-label="${T('list.pinAllOff')}">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <text x="16" y="11"
+                  text-anchor="middle"
+                  font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                  font-size="10" font-weight="700" fill="#000">
+              ALL
+            </text>
+            <path d="M10 12h12v14l-6-4.8L10 26z"
+                  fill="none" stroke="#111" stroke-width="1.6" stroke-linejoin="miter" />
+          </svg>
+        </button>
+
+        <div id="cgpt-list-foot-info"
+             style="margin-left:auto;opacity:.8;font-size:12px;padding:4px 8px;"></div>
       </div>
     `;
 

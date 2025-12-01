@@ -236,10 +236,9 @@ const LIST_CSS = `
 
 #cgpt-list-body .row { 
   display:flex;
-//  align-items:flex-start;
   align-items:stretch; 
   gap:6px; 
-  line-height:1.4;         /* 本文のline-heightと合わせる */
+  line-height:1.7;         /* 本文のline-heightと合わせる */
 }
 #cgpt-list-body .row::before{
   content: "";
@@ -350,12 +349,34 @@ const LIST_CSS = `
 /* 付箋クリック領域の専用カーソル（ON=赤 / OFF=赤） */
 #cgpt-list-body .cgtn-clip-pin {cursor:url("${pinCurURL}"), pointer; }
 
-/* リストを最新にする（ミニボタン） */
+/* リストを最新にする（ミニボタン） 
 #cgpt-list-refresh.cgtn-mini-btn{
   all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px;
 }
-
 #cgpt-list-refresh.cgtn-mini-btn:hover{ background: rgba(0,0,0,.08); }
+*/
+.cgtn-mini-btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+  border-radius:999px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  padding:0;
+}
+
+.cgtn-mini-btn svg {
+  width:16px;
+  height:16px;
+}
+
+/* ホバーで薄いグレー丸（既存リロードと同じ感じに） */
+.cgtn-mini-btn:hover {
+  background:rgba(0,0,0,.06);
+}
 
 /* リストパネル内の行（ライト読みやすさ重視） */
 #cgpt-list-panel .row{ background: #fafafa; color: #0b0d12; }
