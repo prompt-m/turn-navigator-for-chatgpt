@@ -654,11 +654,28 @@ console.log("scrollListToTurn*6 top",top);
     if (!clip) return;
 
     const on = !!pinned;
+
+    clip.setAttribute('aria-pressed', String(on));
+    clip.classList.toggle('off', !on);
+    clip.classList.toggle('on',  on);
+
+    // ★ ここでテキスト絵文字ではなく SVG を入れる
+    if (!clip.querySelector('svg.cgtn-pin-svg')) {
+      clip.innerHTML = PIN_ICON_SVG;
+    }
+  }
+
+/*
+  function paintPinRow(row, pinned){
+    const clip = row.querySelector('.cgtn-clip-pin');
+    if (!clip) return;
+
+    const on = !!pinned;
     clip.setAttribute('aria-pressed', String(on));
     clip.classList.toggle('off', !on);
     clip.textContent = '🔖\uFE0E';
   }
-
+*/
   // === 付箋ボタン（🔖）のイベント委譲版 === '25.11.27
   function bindDelegatedClipPinHandler(){
     const body = document.getElementById('cgpt-list-body');
@@ -1682,6 +1699,16 @@ console.log("******logic.js 畳む開く click");
     btn.addEventListener('click',        handler, {passive:true});
   }
 
+  // === list icons (inline SVG) === '25.12.1
+  const PIN_ICON_SVG = (
+    '<svg class="cgtn-pin-svg" viewBox="0 0 24 24" ' +
+    '     aria-hidden="true" focusable="false">' +
+    '  <path d="M7 3h10a1 1 0 0 1 1 1v16l-6-4-6 4V4a1 1 0 0 1 1-1z"' +
+    '        fill="none" stroke="currentColor" stroke-width="1.9"' +
+    '        stroke-linejoin="round"/>' +
+    '</svg>'
+  );
+
   let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
 //console.log('[renderList 冒頭]');
@@ -1837,7 +1864,22 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         if (isUser) row.classList.add('user-turn');
         if (isAsst) row.classList.add('asst-turn');
 
-        // 本文行テンプレート
+        // 本文行テンプレート '25.12.1 変更
+        row.innerHTML = `
+          <div class="txt"></div>
+          <div class="ops">
+            <button class="cgtn-clip-pin cgtn-iconbtn off"
+                    title="${T('row.pin')}"
+                    aria-pressed="false"
+                    aria-label="${T('row.pin')}">
+              ${PIN_ICON_SVG}
+            </button>
+            <button class="cgtn-preview-btn cgtn-iconbtn"
+                    title="${T('row.previewBtn')}"
+                    aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
+          </div>
+        `;
+/*
         row.innerHTML = `
           <div class="txt"></div>
           <div class="ops">
@@ -1845,6 +1887,7 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
             <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
           </div>
         `;
+*/
         row.querySelector('.txt').textContent = attachLine;
         //row.addEventListener('click', () => scrollToHead(art));
         row.addEventListener('click', (ev) =>{
@@ -1901,11 +1944,21 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         if (isAsst) row2.classList.add('asst-turn');
 
         // 本文行テンプレート（★右側に attach 表示欄あり）
+
         row2.innerHTML = `
           <div class="txt"></div><span class="attach" aria-label="attachment"></span>
           <div class="ops">
-            ${showClipOnBody ? `<button class="cgtn-clip-pin cgtn-iconbtn off" title="${T('row.pin')}" aria-pressed ="false" aria-label="${T('row.pin')}" >🔖\uFE0E</button>` : ``}
-            <button class="cgtn-preview-btn cgtn-iconbtn" title="${T('row.previewBtn')}" aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
+            ${showClipOnBody ? `
+              <button class="cgtn-clip-pin cgtn-iconbtn off"
+                      title="${T('row.pin')}"
+                      aria-pressed="false"
+                      aria-label="${T('row.pin')}">
+                ${PIN_ICON_SVG}
+              </button>
+            ` : ``}
+            <button class="cgtn-preview-btn cgtn-iconbtn"
+                    title="${T('row.previewBtn')}"
+                    aria-label="${T('row.previewBtn')}">🔎\uFE0E</button>
           </div>
         `;
 

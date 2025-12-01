@@ -116,50 +116,32 @@ const NAV_CSS = `
 }
 .cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{ cursor:pointer; opacity:.9 }
 
-/* --- 設定ボタン（ナビ内）--- */
+/* --- 設定ボタン（ナビ内：枠なし・中央寄せ） --- */
 #cgtn-open-settings.cgtn-open-settings{
-  /* ChatGPT 側のデフォルトを一旦リセット */
-  all: unset;
-
-  box-sizing: border-box;
-  font: inherit;
-  font-size: 14px;
-  color: var(--fg, #202124) !important;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;                       /* まるボタン */
-  border: 1px solid var(--bd, rgba(0,0,0,.12));
-  background: #fff;
-
-  box-shadow: 0 4px 14px rgba(0,0,0,.12);     /* ナビボタンと同系の立体感 */
+  all: unset;                              /* ブラウザ標準のボタン装飾を全部消す */
   cursor: pointer;
+/*  font: 16px/1 system-ui,-apple-system,sans-serif;*/
+  color: #666;                             /* 通常時のギア色 */
 
+  padding: 4px;                            /* クリックしやすいように少しだけヒットエリアを広げる */
+  border-radius: 999px;                    /* hover で背景を付けるときのための丸形 */
+
+  align-self: center;                      /* ナビパネル内で中央寄せ */
   transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease,
     transform 0.10s ease;
 }
 
-/* ホバー：少しだけ濃く＆影強め */
 #cgtn-open-settings.cgtn-open-settings:hover{
-  background: color-mix(in srgb, #fff 70%, var(--bd, rgba(0,0,0,.3)) 30%);
-  box-shadow: 0 5px 16px rgba(0,0,0,.18);
-  transform: translateY(-1px);
+  color: #111;                             /* 文字色だけ少し濃く */
+  background-color: rgba(0,0,0,.04);      /* うっすら丸いハイライト（完全に消したければ行ごと削除） */
+  transform: translateY(-1px);            /* 軽く浮かせる */
 }
 
-/* 押下中：沈み込む感じ */
 #cgtn-open-settings.cgtn-open-settings:active{
-  transform: translateY(0);
-  box-shadow:
-    0 2px 6px rgba(0,0,0,.2) inset,
-    0 2px 6px rgba(0,0,0,.10);
+  transform: translateY(0);               /* クリック時は元の位置に戻す */
 }
-
 /* ダークモード調整 */
 @media (prefers-color-scheme: dark){
   #cgtn-open-settings.cgtn-open-settings{
@@ -270,6 +252,18 @@ const LIST_CSS = `
   line-height:inherit;      /* 本文行に合わせる */
   vertical-align:middle;    /* ベースラインずれ対策 */
 }
+/* 行の右端のアイコン列（付箋 + プレビュー） */
+#cgpt-list-body .ops{
+  display:flex;
+  flex-direction: row;   /* ★ 横並びに戻す */
+  align-items: center;   /* ★ アイコン同士を縦中央揃え */
+  justify-content: flex-end;
+  gap:4px;
+}
+/* .row の中で .ops 自体を縦中央にする */
+#cgpt-list-body .row .ops{
+  align-self: center;    /* ★ 行全体の高さの中で中央寄せ */
+}
 #cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
 #cgpt-list-body .turn-idx-anchor::before{
   content: counter(cgtn_turn);
@@ -369,7 +363,9 @@ const LIST_CSS = `
 /*#cgpt-list-panel .row:hover{ background:#f2f5f8; }//要修正　緑系*/
 #cgpt-list-panel .row.user-turn:hover  { background: #D9E2EB; }
 #cgpt-list-panel .row.asst-turn:hover  { background: #DDFFF0; }
-
+#cgpt-list-panel .cgtn-iconbtn svg {
+  vertical-align: middle;
+}
 
 #cgpt-chat-title {
   max-width:100%;
@@ -622,6 +618,27 @@ const PREVIEW_CSS = `
 /* ---------- Preview window ---------- */
 #cgpt-preview{ border-radius:var(--cgtn-radius); }
 #cgpt-preview .header .cgtn-iconbtn{ /* 共通ボタン */ }
+
+/* 一覧パネルのアイコンボタン共通 */
+#cgpt-list-panel .cgtn-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* 付箋ボタン用 SVG 調整 */
+#cgpt-list-panel .cgtn-clip-pin svg.cgtn-pin-svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+#cgpt-list-panel .cgtn-clip-pin.off  { color: #888; }
+#cgpt-list-panel .cgtn-clip-pin.on   { color: #ff9500; } /* 好きな黄色系に */
+#cgpt-list-panel .cgtn-clip-pin:hover { color: #ffb84d; }
 
 `;
 
