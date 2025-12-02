@@ -610,6 +610,7 @@ console.log("scrollListToTurn*6 top",top);
     const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
     return PINS.has(String(k));
   }
+/*
   function togglePin(artOrKey){
     const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
     // 戻り値は次状態（true/false）
@@ -620,6 +621,7 @@ console.log("scrollListToTurn*6 top",top);
     _savePinsSet(s);
     return next;
   }
+*/
   function setPinned(artOrKey, val){
     const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
     const s = new Set(PINS);
@@ -659,7 +661,7 @@ console.log("scrollListToTurn*6 top",top);
     clip.classList.toggle('off', !on);
     clip.classList.toggle('on',  on);
 
-    // ★ ここでテキスト絵文字ではなく SVG を入れる
+    // SVG が入っていない時だけ差し込む（毎回 innerHTML しない）
     if (!clip.querySelector('svg.cgtn-pin-svg')) {
       clip.innerHTML = PIN_ICON_SVG;
     }
@@ -671,9 +673,15 @@ console.log("scrollListToTurn*6 top",top);
     if (!clip) return;
 
     const on = !!pinned;
+
     clip.setAttribute('aria-pressed', String(on));
     clip.classList.toggle('off', !on);
-    clip.textContent = '🔖\uFE0E';
+    clip.classList.toggle('on',  on);
+
+    // ★ ここでテキスト絵文字ではなく SVG を入れる
+    if (!clip.querySelector('svg.cgtn-pin-svg')) {
+      clip.innerHTML = PIN_ICON_SVG;
+    }
   }
 */
   // === 付箋ボタン（🔖）のイベント委譲版 === '25.11.27
@@ -1207,8 +1215,8 @@ console.log("clearListPanelUI el.textContent:",el.textContent);
       }
       // バッジの場所を変更 '25.11.28
       const host  = document.getElementById('lv-lab-pin');
-      const badge = host?.querySelector('.cgtn-badge');
-      if (badge) { badge.textContent = ''; badge.hidden = true; }
+//      const badge = host?.querySelector('.cgtn-badge');
+//      if (badge) { badge.textContent = ''; badge.hidden = true; }
       if (host) {
         host.removeAttribute('aria-pressed');
         host.classList.remove('active');
@@ -1576,49 +1584,6 @@ console.log("******logic.js refreshBtn click");
     })();
     // enableDrag ここまで
 
-/*
-    // つまみ横の付箋のみ（1クリック目から確実に反映）
-    (function bindPinFilter(){
-      const btn = listBox.querySelector('#cgpt-pin-filter');
-      if (!btn || btn._cgtnBound) return;
-      btn._cgtnBound = true;
-      btn.addEventListener('click', (ev)=>{
-        ev.stopPropagation();
-        const cur = SH.getCFG() || {};
-
-console.log("*****付箋のみクリック cgpt-pin-filter click ev.altkey",ev.altkey);
-
-        // Alt+クリックはテーマ切替（任意運用）
-        if (ev.altKey){
-console.log("*****bindPinFilter Alt+クリック click");
-          const nextTheme = (cur.list?.pinTheme === 'gold') ? 'red' : 'gold';
-          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinTheme: nextTheme } });
-          applyPinTheme?.();
-          return;
-        }
-
-        // 付箋のみONOFF pinOnlyトグル → 即時反映
-        const next = !cur.list?.pinOnly;
-console.debug('******付箋のみ通常クリック next=%s', next);
-        SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly: next } });
-
-        btn.setAttribute('aria-pressed', String(next));
-        const pinOnlyChk = document.getElementById('cgpt-pinonly');
-        if (pinOnlyChk) pinOnlyChk.checked = next;
-
-        // 付箋バッジ / フッターを即時更新（DOM 再構築はしない） '25.11.27
-        try { NS.updatePinOnlyBadge?.(); } catch {}
-        // pinOnly DOMフィルタ（renderList禁止版） '25.11.27
-        try { NS.updatePinOnlyBadge?.(); } catch {}
-        try { NS.updateListFooterInfo?.(); } catch {}
-        // ★ オーバーライドで1クリック目から絞込み／解除を確定
-        //NS.renderList(true, { pinOnlyOverride: next });
-
-      }, {passive:true});
-    })();
-    // bindPinFilter ここまで
-*/
-
     // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
     (function bindRoleFilter(panel){
       const box = panel.querySelector('#cgpt-list-filter');
@@ -1680,12 +1645,8 @@ console.log("******logic.js 畳む開く click");
       const st = document.createElement('style');
       st.id = 'cgtn-pinonly-style';
       st.textContent = `
-//        #cgpt-pin-filter[aria-pressed="true"]{
-//          color: #e60033 !important;
-//        }
         /* 付箋モードONのとき、ラベル文字を強調 */
         #lv-lab-pin.active > span:first-of-type{
-          color:#e60033 !important;
           font-weight:600;
         }
       `;
@@ -2215,6 +2176,56 @@ console.debug('[setListEnabled*4]一覧OFF');
   }
   NS.updatePinOnlyView = updatePinOnlyView;
 
+  // === 付箋バッジ更新（唯一の正規処理）=== '25.12.2
+  function updatePinOnlyBadge(){
+    console.debug('[*****updatePinOnlyBadge]');
+    try {
+      const cfg = SH.getCFG?.() || {};
+      const cid = SH.getChatId?.();
+      if (!cid) return;
+
+      // ★ 付箋数は Shared のヘルパーに丸投げ
+      const pinsCount =
+        typeof SH.getPinsCountByChat === 'function'
+          ? SH.getPinsCountByChat(cid)
+          : 0;
+
+      NS.pinsCount = pinsCount;
+
+      // 付箋ボタン（label）とバッジを取得
+      const btn   = document.getElementById('lv-lab-pin');
+      const badge = btn?.querySelector('.cgtn-badge');
+
+      console.log('[*****updatePinOnlyBadge] pinsCount:', pinsCount,
+                  ' btn:', btn, ' badge:', badge);
+
+      if (!btn || !badge) {
+        console.log('[*****updatePinOnlyBadge] return (no btn/badge)');
+        return;
+      }
+
+      // --- バッジ表示制御 ---
+      if (pinsCount > 0) {
+        badge.textContent = String(pinsCount);
+        badge.hidden = false;
+        // 色は CSS で固定するのでここでは触らない
+      } else {
+        badge.textContent = '';
+        badge.hidden = true;
+      }
+
+      // --- ボタンの「選択中」状態 ---
+      const pinOnly = !!cfg.list?.pinOnly;
+      btn.classList.toggle('active', pinOnly);
+  
+    } catch (e){
+      console.warn('updatePinOnlyBadge failed', e);
+    }
+  }
+
+  NS.updatePinOnlyBadge = updatePinOnlyBadge;
+
+/*
   // Pinバッジ更新　'25.11.27
   function updatePinOnlyBadge(){
     console.debug('[*****updatePinOnlyBadge]');
@@ -2264,61 +2275,7 @@ console.debug('[setListEnabled*4]一覧OFF');
     // 一括ボタンの状態同期
     try { updateBulkPinButtonsState(); } catch{}
   }
-
-/*
-  function updatePinOnlyBadge(){
-console.debug('[*****updatePinOnlyBadge]');
-
-    try {
-      const btn = document.getElementById('cgpt-pin-filter');
-      if (!btn) return;
-      const badge = btn?.querySelector('.cgtn-badge');
-      if (!badge) return;
-
-      if ((CGTN_LOGIC.ST?.all?.length ?? 0) === 0) {
-        badge.hidden = true;
-        badge.textContent='';
-        return; 
-      }
-
-      // ★ articleゼロ件なら非表示
-      const turns = window.CGTN_LOGIC?.ST?.all?.length ?? 0;
-      if (turns === 0) {
-        badge.hidden = true;
-        badge.textContent = '';
-        return;
-      }
-
-      const cid = SH.getChatId?.();
-      const count = cid ? SH.getPinsCountByChat?.(cid) : 0;
-
-      // 表示制御
-      if (count > 0) {
-//        badge.textContent = count > 99 ? '99+' : count;
-        badge.textContent = count;       // ここはミキの元コードのまま温存
-        badge.hidden = false;
-      } else {
-        badge.hidden = true;
-      }
-
-      // 付箋ON/OFFモードの視覚強調（既存クラス利用）
-      const cfg = SH.getCFG?.() || {};
-      const pinOnly = !!cfg.list?.pinOnly;
-
-      // ★ CSS で使う pinOnly 状態
-      btn.setAttribute('aria-pressed', String(pinOnly));
-console.debug('[*****updatePinOnlyBadge]　aria-pressed:',String(pinOnly));
-      btn.classList.toggle('active', pinOnly);
-
-    } catch (e) {
-      console.warn('[updatePinOnlyBadge]', e);
-    }
-
-    // ★ 付箋モード変更時に一括ボタンの状態も更新 '25.11.23
-    try { updateBulkPinButtonsState(); } catch{}
-  }
 */
-
   // ★ 全ON/全OFFボタンの活性/非活性制御 '25.11.23
   function updateBulkPinButtonsState(){
     try{
@@ -2526,155 +2483,6 @@ console.log("**clearListFooterInfo ");
     try { NS.updateBulkPinButtonsState?.(); } catch {}
   }
 
-/*
-  function updateListFooterInfo(){
-    const foot = document.getElementById('cgpt-list-foot-info');
-    if (!foot) return;
-
-    const ST = NS?.ST || {};
-    const allTurns   = Array.isArray(ST.all)       ? ST.all.length       : 0;
-    const userTurns  = Array.isArray(ST.user)      ? ST.user.length      : 0;
-    const asstTurns  = Array.isArray(ST.assistant) ? ST.assistant.length : 0;
-
-    // 0件：メッセージのみ（リフレッシュボタンは別要素なので残る）
-    if (!allTurns){
-      foot.dataset.state = 'empty';
-      foot.textContent = T('list.empty') || 'リストはありません';
-      return;
-    }
-
-    // 設定（pinOnly）
-    const cfg     = window.CGTN_SHARED?.getCFG?.() || {};
-    const pinOnly = !!cfg.list?.pinOnly;
-
-    // ---- 集計値の取得（renderList が詰めた NS.metrics を使う） ----
-    const m   = NS.metrics || {};
-    const box = pinOnly ? (m.pins || {}) : (m.all || {});
-    let uploads   = (typeof box.uploads   === 'number') ? box.uploads   : Number(NS?.uploads   || 0);
-    let downloads = (typeof box.downloads === 'number') ? box.downloads : Number(NS?.downloads || 0);
-
-    // ---- 現在のロール（全体 / ユーザー / アシスタント） ----
-    let role = NS?.viewRole || 'all';
-console.log("★★★ updateListFooterInfo role:",role);
-
-    try {
-      const filterBox = document.getElementById('cgpt-list-filter');
-      const checked   = filterBox?.querySelector('input[name="cgtn-lv"]:checked');
-      if (checked){
-        if (checked.id === 'lv-user')      role = 'user';
-        else if (checked.id === 'lv-assist') role = 'assistant';
-        else                                role = 'all';
-      }
-    } catch(e){
-      console.warn('[updateListFooterInfo] role detection failed', e);
-    }
-    NS.viewRole = role;
-
-    // ---- DOM から「ロール別 / 付箋別」の件数を数える ----
-    let visibleForRole = 0;   // ロール条件だけ満たす可視ターン数（pinOnly=OFF のときに使う）
-    let pinsForRole    = 0;   // ロール条件＋付箋あり のターン数（pinOnly=ON の分子）
-
-    try {
-      const body = document.getElementById('cgpt-list-body');
-      if (body){
-        const anchors = body.querySelectorAll('.turn-idx-anchor');
-        anchors.forEach(el => {
-          const row = el.closest('.row');
-          if (!row) return;
-          if (row.offsetParent === null) return;  // 非表示行は除外
-
-          const r     = row.getAttribute('data-role');   // user / assistant
-          const isPin = row.getAttribute('data-pin') === '1';
-
-          const roleMatch =
-            (role === 'all') ||
-            (role === 'user'      && r === 'user') ||
-            (role === 'assistant' && r === 'assistant');
-
-          if (!roleMatch) {
-            console.log(" skip: role mismatch", idx1, "→ need:", role, "have:", r);
-            return;
-          }
-          visibleForRole++;
-          if (isPin) pinsForRole++;
-        });
-      }
-    } catch(e){
-      console.warn('[updateListFooterInfo] visible count failed', e);
-    }
-
-    // ---- 会話数（分母）の決め方 ----
-    const totalByRole = {
-      all:       allTurns,
-      user:      userTurns,
-      assistant: asstTurns
-    };
-
-    let totalDisplay;
-    let countDisplay;
-
-    if (pinOnly){
-      // 付箋のみ表示：
-      //   分母 = ロール別の総ターン数（全体 / user / assistant）
-      //   分子 = 付箋付きターン数（ロール条件も適用）
-      totalDisplay = totalByRole[role] || allTurns;
-      if (totalDisplay <= 0) totalDisplay = allTurns;  // 念のためのフォールバック
-      countDisplay = pinsForRole;
-    } else {
-      // ★ 全体/ユーザー/アシスタント表示用
-      const tpl = T('list.footer.all') || '{total}';
-
-      // 分母は「全体のターン数」
-      const denom = totalByRole.all || allTurns || 0;
-
-      let mainText;
-      if (role === 'all' || !denom) {
-        // 全体表示 → 分母だけ（例: 6）
-        mainText = String(denom);
-      } else {
-        // ユーザー/アシスタント → 分子/分母（例: 3/6）
-        const num = countDisplay || 0;
-        mainText = `${num}/${denom}`;
-      }
-
-      foot.textContent = tpl
-        .replace('{count}',     String(countDisplay))
-        // ★ {total} に「6」または「3/6」を流し込む
-        .replace('{total}',     mainText)
-        .replace('{uploads}',   String(uploads))
-        .replace('{downloads}', String(downloads));
-    }
-
-    // ---- uploads / downloads をロールに合わせて整形 ----
-    // 「ユーザー＝アップロード」「アシスタント＝ダウンロード」とみなす
-    if (role === 'user') {
-      downloads = 0;
-    } else if (role === 'assistant') {
-      uploads = 0;
-    }
-
-    // ---- テンプレート適用 ----
-    foot.dataset.state = 'normal';
-
-    if (pinOnly){
-      const tpl = T('list.footer.pinOnly') || '{count}/{total}';
-      foot.textContent = tpl
-        .replace('{count}',     String(countDisplay))  // 付箋付きターン数（分子）
-        .replace('{total}',     String(totalDisplay))  // ロール別総ターン数（分母）
-        .replace('{uploads}',   String(uploads))
-        .replace('{downloads}', String(downloads));
-    } else {
-      const tpl = T('list.footer.all') || '{total}';
-      foot.textContent = tpl
-        .replace('{count}',     String(countDisplay))  // （テンプレ未使用だが一応埋める）
-        .replace('{total}',     String(totalDisplay))  // 現在ロールでの可視ターン数
-        .replace('{uploads}',   String(uploads))
-        .replace('{downloads}', String(downloads));
-    }
-    // ★ フッター更新タイミングでボタン状態も同期 '25.11.23
-    try { NS.updateBulkPinButtonsState?.(); } catch{}
-  }
-*/
   NS.updateListFooterInfo = updateListFooterInfo;
 
 

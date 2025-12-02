@@ -541,22 +541,13 @@ const MISC_CSS = `
     user-select: none;
     cursor: pointer;
   }
-/*
-  #cgpt-list-filter label span{
-    padding: 3px 10px;
-    border-radius: 999px;
-    border: 1px solid #bbb;
-    font-size: 12px;
-    transition: background .15s ease, color .15s ease, border-color .15s ease;
-  }
-*/
 
-  #cgpt-list-filter label:has(input:checked) span{
+  #cgpt-list-filter label:has(input:checked) .cgtn-pill-btn{
     background:#222;
     color:#fff;
     border-color:#222;
   }
-  #cgpt-list-filter label:hover span{
+  #cgpt-list-filter label:hover .cgtn-pill-btn{
     background: rgba(0,0,0,.06);
   }
 
