@@ -369,8 +369,8 @@ const LIST_CSS = `
 }
 
 .cgtn-mini-btn svg {
-  width:16px;
-  height:16px;
+  width:20px;
+  height:20px;
 }
 
 /* ホバーで薄いグレー丸（既存リロードと同じ感じに） */
@@ -568,7 +568,7 @@ const MISC_CSS = `
     margin:0;
   }
 
-#cgpt-list-foot { display:flex; align-items:center; gap:6px; }
+#cgpt-list-foot { display:flex; align-items:center; gap:2px; }
 #cgpt-list-foot-info { margin-left:auto; }
 
 /* トグルラベルの文字色を黒固定 */
@@ -603,11 +603,6 @@ const MISC_CSS = `
   line-height: 1;
 } 
 
-/* 色だけ上書きする既存ルールはそのまま残す 
-.cgtn-badge {
-  background: #0a84ff;
-}
-*/
 /* スクロールバー（WebKit系） */
 .cgtn-dock-body::-webkit-scrollbar,
 #cgpt-list-body::-webkit-scrollbar{ width: 10px; }
@@ -648,7 +643,36 @@ const PREVIEW_CSS = `
   padding: 0;
 }
 
-/* 付箋ボタン用 SVG 調整 */
+/* ボタン自体の基本色 */
+#cgpt-list-body .cgtn-clip-pin{
+  color:#444;
+}
+
+/* 未ピン時はちょっと薄くする（既存の .off があればそれで OK） */
+#cgpt-list-body .cgtn-clip-pin.off{
+  opacity:.45;
+}
+
+/* SVG のサイズと線の太さ */
+#cgpt-list-body .cgtn-clip-pin svg.cgtn-pin-svg{
+  width:16px;
+  height:16px;
+  display:block;
+  stroke:currentColor;
+  fill:none;
+}
+
+/* ピン ON 時：ボタン色を赤にし、中身も塗りつぶす */
+#cgpt-list-body .cgtn-clip-pin.on{
+  color:#e53935;        /* 好きな赤に調整してOK */
+}
+
+#cgpt-list-body .cgtn-clip-pin.on svg.cgtn-pin-svg{
+  fill:currentColor;
+}
+
+
+/* 付箋ボタン用 SVG 調整
 #cgpt-list-panel .cgtn-clip-pin svg.cgtn-pin-svg {
   width: 16px;
   height: 16px;
@@ -658,9 +682,9 @@ const PREVIEW_CSS = `
 }
 
 #cgpt-list-panel .cgtn-clip-pin.off  { color: #888; }
-#cgpt-list-panel .cgtn-clip-pin.on   { color: #ff9500; } /* 好きな黄色系に */
+#cgpt-list-panel .cgtn-clip-pin.on   { color: #ff9500; }
 #cgpt-list-panel .cgtn-clip-pin:hover { color: #ffb84d; }
-
+*/
 `;
 
 /* ここで一括注入（順序固定） */

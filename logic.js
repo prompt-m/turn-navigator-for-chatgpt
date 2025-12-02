@@ -1297,46 +1297,73 @@ console.log("clearListPanelUI catch");
       </div>
       <div id="cgpt-list-body"></div>
       <div id="cgpt-list-foot">
+        <!-- ★ 最新にする -->
         <button id="cgpt-list-refresh" class="cgtn-mini-btn" type="button"
                 title="${T('list.refresh')}" aria-label="${T('list.refresh')}">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 8a7 7 0 0 1 11.5-2.5"
-                  fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round" />
-            <path d="M17 3.5v4.2h-4.2"
-                  fill="none" stroke="#111" stroke-width="1.6"
-                  stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M18 16a7 7 0 0 1-11.5 2.5"
-                  fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round" />
+            <!-- 円弧：320°、中央ぴったり -->
+            <circle
+              cx="12" cy="12" r="7.5"
+              fill="none"
+              stroke="#111827"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-dasharray="40 7"
+              transform="rotate(-50 12 12)"
+            />
+
+            <!-- 先端の矢印（三角形） -->
+            <g transform="translate(-1,1)">
+            <path
+              d="M16.5 3.6 L21.2 5.4 L17.4 9.4 Z"
+              fill="#111827"
+            />
+            </g>
+
           </svg>
         </button>
 
         <!-- ★ 付箋 全ON -->
         <button id="cgpt-pin-all-on" class="cgtn-mini-btn" type="button"
                 title="${T('list.pinAllOn')}" aria-label="${T('list.pinAllOn')}">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
+          <svg class="cgtn-all-pin-on" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <g transform="translate(0,3)">
+            <!-- ALL の文字：真ん中寄せ、太め -->
             <text x="16" y="11"
                   text-anchor="middle"
-                  font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-                  font-size="10" font-weight="700" fill="#000">
+                  font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+                  font-size="20" font-weight="700">
               ALL
             </text>
-            <path d="M10 12h12v14l-6-4.8L10 26z"
-                  fill="#ff3a30" stroke="#111" stroke-width="1.6" stroke-linejoin="miter" />
+
+            <!-- ブックマーク本体（ちょっと縦長） -->
+            <path d="M9 13.5C9 12.6716 9.6716 12 10.5 12H21.5C22.3284 12 23 12.6716 23 13.5V29L16 21.5L9 29Z"
+                  fill="#ff3b30"
+                  stroke="#111827"
+                  stroke-width="1.4"
+                  stroke-linejoin="round"/>
+            </g>
           </svg>
         </button>
 
         <!-- ★ 付箋 全OFF -->
         <button id="cgpt-pin-all-off" class="cgtn-mini-btn" type="button"
                 title="${T('list.pinAllOff')}" aria-label="${T('list.pinAllOff')}">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
+          <svg class="cgtn-all-pin-off" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <g transform="translate(0,3)">
             <text x="16" y="11"
                   text-anchor="middle"
-                  font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-                  font-size="10" font-weight="700" fill="#000">
+                  font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+                  font-size="20" font-weight="700">
               ALL
             </text>
-            <path d="M10 12h12v14l-6-4.8L10 26z"
-                  fill="none" stroke="#111" stroke-width="1.6" stroke-linejoin="miter" />
+
+            <path d="M9 13.5C9 12.6716 9.6716 12 10.5 12H21.5C22.3284 12 23 12.6716 23 13.5V29L16 21.5L9 29Z"
+                  fill="none"
+                  stroke="#111827"
+                  stroke-width="1.4"
+                  stroke-linejoin="round"/>
+          </g>
           </svg>
         </button>
 
@@ -1739,6 +1766,7 @@ console.log("******logic.js 畳む開く click");
     btn.addEventListener('click',        handler, {passive:true});
   }
 
+/*
   // === list icons (inline SVG) === '25.12.1
   const PIN_ICON_SVG = (
     '<svg class="cgtn-pin-svg" viewBox="0 0 24 24" ' +
@@ -1748,6 +1776,13 @@ console.log("******logic.js 畳む開く click");
     '        stroke-linejoin="round"/>' +
     '</svg>'
   );
+*/
+  // ★ 付箋ボタン用アイコン（アウトラインだけ／色は currentColor で制御）'25.12.2
+  const PIN_ICON_SVG =
+    '<svg class="cgtn-pin-svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">' +
+      '<path d="M4 2.75C4 2.33579 4.33579 2 4.75 2H11.25C11.6642 2 12 2.33579 12 2.75V12.5L8 10L4 12.5Z"' +
+        ' stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' +
+    '</svg>';
 
   let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
