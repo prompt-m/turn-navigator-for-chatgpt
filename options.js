@@ -284,6 +284,7 @@ console.log("renderPinsManager*2 all:",all);
 console.log("renderPinsManager*2.1 cfg:",cfg);
     const map = {};
 
+/*
     for (const [key, val] of Object.entries(all)) {
       if (!key.startsWith('cgtnPins::')) continue;
       const chatId  = key.slice('cgtnPins::'.length);
@@ -306,6 +307,47 @@ console.log("renderPinsManager*2.1 cfg:",cfg);
       const updated = val.updatedAt || live.updated || null;
 
       map[chatId] = { pins: pinsArr, title, updatedAt: updated };
+    }
+*/
+
+    for (const [key, val] of Object.entries(all)) {
+      if (!key.startsWith('cgtnPins::')) continue;
+
+      const chatId  = key.slice('cgtnPins::'.length);
+      const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
+
+      // ★ 実際の付箋数（1が立っている数）
+      const pinsCount = pinsArr.filter(Boolean).length;
+
+      // ★ pins 配列はあるが 1 が一つも無い = 付箋 0 件
+      //   → 設定画面に出さず、ストレージからも削除しておく
+      if (pinsCount === 0) {
+        try {
+          // 新方式のマップからも削除
+          await SH.deletePinsForChatAsync?.(chatId);
+        } catch (e) {
+          console.warn('[renderPinsManager] cleanup zero pins failed', chatId, e);
+        }
+        continue; // 一覧にも出さない
+      }
+
+      // ① 付箋データに保存されたタイトルを最優先
+      const savedTitle = (val.title || '').trim();
+
+      // ② インデックス（chatIndex.ids/map）にも同じCIDがあれば補完
+      const live = (cfg.chatIndex?.ids?.[chatId] || cfg.chatIndex?.map?.[chatId]) || {};
+      const proj = (live.project || live.folder || live.group || '').trim();
+      const idxTitle = (live.title || '').trim();
+
+      // ③ 優先度：savedTitle > idxTitle > fallback(CID)
+      let title = savedTitle || idxTitle || chatId;
+      if (proj) title = `[${proj}] ${title}`;
+
+      map[chatId] = {
+        pins: pinsArr,
+        title,
+        updatedAt: val.updatedAt || null
+      };
     }
 
 console.log("renderPinsManager*3 map:",map);
