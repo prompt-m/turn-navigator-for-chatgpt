@@ -1,97 +1,314 @@
 # ChatGPT Turn Navigator
-
 *(English version first / 日本語は下にあります)*
 
----
 
-## 🚀 English
+# 🇺🇸 English Version
 
-### Overview  
-**ChatGPT Turn Navigator** is a Chrome extension that adds a navigation panel and hotkeys to the ChatGPT interface.  
-You can jump between user and assistant messages, scroll smoothly to the top or bottom, switch target roles, and drag the panel to save its position.  
+ChatGPT Turn Navigator is a Chrome Extension that makes long ChatGPT conversations **easy to navigate, search, pin, and analyze**.
 
-### Features  
-- Separate navigation for **User** and **Assistant** messages  
-- “All” mode: jump to the very top or bottom of the page  
-- Hotkeys (default: **Ctrl + ↑ / ↓ / Home / End**)  
-- **Alt + 1 / 2 / 3** to switch target role (User / Assistant / All)  
-- Drag the panel to reposition it (position is saved)  
-- Light/Dark mode support  
-
-### Screenshots  
-English UI:  
-![English UI](docs/screenshot-en.png)  
-
-Full page screenshot:  
-![Full screenshot](docs/screenshot-full.png)  
-
-### Installation (Developer Mode)  
-1. Download or clone this repository  
-2. Open `chrome://extensions` in Chrome  
-3. Enable **Developer mode** (top-right)  
-4. Click **Load unpacked** and select the extracted folder  
-
-### Usage & Hotkeys  
-
-| Action | Hotkey | Description |
-|--------|--------|-------------|
-| Scroll to first message | Ctrl + Home | Jumps to the first message of the selected role |
-| Scroll to previous | Ctrl + ↑ | Moves to the previous message |
-| Scroll to next | Ctrl + ↓ | Moves to the next message |
-| Scroll to last message | Ctrl + End | Jumps to the last message of the selected role |
-| Switch target role | Alt + 1 / 2 / 3 | Switch between User / Assistant / All |
-
-### Configuration  
-- You can adjust **CENTER_BIAS**, **HEADER_PX**, **SCROLL_LOCK_MS**, and hotkeys via the options page.  
-- Panel position is saved automatically when dragged.  
-
-### License & Contribution  
-- Licensed under the **MIT License**  
-- Contributions and pull requests are welcome!  
+It adds a floating navigation panel, a detailed turn list, pin management (🔖), file extraction, and jump navigation — dramatically improving productivity when working with ChatGPT.
 
 ---
 
-## 🇯🇵 日本語版
+## 🚀 Features
 
-### 概要  
-**ChatGPT Turn Navigator** は、ChatGPT の画面にナビゲーションパネルとホットキーを追加する Chrome 拡張です。  
-ユーザー／アシスタントの発言間を移動したり、ページ全体の先頭／末尾にジャンプしたりできます。パネル位置の保存やホットキー切り替えにも対応しています。  
+### ■ 1. Role-based Filtering
+Easily switch between:
 
-### 主な機能  
-- ユーザー／アシスタントの発言を個別にナビゲート  
-- 「全体」モードでページ最上部／最下部へジャンプ  
-- ホットキー（既定: **Ctrl + ↑／↓／Home／End**）  
-- **Alt + 1／2／3** で対象ロールを切り替え（ユーザー／アシスタント／全体）  
-- パネルをドラッグで移動＆位置保存  
-- ダーク／ライトテーマ対応  
+- **All**
+- **User only**
+- **Assistant only**
 
-### スクリーンショット  
-日本語UI:  
-![日本語UI](docs/screenshot-ja.png)  
+Perfect for long conversations where you need to isolate relevant turns.
 
-フルサイズスクリーンショット:  
-![フルスクリーンショット](docs/screenshot-full.png)  
+---
 
-### インストール方法（開発モード）  
-1. このリポジトリをダウンロードまたはクローン  
-2. Chrome で `chrome://extensions` を開く  
-3. 右上で **デベロッパーモード** を ON  
-4. 「パッケージ化されていない拡張機能を読み込む」から展開したフォルダを選択  
+### ■ 2. Pin Management (🔖)
+Mark important turns with a pin:
 
-### 使い方 & ホットキー  
+- Click to toggle **red (ON)** / **gray (OFF)**
+- Filter by **Pinned only**
+- Bulk actions:
+  - **ALL ON** (only User / only Assistant / All turns)
+  - **ALL OFF**
+- Multi-row turns (attachment row + text row) are handled together
 
-| 操作 | ホットキー | 説明 |
-|------|------------|------|
-| 先頭の発言へ移動 | Ctrl + Home | 選択ロールの最初の発言へジャンプ |
-| 前の発言へ移動 | Ctrl + ↑ | ひとつ前の発言へ移動 |
-| 次の発言へ移動 | Ctrl + ↓ | ひとつ次の発言へ移動 |
-| 末尾の発言へ移動 | Ctrl + End | 選択ロールの最後の発言へジャンプ |
-| 対象ロール切り替え | Alt + 1／2／3 | ユーザー／アシスタント／全体を切り替え |
+---
 
-### 設定  
-- **CENTER_BIAS**, **HEADER_PX**, **SCROLL_LOCK_MS** などはオプション画面で調整可能  
-- パネル位置はドラッグで移動すると自動保存されます  
+### ■ 3. Attachment File Extraction
+Automatically extracts file names from ChatGPT's attachment cards.
 
-### ライセンス・貢献  
-- **MITライセンス** で公開  
-- 改善提案や Pull Request を歓迎します！
+Example:
+
+```
+(File) ui.js options.js shared.js manifest.json
+```
+
+Supports PDF / ZIP / PNG / JS / multiple attachments.
+
+---
+
+### ■ 4. Turn List Panel
+A collapsible sidebar showing all turns:
+
+- Click to jump to any turn  
+- Pinned state (🔖) and preview (🔍) icons  
+- File names listed for attachment rows  
+- Footer shows:
+  - Turn count  
+  - Upload count  
+  - Download count  
+
+---
+
+### ■ 5. Guide Line Overlay
+A horizontal guide line helps your eyes track text while scrolling.
+
+---
+
+## 🖼 Screenshots
+*(Replace with your real images — English version uses filenames ending with **e**)*
+
+- Navigation Panel  
+  ![](assets/screen_nav_e.png)
+
+- List Panel (All)  
+  ![](assets/screen_list_all_e.png)
+
+- Pinned Only  
+  ![](assets/screen_list_pinonly_e.png)
+
+- Attachment Extraction  
+  ![](assets/screen_files_e.png)
+
+- Settings Page  
+  ![](assets/screen_options_e.png)
+
+---
+
+## 📦 Installation
+
+Manual installation:
+
+```
+1. Download ZIP & extract
+2. Chrome → Extensions → Enable developer mode
+3. “Load unpacked”
+4. Select the extracted folder
+```
+
+---
+
+## 🔧 Usage
+
+### Navigation Panel  
+Open/close from top-right toggle.  
+Draggable. Snap-back supported.
+
+### Pins  
+Click 🔖 on any turn.  
+Use **ALL ON / ALL OFF** for batch operations.
+
+### List Panel  
+- Open → 🗂 button  
+- Click to jump  
+- “Pinned only” view  
+- Upload/Download counts: populated after clicking “Refresh”
+
+### Settings  
+Right-bottom ⚙ icon.  
+Remove unused pin data per chat.
+
+---
+
+## 📁 File Structure
+
+```
+manifest.json
+content.js
+logic.js
+ui.js
+shared.js
+events.js
+inject_url_hook.js
+options.html
+options.js
+i18n.js
+sw.js
+assets/*.cur
+assets/*.png
+README.md
+```
+
+---
+
+## 🛠 Developer Notes
+
+- Manifest V3  
+- MutationObserver with debouncing  
+- Storage: chrome.storage.sync (+ local fallback)  
+- Pins stored per ChatID  
+- Auto-sync on:
+  - New turns  
+  - Chat switching  
+
+---
+
+## 📜 License
+MIT License
+
+---
+
+## 🙏 Author’s Note
+Built to make ChatGPT more usable for real work.  
+Suggestions and improvements are always welcome.
+
+
+
+---
+
+# 🇯🇵 日本語版
+
+ChatGPT Turn Navigator は、ChatGPT の長い会話を  
+**見やすく・移動しやすく・管理しやすくする** Chrome 拡張機能です。
+
+ナビパネル、一覧パネル、付箋管理（🔖）、添付ファイル抽出、  
+高速ジャンプなどを搭載し、ChatGPT での作業効率が大幅に向上します。
+
+---
+
+## 🚀 主な機能
+
+### ■ 1. ロール別フィルタ
+会話を **全体 / ユーザー / アシスタント** で瞬時に切り替え可能。
+
+---
+
+### ■ 2. 付箋（🔖）管理
+重要なターンに印を付けられます。
+
+- 赤 / グレー 切り替え
+- **付箋のみ表示**
+- ロール別の **ALL ON / ALL OFF**
+- 添付＋本文の複数行ターンも一括処理
+
+---
+
+### ■ 3. 添付ファイルの自動抽出
+ChatGPT が表示するファイルカードから正確にファイル名を抽出。
+
+例：
+
+```
+(File) ui.js options.js shared.js manifest.json
+```
+
+PDF / ZIP / PNG / JS など幅広く対応。
+
+---
+
+### ■ 4. 一覧パネル（List Panel）
+右側に会話全体を一覧表示。
+
+- クリックで該当ターンにジャンプ  
+- 付箋アイコン・プレビューアイコンつき  
+- 添付ファイル名の一覧表示  
+- フッターに件数・アップ数・DL数を表示
+
+---
+
+### ■ 5. ガイドライン（基準線）
+スクロール中でも視線が迷わない補助線。
+
+---
+
+## 🖼 スクリーンショット
+
+- ナビパネル  
+  ![](assets/screen_nav.png)
+
+- 一覧パネル（全体）  
+  ![](assets/screen_list_all.png)
+
+- 付箋のみ  
+  ![](assets/screen_list_pinonly.png)
+
+- 添付ファイル抽出例  
+  ![](assets/screen_files.png)
+
+- 設定画面  
+  ![](assets/screen_options.png)
+
+---
+
+## 📦 インストール方法
+
+```
+1. ZIP を展開
+2. Chrome → 拡張機能 → デベロッパーモード ON
+3. 「パッケージ化されていない拡張機能を読み込む」
+4. フォルダを選択
+```
+
+---
+
+## 🔧 使い方
+
+### ● ナビパネル  
+右上のボタンで ON/OFF。  
+ドラッグ可能。
+
+### ● 付箋  
+各ターン右端の 🔖 をクリック。  
+ALL ON / ALL OFF も利用可能。
+
+### ● 一覧パネル  
+- 🗂 で開く  
+- クリックでジャンプ  
+- 付箋のみ → 件数は「ー」表示（最新にするで更新）
+
+### ● 設定画面  
+⚙ から開く。  
+チャットごとの付箋データを削除可能。
+
+---
+
+## 📁 ファイル構成
+
+```
+manifest.json
+content.js
+logic.js
+ui.js
+shared.js
+events.js
+inject_url_hook.js
+options.html
+options.js
+i18n.js
+sw.js
+assets/*.cur
+assets/*.png
+README.md
+```
+
+---
+
+## 🛠 開発者向け情報
+
+- Manifest V3  
+- DOM 監視：MutationObserver + debounce  
+- ストレージ：chrome.storage.sync（local fallbackあり）  
+- 付箋データは ChatID 単位  
+- 自動同期：ターン追加 / チャット切り替え
+
+---
+
+## 📜 ライセンス
+MIT License
+
+---
+
+## 🙏 作者より
+ChatGPT の長い会話をもっと扱いやすくするために作りました。  
+改善案はいつでも歓迎です。

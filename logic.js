@@ -252,8 +252,7 @@ console.log("scrollListToTurn*6 top",top);
     return (names || []).filter(n => /\.pdf(\b|$)/i.test(String(n)));
   }
 
-  // ===== 添付ファイル検出（Article.txt対応） =====
-
+  // ===== 添付ファイル検出（Article.txt対応） ===== '25.12.4 改
   // 1) ファイル名の収集
   //   - a[download] / a[href] も拾う（将来の変化に備え）
   //   - ChatGPTの“ファイルチップ”（hrefなし）の中にある
@@ -264,22 +263,58 @@ console.log("scrollListToTurn*6 top",top);
 
     // a[download] と a[href] のテキスト/末尾名
     el.querySelectorAll('a[download], a[href]').forEach(a => {
-      const dn  = (a.getAttribute('download') || '').trim();
-      const txt = (a.textContent || '').trim();
+      const dn   = (a.getAttribute('download') || '').trim();
       const href = a.getAttribute('href') || '';
       const tail = href.split('/').pop()?.split('?')[0] || '';
+
+      // ChatGPT の「ファイルカード」対策：
+      // a の内側に .text-token-link 等があれば、まずそれをファイル名候補にする
+      let txt = '';
+      const chip =
+        a.querySelector('.text-token-link') ||
+        a.querySelector('.truncate.font-semibold');
+
+      if (chip) {
+        txt = (chip.textContent || '').trim();
+      } else {
+        txt = (a.textContent || '').trim();
+      }
+
       const picked = dn || (txt && /\S/.test(txt) ? txt : tail);
       if (picked) names.add(picked);
     });
 
-    // “ファイルチップ”内の表示名（hrefが無いケース）
+    // “古いタイプのファイルチップ”内の表示名（href が無いケース）
     el.querySelectorAll('.border.rounded-xl .truncate.font-semibold').forEach(n => {
       const tx = (n.textContent || '').trim();
       if (tx) names.add(tx);
     });
 
+    // --- 追加: 「README.md 生成完了＋クリックしてダウンロード」タイプのフォールバック ---
+    // --- 追加: 「README.md ダウンロード」タイプ専用フォールバック ---
+    if (!names.size) {
+console.log("★★★★collectAttachmentNames names.size:",names.size);
+      const FILE_RE = /\b[0-9A-Za-z_.-]+\.[A-Za-z0-9]{1,8}\b/g;
+
+      el.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
+        const tx = (h.textContent || '').trim();
+        if (!tx) return;
+
+        const lower = tx.toLowerCase();
+console.log("★★★★collectAttachmentNames lower:",lower);
+        // ★ 同じ見出しの中に「ダウンロード / download」がある場合だけ有効
+        if (!/ダウンロード|download/.test(lower)) return;
+console.log("★★★★collectAttachmentNames tx:",tx);
+        let m;
+        while ((m = FILE_RE.exec(tx))) {
+          names.add(m[0]);
+        }
+      });
+    }
+
     return [...names];
   }
+
 
   // 2) 種別マーク（🖼/🎞/📝）
   function detectAttachmentKinds(root){
