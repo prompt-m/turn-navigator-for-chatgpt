@@ -284,27 +284,25 @@ console.log("scrollListToTurn*6 top",top);
       if (picked) names.add(picked);
     });
 
-    // “古いタイプのファイルチップ”内の表示名（href が無いケース）
-    el.querySelectorAll('.border.rounded-xl .truncate.font-semibold').forEach(n => {
-      const tx = (n.textContent || '').trim();
-      if (tx) names.add(tx);
-    });
-
-    // --- 追加: 「README.md 生成完了＋クリックしてダウンロード」タイプのフォールバック ---
-    // --- 追加: 「README.md ダウンロード」タイプ専用フォールバック ---
+    // ★ ここまでで names に何も入っていない場合だけ、ダウンロード系の特別処理
     if (!names.size) {
-console.log("★★★★collectAttachmentNames names.size:",names.size);
+      console.log("★★★★collectAttachmentNames names.size:", names.size);
+
+      // メッセージ全体のテキストで「ダウンロード系」かどうかを判定
+      const fullText = (el.innerText || '').toLowerCase();
+      if (!/ダウンロード|download/.test(fullText)) {
+        // ダウンロードっぽい文言がなければ何もしない
+        return [...names];
+      }
+
       const FILE_RE = /\b[0-9A-Za-z_.-]+\.[A-Za-z0-9]{1,8}\b/g;
 
+      // ファイル名の候補は見出しからだけ拾う
       el.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
         const tx = (h.textContent || '').trim();
         if (!tx) return;
 
-        const lower = tx.toLowerCase();
-console.log("★★★★collectAttachmentNames lower:",lower);
-        // ★ 同じ見出しの中に「ダウンロード / download」がある場合だけ有効
-        if (!/ダウンロード|download/.test(lower)) return;
-console.log("★★★★collectAttachmentNames tx:",tx);
+        console.log("★★★★collectAttachmentNames heading:", tx);
         let m;
         while ((m = FILE_RE.exec(tx))) {
           names.add(m[0]);
