@@ -252,141 +252,6 @@ console.log("scrollListToTurn*6 top",top);
     return (names || []).filter(n => /\.pdf(\b|$)/i.test(String(n)));
   }
 
-  // ===== 添付ファイル検出（Article.txt対応） ===== '25.12.4 改
-  // 1) ファイル名の収集
-  //   - a[download] / a[href] も拾う（将来の変化に備え）
-  //   - ChatGPTの“ファイルチップ”（hrefなし）の中にある
-  //     .border.rounded-xl .truncate.font-semibold からも拾う
-
-  // 添付ファイル名の収集ロジック '25.12.5 改
-
-  function collectAttachmentNames(root){
-    const el = root || document;
-    const names = new Set();
-
-    // --- ① a[download] / a[href] から拾う -------------------------
-    el.querySelectorAll('a[download], a[href]').forEach(a => {
-      const dn   = (a.getAttribute('download') || '').trim();
-      const href = a.getAttribute('href') || '';
-      const tail = href.split('/').pop()?.split('?')[0] || '';
-
-      // ChatGPT の「ファイルカード」対策：
-      // a の内側に .text-token-link 等があれば、まずそれをファイル名候補にする
-      let txt = '';
-      const chip =
-        a.querySelector('.text-token-link') ||
-        a.querySelector('.truncate.font-semibold');
-
-      if (chip) {
-        txt = (chip.textContent || '').trim();
-      } else {
-        txt = (a.textContent || '').trim();
-      }
-
-      // 空でなければ txt を優先、なければ download 属性 → tail
-      const picked = dn || (txt && /\S/.test(txt) ? txt : tail);
-      if (picked) names.add(picked);
-    });
-
-    // --- ② まだ 0 件なら「ダウンロード系メッセージ」解析 ----------------
-    if (!names.size) {
-      // メッセージ全体から「ダウンロード/Download」っぽさを判定
-      const fullText = (el.innerText || '').toLowerCase();
-      if (!/ダウンロード|download/.test(fullText)) {
-        // そもそもダウンロード系でなければ何もしない
-        return [...names];
-      }
-
-      const FILE_RE = /\b[0-9A-Za-z_.-]+\.[A-Za-z0-9]{1,8}\b/g;
-
-      // 2-1) 見出し(h1〜h6)からファイル名を拾う
-      el.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
-        const tx = (h.textContent || '').trim();
-        if (!tx) return;
-
-        let m;
-        while ((m = FILE_RE.exec(tx))) {
-          names.add(m[0]);
-        }
-      });
-
-      // 2-2) それでも 0 件なら、段落テキストからも拾ってみる（控えめに）
-      if (!names.size) {
-        el.querySelectorAll('p,li').forEach(node => {
-          const tx = (node.textContent || '').trim();
-          if (!tx) return;
-
-          // 「Download XXX.zip」「README.md をダウンロード」みたいな文だけ対象
-          if (!/ダウンロード|download/i.test(tx)) return;
-
-          let m;
-          while ((m = FILE_RE.exec(tx))) {
-            names.add(m[0]);
-          }
-        });
-      }
-    }
-
-    return [...names];
-  }
-/*
-  function collectAttachmentNames(root){
-    const el = root || document;
-    const names = new Set();
-
-    // a[download] と a[href] のテキスト/末尾名
-    el.querySelectorAll('a[download], a[href]').forEach(a => {
-      const dn   = (a.getAttribute('download') || '').trim();
-      const href = a.getAttribute('href') || '';
-      const tail = href.split('/').pop()?.split('?')[0] || '';
-
-      // ChatGPT の「ファイルカード」対策：
-      // a の内側に .text-token-link 等があれば、まずそれをファイル名候補にする
-      let txt = '';
-      const chip =
-        a.querySelector('.text-token-link') ||
-        a.querySelector('.truncate.font-semibold');
-
-      if (chip) {
-        txt = (chip.textContent || '').trim();
-      } else {
-        txt = (a.textContent || '').trim();
-      }
-
-      const picked = dn || (txt && /\S/.test(txt) ? txt : tail);
-      if (picked) names.add(picked);
-    });
-
-    // ★ ここまでで names に何も入っていない場合だけ、ダウンロード系の特別処理
-    if (!names.size) {
-      console.log("★★★★collectAttachmentNames names.size:", names.size);
-
-      // メッセージ全体のテキストで「ダウンロード系」かどうかを判定
-      const fullText = (el.innerText || '').toLowerCase();
-      if (!/ダウンロード|download/.test(fullText)) {
-        // ダウンロードっぽい文言がなければ何もしない
-        return [...names];
-      }
-
-      const FILE_RE = /\b[0-9A-Za-z_.-]+\.[A-Za-z0-9]{1,8}\b/g;
-
-      // ファイル名の候補は見出しからだけ拾う
-      el.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
-        const tx = (h.textContent || '').trim();
-        if (!tx) return;
-
-        console.log("★★★★collectAttachmentNames heading:", tx);
-        let m;
-        while ((m = FILE_RE.exec(tx))) {
-          names.add(m[0]);
-        }
-      });
-    }
-
-    return [...names];
-  }
-*/
-
   // 2) 種別マーク（🖼/🎞/📝）
   function detectAttachmentKinds(root){
     const el = root || document;
@@ -416,7 +281,10 @@ console.log("scrollListToTurn*6 top",top);
   // 3) 見出しテキスト（ファイル名優先）
   // 見出しテキスト：ファイル名＋本文を両方出す（両方ある場合は「 | 」で連結）
   function extractSummaryText(head, maxChars){
+
+console.log("extractSummaryText head:",head);
     const names = collectAttachmentNames(head);
+console.log("extractSummaryText name:",name);
     let filePart = names.length ? names.join('、 ') : '';
 
     // 本文候補
@@ -504,26 +372,14 @@ console.log("scrollListToTurn*6 top",top);
   // ★ 調べたいターン番号（例: 81）
   //   ログを一切出したくないときは null にしておく
   const DEBUG_ATTACH_TURN = 81;
-
+  // 添付ファイル名をまとめて抽出
+  // - a[download], a[href] … 通常のリンク
+  // - a.cursor-pointer      … ChatGPT の「Download XXX」ボタン
+  // - それでも見つからなければ、同じ article 内のテキストから拡張子付き単語を拾う
+  // 添付ファイル名の抽出ロジック（リスト表示用）
   function collectAttachmentNames(root){
     const el = root || document;
     const names = new Set();
-
-    // ------- ここで「このターンを調査対象にするか？」を決める -------
-    let debugThisTurn = false;
-    try {
-      const dt = el.getAttribute?.('data-testid') || '';
-      const m  = dt.match(/conversation-turn-(\d+)/);
-      if (m) {
-        const turnNo = Number(m[1]);
-        if (Number.isFinite(turnNo) && DEBUG_ATTACH_TURN != null) {
-          debugThisTurn = (turnNo === DEBUG_ATTACH_TURN);
-        }
-      }
-    } catch(e){
-      // ここは黙っておく
-    }
-    // --------------------------------------------------------------
 
     // a[download] と a[href] のテキスト/末尾名
     el.querySelectorAll('a[download], a[href]').forEach(a => {
@@ -548,45 +404,15 @@ console.log("scrollListToTurn*6 top",top);
       if (picked) names.add(picked);
     });
 
-    // ★ ここまでで names に何も入っていない場合だけ、ダウンロード系の特別処理
-    if (!names.size) {
-      if (debugThisTurn) {
-        console.log('★★★★collectAttachmentNames pre-fallback names.size=0');
-      }
-
-      // メッセージ全体のテキストで「ダウンロード系」かどうかを判定
-      const fullText = (el.innerText || '').toLowerCase();
-      if (!/ダウンロード|download/.test(fullText)) {
-        if (debugThisTurn) {
-          console.log('★★★★collectAttachmentNames not download-ish, skip');
-        }
-        return [...names];
-      }
-
-      const FILE_RE = /\b[0-9A-Za-z_.-]+\.[A-Za-z0-9]{1,8}\b/g;
-
-      // ファイル名の候補は見出しからだけ拾う
-      el.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
-        const tx = (h.textContent || '').trim();
-        if (!tx) return;
-
-        if (debugThisTurn) {
-          console.log('★★★★collectAttachmentNames heading:', tx);
-        }
-
-        let m;
-        while ((m = FILE_RE.exec(tx))) {
-          names.add(m[0]);
-        }
-      });
-    }
-
-    if (debugThisTurn) {
-      console.log('★★★★collectAttachmentNames FINAL:', [...names]);
-    }
+    // “古いタイプのファイルチップ”内の表示名（href が無いケース）
+    el.querySelectorAll('.border.rounded-xl .truncate.font-semibold').forEach(n => {
+      const tx = (n.textContent || '').trim();
+      if (tx) names.add(tx);
+    });
 
     return [...names];
   }
+
 
   // --- logic.js: buildAttachmentLine 置き換え版 -------------------------------
   // 目的：
@@ -600,7 +426,9 @@ console.log("scrollListToTurn*6 top",top);
     const role = (typeof getTurnRole === 'function' ? getTurnRole(el) : 'unknown') || 'unknown';
 
     // 1) 既存抽出でファイル名を取得
+console.log("buildAttachmentLine");
     const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
+console.log("buildAttachmentLine names:",names);
     if (names.length) {
       // ローカル小ヘルパ：PDF抽出
       const pickPdfNames = (arr) => (arr || []).filter(n => /\.pdf(\b|$)/i.test(String(n)));
