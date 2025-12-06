@@ -1162,8 +1162,75 @@ console.log("installAutoSyncForTurns 4");
   }
 
 
-  // ========= 9) 初期セットアップ =========
+  // ========= 9) 初期セットアップ ========= '25.12.6 改
+
   async function initialize(){
+
+    // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // 設定ロード & v2 ストレージ移行
+    await SH.loadSettings();
+    try {
+      // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
+      await SH.migratePinsStorageOnce?.();
+    } catch {}
+
+    // UI 構築 & フォーカス保護まわり
+    UI.installUI();
+    ensureFocusPark();
+    installFocusStealGuard();
+
+    // 言語・位置などの初期反映
+    UI.applyLang();
+    UI.clampPanelWithinViewport();
+
+    // 基準線の初期表示（保存 showViz を尊重）
+    try {
+      const cfg = SH?.getCFG?.();
+      SH?.renderViz?.(cfg, !!cfg?.showViz);
+    } catch {}
+
+    // イベント系のバインド
+    EV.bindEvents();
+    bindPreviewDockOnce();
+    bindBaselineAutoFollow();
+
+    // URL 変更フック（必要な場合のみ）
+    if (USE_INJECT_URL_HOOK) {
+      injectUrlChangeHook();
+    }
+
+    // ゴミになったゼロ件レコードの掃除
+    try {
+      SH.cleanupZeroPinRecords?.();
+    } catch {}
+
+    // ★ 初回 rebuild は「UI とイベントが一通り整ったあと」で、
+    //   かつ ChatGPT 本体の初期化とも競合しないよう 1.2 秒遅らせて実行 '25.12.6
+    setTimeout(() => {
+      rebuildAndRenderSafely({ forceList:true })
+        .catch(e => console.warn('[init-delayed] rebuildAndRenderSafely failed', e));
+    }, 1200);
+
+    // viewport 変化でナビ位置クランプ
+    window.addEventListener(
+      'resize',
+      () => UI.clampPanelWithinViewport(),
+      { passive:true }
+    );
+    window.addEventListener(
+      'orientationchange',
+      () => UI.clampPanelWithinViewport()
+    );
+  }
+
+/*
+  async function initialize(){
+
+    // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     await SH.loadSettings();
     // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
     try { await SH.migratePinsStorageOnce?.(); } catch {}
@@ -1189,11 +1256,17 @@ console.log("installAutoSyncForTurns 4");
 
     // content.js → initialize() 内の最初の rebuild 呼び出しを置き換え
     (async () => {
-      try {
-        await rebuildAndRenderSafely({ forceList:true });
-      } catch(e) {
-        console.warn('[init] rebuildAndRenderSafely failed', e);
-      }
+        // rebuild の初回実行を遅らせる
+        setTimeout(() => {
+          rebuildAndRenderSafely({ forceList:true }).catch(e => console.warn(e));
+        }, 1200);
+
+//      try {
+//        await rebuildAndRenderSafely({ forceList:true });
+//      } catch(e) {
+//        console.warn('[init] rebuildAndRenderSafely failed', e);
+//      }
+
     })();
 
     // viewport 変化でナビ位置クランプ
@@ -1201,6 +1274,7 @@ console.log("installAutoSyncForTurns 4");
     window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
 
   }
+*/
   // ========= 10) DOM Ready =========
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize, { once:true });

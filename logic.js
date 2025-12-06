@@ -377,6 +377,8 @@ console.log("extractSummaryText name:",name);
   // - a.cursor-pointer      … ChatGPT の「Download XXX」ボタン
   // - それでも見つからなければ、同じ article 内のテキストから拡張子付き単語を拾う
   // 添付ファイル名の抽出ロジック（リスト表示用）
+  // 添付ファイル名を収集
+
   function collectAttachmentNames(root){
     const el = root || document;
     const names = new Set();
@@ -413,7 +415,6 @@ console.log("extractSummaryText name:",name);
     return [...names];
   }
 
-
   // --- logic.js: buildAttachmentLine 置き換え版 -------------------------------
   // 目的：
   // ・アシスタント：非PDFファイルを添付行に列挙（複数時は ⭳（<本文から抽出したFileラベル>）a b c）
@@ -426,9 +427,7 @@ console.log("extractSummaryText name:",name);
     const role = (typeof getTurnRole === 'function' ? getTurnRole(el) : 'unknown') || 'unknown';
 
     // 1) 既存抽出でファイル名を取得
-console.log("buildAttachmentLine");
     const names = Array.from(new Set(collectAttachmentNames(el))).filter(Boolean);
-console.log("buildAttachmentLine names:",names);
     if (names.length) {
       // ローカル小ヘルパ：PDF抽出
       const pickPdfNames = (arr) => (arr || []).filter(n => /\.pdf(\b|$)/i.test(String(n)));
