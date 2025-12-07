@@ -78,8 +78,8 @@ A horizontal guide line helps your eyes track text while scrolling.
 - Pinned Only  
   ![](assets/screen_list_pinonly_e.png)
 
-- Attachment Extraction  
-  ![](assets/screen_files_e.png)
+- Preview Display
+  ![](assets/screen_preview_e.png)
 
 - Settings Page  
   ![](assets/screen_options_e.png)
@@ -169,11 +169,11 @@ Suggestions and improvements are always welcome.
 
 # 🇯🇵 日本語版
 
-ChatGPT Turn Navigator は、ChatGPT の長い会話を  
-**見やすく・移動しやすく・管理しやすくする** Chrome 拡張機能です。
+ChatGPT Turn Navigator は、長くなった ChatGPT の会話を
+**高速に移動・把握できるようにする** Chrome 拡張機能（MV3） です。
 
 ナビパネル、一覧パネル、付箋管理（🔖）、添付ファイル抽出、  
-高速ジャンプなどを搭載し、ChatGPT での作業効率が大幅に向上します。
+高速ジャンプ、プレビュー表示などを搭載し、ChatGPT での作業効率が大幅に向上します。
 
 ---
 
@@ -233,8 +233,8 @@ PDF / ZIP / PNG / JS など幅広く対応。
 - 付箋のみ  
   ![](assets/screen_list_pinonly.png)
 
-- 添付ファイル抽出例  
-  ![](assets/screen_files.png)
+- プレビュー表示 
+  ![](assets/screen_preview.png)
 
 - 設定画面  
   ![](assets/screen_options.png)
