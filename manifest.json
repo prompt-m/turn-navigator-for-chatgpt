@@ -1,26 +1,39 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Turn Navigator",
-  "version": "1.1.0",
-  "version_name": "1.1.0 (2025-09-25 00:00 JST)",
-  "description": "ChatGPTの画面にナビ、リスト、付箋、プレビュー機能を追加。ユーザーやアシスタントの発言をすばやく移動・表示できます。",
+  "version": "1.2.0",
+  "version_name": "1.2.0 (2025-12-13 00:00 JST)",
+  "description": "Adds a floating navigation panel, turn list with pins, preview, and attachment indicators to ChatGPT, enabling fast navigation between user and assistant messages.",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",
     "128": "icon128.png"
   },
-  "web_accessible_resources": [{
-    "resources": ["inject_url_hook.js","assets/*.cur","assets/*.png"],
-    "matches": ["*://chat.openai.com/*", "*://chatgpt.com/*","<all_urls>"]
-  }],
-  "permissions": ["storage","tabs"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inject_url_hook.js",
+        "assets/*.cur",
+        "assets/*.png"
+      ],
+      "matches": [
+        "*://chat.openai.com/*",
+        "*://chatgpt.com/*",
+        "<all_urls>"
+      ]
+    }
+  ],
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://*.openai.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://*.openai.com/*"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://*.openai.com/*"
+      ],
       "js": [
         "i18n.js",
         "shared.js",
@@ -33,12 +46,12 @@
     }
   ],
   "options_ui": {
-     "page": "options.html",
-     "open_in_tab": true 
+    "page": "options.html",
+    "open_in_tab": true
   },
   "background": {
     "service_worker": "sw.js",
-    "type": "module" 
+    "type": "module"
   },
   "action": {
     "default_title": "ChatGPT Turn Navigator"

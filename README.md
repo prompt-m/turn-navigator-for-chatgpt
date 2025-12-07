@@ -1,123 +1,155 @@
-# ChatGPT Turn Navigator
-*(English version first / 日本語は下にあります)*
+---
 
+# ChatGPT Turn Navigator
+
+*(English version first / 日本語は下にあります)*
 
 # 🇺🇸 English Version
 
-ChatGPT Turn Navigator is a Chrome Extension that makes long ChatGPT conversations **easy to navigate, search, pin, and analyze**.
+**ChatGPT Turn Navigator** is a Chrome Extension (Manifest V3) that dramatically improves your ability to **navigate, review, and manage long ChatGPT conversations**.
 
-It adds a floating navigation panel, a detailed turn list, pin management (🔖), file extraction, and jump navigation — dramatically improving productivity when working with ChatGPT.
+It adds:
+
+* A floating navigation panel
+* A full turn list with jump navigation
+* Pin management (🔖)
+* Turn preview
+* **Image attachment detection**
+* JA / EN language toggle
+
+Designed for long research threads, programming work, documentation, project logs, and any ChatGPT workflow that grows beyond a few dozen turns.
 
 ---
 
 ## 🚀 Features
 
 ### ■ 1. Role-based Filtering
-Easily switch between:
 
-- **All**
-- **User only**
-- **Assistant only**
+Switch the navigation target instantly:
 
-Perfect for long conversations where you need to isolate relevant turns.
+* **All turns**
+* **User only**
+* **Assistant only**
+
+Greatly reduces scrolling fatigue.
 
 ---
 
 ### ■ 2. Pin Management (🔖)
-Mark important turns with a pin:
 
-- Click to toggle **red (ON)** / **gray (OFF)**
-- Filter by **Pinned only**
-- Bulk actions:
-  - **ALL ON** (only User / only Assistant / All turns)
-  - **ALL OFF**
-- Multi-row turns (attachment row + text row) are handled together
+Mark important turns and filter them later.
+
+* Toggle ON/OFF
+* “Pinned only” mode
+* Pins are stored per chat
+* Uses `chrome.storage.sync` (with size limits)
 
 ---
 
-### ■ 3. Attachment File Extraction
-Automatically extracts file names from ChatGPT's attachment cards.
+### ■ 3. Attachment Detection (Current Behavior)
 
-Example:
+Navigator currently detects **ChatGPT-generated images only**.
 
-```
-(File) ui.js options.js shared.js manifest.json
-```
+**Detected:**
 
-Supports PDF / ZIP / PNG / JS / multiple attachments.
+* ChatGPT-generated images (PNG / JPG / WebP)
+
+**Not detected:**
+
+* ChatGPT’s **Download button attachments** *(planned for a future update)*
+* User uploads
+* Filenames written in plain text
+* Code blocks
 
 ---
 
 ### ■ 4. Turn List Panel
-A collapsible sidebar showing all turns:
 
-- Click to jump to any turn  
-- Pinned state (🔖) and preview (🔍) icons  
-- File names listed for attachment rows  
-- Footer shows:
-  - Turn count  
-  - Upload count  
-  - Download count  
+A collapsible sidebar showing every turn.
+
+Includes:
+
+* Role icon
+* Snippet preview
+* Pin toggle
+* Attachment icon
+* Footer with counts
+
+Clicking jumps to and highlights the selected turn.
 
 ---
 
-### ■ 5. Guide Line Overlay
-A horizontal guide line helps your eyes track text while scrolling.
+### ■ 5. Turn Preview
+
+Preview any turn **without jumping**.
+
+Useful for checking:
+
+* Long replies
+* Code
+* Images
+* Previous reasoning
+
+---
+
+### ■ 6. Guide Line Overlay
+
+A horizontal guideline helps maintain visual orientation when scrolling.
 
 ---
 
 ## 🖼 Screenshots
-*(Replace with your real images — English version uses filenames ending with **e**)*
 
-- Navigation Panel  
-  ![](assets/screen_nav_e.png)
+* Navigation Panel
+  ![](docs/screen_nav_e.png)
 
-- List Panel (All)  
-  ![](assets/screen_list_all_e.png)
+* List Panel (All)
+  ![](docs/screen_list_all_e.png)
 
-- Pinned Only  
-  ![](assets/screen_list_pinonly_e.png)
+* Pinned Only
+  ![](docs/screen_list_pinonly_e.png)
 
-- Preview Display
-  ![](assets/screen_preview_e.png)
+* Preview Panel
+  ![](docs/screen_preview_e.png)
 
-- Settings Page  
-  ![](assets/screen_options_e.png)
+* Settings Page
+  ![](docs/screen_options_e.png)
 
 ---
 
 ## 📦 Installation
 
-Manual installation:
-
-```
-1. Download ZIP & extract
-2. Chrome → Extensions → Enable developer mode
-3. “Load unpacked”
-4. Select the extracted folder
-```
+1. Download and extract ZIP
+2. Open Chrome → `chrome://extensions/`
+3. Enable **Developer mode**
+4. Click **Load unpacked**
+5. Select the folder containing `manifest.json`
 
 ---
 
 ## 🔧 Usage
 
-### Navigation Panel  
-Open/close from top-right toggle.  
-Draggable. Snap-back supported.
+### Navigation Panel
 
-### Pins  
-Click 🔖 on any turn.  
-Use **ALL ON / ALL OFF** for batch operations.
+Drag to reposition.
+Jump between roles or sequentially.
 
-### List Panel  
-- Open → 🗂 button  
-- Click to jump  
-- “Pinned only” view  
-- Upload/Download counts: populated after clicking “Refresh”
+### Pins
 
-### Settings  
-Right-bottom ⚙ icon.  
-Remove unused pin data per chat.
+Click 🔖 to toggle.
+Use “Pinned only” to focus on key turns.
+
+### List Panel
+
+Open with the 🗂 button.
+Click rows to jump.
+Refresh when new attachments appear.
+
+### Settings
+
+Open via ⚙
+Clear per-chat pin data.
+Adjust list width, preview options, and language.
 
 ---
 
@@ -135,141 +167,159 @@ options.html
 options.js
 i18n.js
 sw.js
-assets/*.cur
 assets/*.png
+assets/*.cur
 README.md
 ```
 
 ---
 
-## 🛠 Developer Notes
+## ⚠ Notes on Long Conversations
 
-- Manifest V3  
-- MutationObserver with debouncing  
-- Storage: chrome.storage.sync (+ local fallback)  
-- Pins stored per ChatID  
-- Auto-sync on:
-  - New turns  
-  - Chat switching  
+ChatGPT may fail to load conversations exceeding **80–120 turns** or consuming **800MB–1GB** memory.
+
+Typical symptoms:
+
+* “Unable to load conversation…”
+* 500 errors
+* Long blank loading times
+
+These limitations come from **ChatGPT itself**, not the extension.
+
+**Recommended:**
+
+* Split extremely long chats
+* Reload the tab if memory usage becomes high
 
 ---
 
 ## 📜 License
+
 MIT License
 
 ---
-
-## 🙏 Author’s Note
-Built to make ChatGPT more usable for real work.  
-Suggestions and improvements are always welcome.
-
-
 
 ---
 
 # 🇯🇵 日本語版
 
-ChatGPT Turn Navigator は、長くなった ChatGPT の会話を
-**高速に移動・把握できるようにする** Chrome 拡張機能（MV3） です。
+**ChatGPT Turn Navigator** は、長くなった ChatGPT の会話を
+**高速に移動・把握・管理できるようにする** Chrome 拡張機能（MV3）です。
 
-ナビパネル、一覧パネル、付箋管理（🔖）、添付ファイル抽出、  
-高速ジャンプ、プレビュー表示などを搭載し、ChatGPT での作業効率が大幅に向上します。
+ナビパネル、一覧パネル、付箋（🔖）、プレビュー、
+**画像添付の検出（Download添付は次版で対応予定）** など、
+ChatGPT の実務利用を強力に支援します。
 
 ---
 
 ## 🚀 主な機能
 
 ### ■ 1. ロール別フィルタ
-会話を **全体 / ユーザー / アシスタント** で瞬時に切り替え可能。
+
+**全体 / ユーザー / アシスタント** を瞬時に切り替え。
 
 ---
 
 ### ■ 2. 付箋（🔖）管理
-重要なターンに印を付けられます。
 
-- 赤 / グレー 切り替え
-- **付箋のみ表示**
-- ロール別の **ALL ON / ALL OFF**
-- 添付＋本文の複数行ターンも一括処理
+重要なターンに印を付けて管理できます。
+
+* ON/OFF
+* **付箋のみ表示**
+* ChatID ごとに保存
+* Storage Sync を優先（容量制限あり）
 
 ---
 
-### ■ 3. 添付ファイルの自動抽出
-ChatGPT が表示するファイルカードから正確にファイル名を抽出。
+### ■ 3. 添付ファイル検出（現行仕様）
 
-例：
+Navigator が検出できるのは **ChatGPT が生成した画像添付のみ** です。
 
-```
-(File) ui.js options.js shared.js manifest.json
-```
+**検出できる：**
 
-PDF / ZIP / PNG / JS など幅広く対応。
+* ChatGPT が生成した **PNG / JPG / WebP 画像**
+
+**検出できない：**
+
+* ChatGPT の **Download ボタン形式の添付（次版で対応予定）**
+* ユーザーのアップロード
+* テキストに書かれたファイル名
+* コードブロック
 
 ---
 
 ### ■ 4. 一覧パネル（List Panel）
-右側に会話全体を一覧表示。
 
-- クリックで該当ターンにジャンプ  
-- 付箋アイコン・プレビューアイコンつき  
-- 添付ファイル名の一覧表示  
-- フッターに件数・アップ数・DL数を表示
+会話全体を俯瞰し、任意のターンへ即ジャンプできます。
+
+* クリックでジャンプ
+* 付箋・添付アイコン
+* フッターで件数表示
 
 ---
 
-### ■ 5. ガイドライン（基準線）
-スクロール中でも視線が迷わない補助線。
+### ■ 5. プレビュー表示
+
+ジャンプせずにターンの中身を確認できます。
+
+---
+
+### ■ 6. ガイドライン
+
+スクロール中の位置把握を補助します。
 
 ---
 
 ## 🖼 スクリーンショット
 
-- ナビパネル  
-  ![](assets/screen_nav.png)
+* ナビパネル
+  ![](docs/screen_nav.png)
 
-- 一覧パネル（全体）  
-  ![](assets/screen_list_all.png)
+* 一覧パネル（全体）
+  ![](docs/screen_list_all.png)
 
-- 付箋のみ  
-  ![](assets/screen_list_pinonly.png)
+* 付箋のみ
+  ![](docs/screen_list_pinonly.png)
 
-- プレビュー表示 
-  ![](assets/screen_preview.png)
+* プレビュー表示
+  ![](docs/screen_preview.png)
 
-- 設定画面  
-  ![](assets/screen_options.png)
+* 設定画面
+  ![](docs/screen_options.png)
 
 ---
 
 ## 📦 インストール方法
 
-```
 1. ZIP を展開
-2. Chrome → 拡張機能 → デベロッパーモード ON
-3. 「パッケージ化されていない拡張機能を読み込む」
-4. フォルダを選択
-```
+2. Chrome → `chrome://extensions/`
+3. デベロッパーモードを ON
+4. 「パッケージ化されていない拡張機能を読み込む」
+5. フォルダを選択
 
 ---
 
 ## 🔧 使い方
 
-### ● ナビパネル  
-右上のボタンで ON/OFF。  
-ドラッグ可能。
+### ● ナビパネル
 
-### ● 付箋  
-各ターン右端の 🔖 をクリック。  
-ALL ON / ALL OFF も利用可能。
+表示切り替え＆ドラッグ可能。
 
-### ● 一覧パネル  
-- 🗂 で開く  
-- クリックでジャンプ  
-- 付箋のみ → 件数は「ー」表示（最新にするで更新）
+### ● 付箋
 
-### ● 設定画面  
-⚙ から開く。  
-チャットごとの付箋データを削除可能。
+🔖 をクリックして操作。
+「付箋のみ」で一覧を絞り込み。
+
+### ● 一覧パネル
+
+🗂 ボタンで開閉。
+行クリックでジャンプ。
+画像添付のみ検出（Download添付は次版で対応）。
+
+### ● 設定画面
+
+⚙ から開く。
+付箋データ削除・リスト幅調整・言語設定など。
 
 ---
 
@@ -287,28 +337,38 @@ options.html
 options.js
 i18n.js
 sw.js
-assets/*.cur
 assets/*.png
+assets/*.cur
 README.md
 ```
 
 ---
 
-## 🛠 開発者向け情報
+## ⚠ 長大チャットの注意
 
-- Manifest V3  
-- DOM 監視：MutationObserver + debounce  
-- ストレージ：chrome.storage.sync（local fallbackあり）  
-- 付箋データは ChatID 単位  
-- 自動同期：ターン追加 / チャット切り替え
+会話が非常に長い場合（80〜120ターン以上）
+ChatGPT 側で以下が発生する場合があります：
+
+* Unable to load conversation
+* 500 エラー
+* 画面が白いまま固まる
+* メモリ使用量が 800MB〜1GB以上に増加
+
+これは ChatGPT 本体の制限であり、Navigator からは制御できません。
+
+**推奨：**
+
+* 大規模プロジェクトは複数チャットに分ける
+* メモリ使用量が増えたらタブを開き直す
 
 ---
 
 ## 📜 ライセンス
+
 MIT License
 
 ---
 
-## 🙏 作者より
-ChatGPT の長い会話をもっと扱いやすくするために作りました。  
-改善案はいつでも歓迎です。
+**Happy navigating ✨**
+
+---
