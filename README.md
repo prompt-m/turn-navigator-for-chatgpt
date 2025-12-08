@@ -1,5 +1,3 @@
----
-
 # ChatGPT Turn Navigator
 
 *(English version first / 日本語は下にあります)*
