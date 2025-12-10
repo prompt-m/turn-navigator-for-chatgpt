@@ -661,21 +661,33 @@ const PREVIEW_CSS = `
 #cgpt-list-body .cgtn-clip-pin.on svg.cgtn-pin-svg{
   fill:currentColor;
 }
-
-
-/* 付箋ボタン用 SVG 調整
-#cgpt-list-panel .cgtn-clip-pin svg.cgtn-pin-svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-  fill: currentColor;
-  stroke: currentColor;
+/* ナビ下部のミニボタン行（⟳ と ⚙） */
+#cgpt-nav .cgtn-mini-row{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  margin:4px 0 2px;
 }
 
-#cgpt-list-panel .cgtn-clip-pin.off  { color: #888; }
-#cgpt-list-panel .cgtn-clip-pin.on   { color: #ff9500; }
-#cgpt-list-panel .cgtn-clip-pin:hover { color: #ffb84d; }
-*/
+/* ミニボタン本体を丸く中央寄せ */
+#cgpt-nav .cgtn-mini-btn{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+}
+
+/* リフレッシュのアイコンサイズを揃える */
+#cgpt-nav .cgtn-mini-btn svg{
+  width:16px;
+  height:16px;
+}
+
+
 `;
 
 /* ここで一括注入（順序固定） */
@@ -753,9 +765,34 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
           <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
           <span data-i18n="list"></span>
         </label>
-
+        <div class="cgtn-mini-row">
+        <!-- 最新にするボタン（ナビパネル） -->
+        <button id="cgpt-navi-refresh" class="cgtn-mini-btn" type="button"
+                title="${T('navi.refresh')}" aria-label="${T('navi.refresh')}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <!-- 円弧：320°、中央ぴったり -->
+            <circle
+              cx="12" cy="12" r="7.5"
+              fill="none"
+              stroke="#111827"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-dasharray="40 7"
+              transform="rotate(-50 12 12)"
+            />
+            <!-- 先端の矢印（三角形） -->
+            <g transform="translate(-1,1)">
+              <path
+                d="M16.5 3.6 L21.2 5.4 L17.4 9.4 Z"
+                fill="#111827"
+              />
+            </g>
+          </svg>
+        </button>
         <!-- 設定ボタン -->
-        <button id="cgtn-open-settings" class="cgtn-open-settings" title="設定を開く">⚙</button>
+        <button id="cgtn-open-settings" class="cgtn-mini-btn " 
+                title="設定を開く">⚙</button>
+      </div>
       </div>
     `;
 
@@ -840,10 +877,35 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
       '#cgpt-nav .cgpt-lang-btn' : 'nav.lang',
       '#cgpt-viz'                : 'nav.viz',
       '#cgpt-list-toggle'        : 'nav.list',
+      '#cgpt-navi-refresh'       : 'nav.refresh',
       '#cgtn-open-settings'      : 'nav.openSettings'
     }, document);
 
-/*ｺｺｶﾗ*/
+    // === 手動リフレッシュ（ナビパネル） ===
+    (function bindNaviRefresh(){
+      const btn = box.querySelector('#cgpt-navi-refresh');
+      if (!btn) return;
+    
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+    
+        try {
+          // 内部状態を完全再構築
+          LG.rebuild?.();
+    
+          // 一覧パネルが開いていれば再描画
+          if (SH.isListOpen?.()) {
+            LG.renderList?.(true);
+          }
+    
+          console.debug('[CGTN] manual refresh (nav): rebuild + optional renderList');
+        } catch (e) {
+          console.warn('[CGTN] nav refresh failed', e);
+        }
+      });
+    })();
+
     // === フォーカスが残らない最終防御（モダリティ + パーキング） ===
     (function enforceNoFocusNav(){
       const root = document.getElementById('cgpt-nav');
@@ -888,9 +950,9 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
         } catch {}
       }, { capture:true });
     })();
-/*ｺｺﾏﾃﾞ*/
 
   }
+/* installUI ｺｺﾏﾃﾞ*/
 
   function applyLang(){
     const box = document.getElementById('cgpt-nav');
