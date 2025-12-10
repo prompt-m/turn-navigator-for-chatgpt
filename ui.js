@@ -108,14 +108,80 @@ const NAV_CSS = `
 #cgpt-nav button:hover{ background:#fff }
 */
 .cgpt-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0px }
-#cgpt-nav .cgpt-lang-btn{ height:28px; margin-top:4px; color:#000 }
-#cgpt-nav input[type=checkbox] { cursor: pointer; }  
-.cgpt-viz-toggle,.cgpt-list-toggle{
-  margin-top:6px; display:flex; gap:8px; align-items:center;
-  justify-content:flex-start; font-size:12px; cursor:pointer
+#cgpt-nav .cgpt-lang-btn{ height:22px; margin-top:16px; color:#000 }
+#cgpt-nav input[type=checkbox] { cursor: pointer; }
+#cgpt-nav .cgpt-list-toggle input:checked + .cgtn-pill-btn{
+  background:#111;
+  color:#fff;
+  box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
-.cgpt-viz-toggle:hover,.cgpt-list-toggle:hover{ cursor:pointer; opacity:.9 }
 
+/* 一覧トグルを pill ボタン化（ロールボタンと同じ仕様） */
+#cgpt-nav .cgpt-list-toggle{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin-top:6px;
+}
+
+#cgpt-nav .cgpt-list-toggle > input[type="checkbox"]{
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+
+/* OFF（ロールボタンOFFと同じ） */
+#cgpt-nav .cgpt-list-toggle > span{
+  height:22px;
+  min-width:60px;
+  padding:6px 14px;
+  border-radius:999px;
+  background:#fff;
+  color:#111;
+  font-size:12px;
+  box-shadow:0 3px 10px rgba(0,0,0,.12);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  cursor:pointer;
+  transition:
+    background .18s ease,
+    color .18s ease,
+    box-shadow .18s ease,
+    transform .08s ease;
+}
+
+/* hover（ロールボタンと統一） */
+#cgpt-nav .cgpt-list-toggle > span:hover{
+  box-shadow:0 6px 18px rgba(0,0,0,.16);
+  background:#f3f4f6;
+  transform:translateY(-1px);
+}
+
+/* ON（ロールボタンONと完全一致） */
+#cgpt-nav .cgpt-list-toggle > input[type="checkbox"]:checked + span{
+  background:#111;
+  color:#fff;
+  box-shadow:0 3px 10px rgba(0,0,0,.25);
+}
+
+/*
+.cgpt-viz-toggle,
+.cgpt-list-toggle{
+  margin-top:6px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:flex-start;
+  font-size:12px;
+  cursor:pointer
+}
+.cgpt-viz-toggle:hover,
+.cgpt-list-toggle:hover{
+  cursor:pointer;
+  opacity:.9 
+}
+*/
 /* --- 設定ボタン（ナビ内：枠なし・中央寄せ） --- */
 #cgtn-open-settings.cgtn-open-settings{
   all: unset;                              /* ブラウザ標準のボタン装飾を全部消す */
@@ -562,9 +628,10 @@ const MISC_CSS = `
 #cgpt-list-foot { display:flex; align-items:center; gap:2px; }
 #cgpt-list-foot-info { margin-left:auto; }
 
-/* トグルラベルの文字色を黒固定 */
+/* トグルラベルの文字色を黒固定 
 .cgpt-viz-toggle span[data-i18n="line"] { color: #000; }
 .cgpt-list-toggle span[data-i18n="list"] { color: #000; }
+*/
 
 /* フッタ系ボタンの色 */
 #cgpt-list-foot,      /* リストパネルのフッタ */
@@ -652,6 +719,7 @@ const PREVIEW_CSS = `
   stroke:currentColor;
   fill:none;
 }
+
 
 /* ピン ON 時：ボタン色を赤にし、中身も塗りつぶす */
 #cgpt-list-body .cgtn-clip-pin.on{
@@ -762,8 +830,8 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
 
         <!-- 一覧表示 -->
         <label class="cgpt-list-toggle">
-          <input id="cgpt-list-toggle" type="checkbox" style="accent-color:#888;">
-          <span data-i18n="list"></span>
+          <input id="cgpt-list-toggle" type="checkbox">
+          <span class="cgtn-pill-btn" data-i18n="list"></span>
         </label>
         <div class="cgtn-mini-row">
         <!-- 最新にするボタン（ナビパネル） -->
