@@ -1441,7 +1441,7 @@ console.log("******logic.js refreshBtn click");
           #cgpt-list-filter:has(#lv-user:checked)   + #cgpt-list-body .row:not([data-role="user"])      { display:none; }
           #cgpt-list-filter:has(#lv-assist:checked) + #cgpt-list-body .row:not([data-role="assistant"]) { display:none; }
           #cgpt-list-filter:has(#lv-pin:checked)    + #cgpt-list-body .row:not([data-pin="1"]) { display:none; }
-          #cgpt-list-body { counter-reset: cgtn_turn; }
+          /*#cgpt-list-body { counter-reset: cgtn_turn; } '25.12.12*/
           /* 付箋のみ表示（ピン無し行を非表示） '25.11.28
            パネルに .pinonly が付いている間だけ、
            data-pin="1" 以外の .row が全部 display:none になる。*/

@@ -306,6 +306,7 @@ const LIST_CSS = `
   gap:6px; 
   line-height:1.7;         /* 本文のline-heightと合わせる */
 }
+/* */
 #cgpt-list-body .row::before{
   content: "";
   display:inline-block;
@@ -329,9 +330,18 @@ const LIST_CSS = `
 #cgpt-list-body .row .ops{
   align-self: center;    /* ★ 行全体の高さの中で中央寄せ */
 }
-#cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }
+/*#cgpt-list-body .turn-idx-anchor { counter-increment: cgtn_turn; }*/
+/*
 #cgpt-list-body .turn-idx-anchor::before{
   content: counter(cgtn_turn);
+  opacity:.75;
+  color:#333;
+  vertical-align:middle;
+}
+*/
+/* ターン番号を実番号に変更 */
+#cgpt-list-body .turn-idx-anchor::before{
+  content: attr(data-idx);   /* ← CSSカウンタの代わりに data-idx を表示 */
   opacity:.75;
   color:#333;
   vertical-align:middle;
