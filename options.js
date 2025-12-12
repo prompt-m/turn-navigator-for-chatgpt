@@ -28,29 +28,39 @@ console.log("syncSetAsync",obj);
   }
 
   /* 使用量（KB）＋アイテム数 を同時表示。i18n対応 */
+  /* 使用量（KB）＋付箋付きチャット数 を同時表示。i18n対応 */
   async function updateSyncUsageLabel(){
     try{
       const el = document.getElementById('sync-usage');
       if (!el) return;
-  
+
       // Promise化ヘルパ
       const getBytes = () => new Promise(res => chrome.storage.sync.getBytesInUse(null, b => res(b||0)));
       const getAll   = () => new Promise(res => chrome.storage.sync.get(null, obj => res(obj||{})));
-  
+
       const [bytesInUse, allItems] = await Promise.all([ getBytes(), getAll() ]);
-  
-      const usedKB  = (bytesInUse/1024).toFixed(1);
-      const totalKB = 100;       // sync 全体上限=約100KB
-      const items   = Object.keys(allItems).length - 1;//共通キー分をマイナス
-      const itemsMax = 512-1;      // sync のキー上限
-  
+
+      const usedKB   = (bytesInUse/1024).toFixed(1);
+      const totalKB  = 100;        // sync 全体上限=約100KB
+      const itemsMax = 512 - 1;    // sync のキー上限（共通キー除外）
+
+      // ★ 付箋付きチャット数を正しく数える
+      const pinKeys = Object.keys(allItems).filter(k => k.startsWith('cgtnPins::'));
+      const pinChats = pinKeys.filter(k => {
+        const pins = allItems[k]?.pins;
+        return Array.isArray(pins) && pins.some(Boolean);
+      }).length;
+
       // i18n（無ければフォールバック）
       const t = window.CGTN_I18N?.t || (s=>s);
-      const usageLabel = t('options.syncUsage');   // 例: "sync使用量"
-      const itemsLabel = t('options.itemsLabel');  // 例: "アイテム数"
-  
-      // 表示テキストは 例) "sync使用量 8.0KB / 100KB ・ アイテム数 23 / 512"
-      el.textContent = `${usageLabel} ${usedKB}KB / ${totalKB}KB ・ ${itemsLabel} ${items} / ${itemsMax}`;
+      const usageLabel = t('options.syncUsage');        // 例: "sync使用量"
+      const itemsLabel = t('options.itemsLabel')       // フォールバック
+                      || '付箋付きチャット数';
+
+      // 表示テキスト例:
+      // "sync使用量 8.0KB / 100KB ・ 付箋付きチャット数 5 / 511"
+      el.textContent =
+        `${usageLabel} ${usedKB}KB / ${totalKB}KB ・ ${itemsLabel} ${pinChats} / ${itemsMax}`;
     }catch(e){
       // 取れない場合は静かにスキップ
       console.warn('updateSyncUsageLabel failed', e);
