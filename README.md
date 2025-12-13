@@ -216,8 +216,7 @@ ChatGPT の実務利用を強力に支援します。
 * ON/OFF
 * **付箋のみ表示**
 * ChatID ごとに保存
-* Storage Sync を優先（容量制限あり）
-
+* chrome.storage.sync に保存（容量制限あり）
 ---
 
 ### ■ 3. 添付ファイル検出（現行仕様）

@@ -203,7 +203,6 @@
       const last = sc.querySelector('.row:last-of-type');
       if (last) last.scrollIntoView({ block:'end', inline:'nearest' });
       else sc.scrollTop = sc.scrollHeight;
-      console.debug('[scrollListToTurn] turnKey undefined → scroll to bottom');
       return;
     }
 

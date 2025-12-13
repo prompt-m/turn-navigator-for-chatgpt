@@ -152,9 +152,9 @@
         try { SH.setPageInfo?.(__pageInfo); } catch {}
 
         // ログ（どこから→どこへ）
-        try {
-          console.debug('[cgtn] nav', `${fKind}:${fCid || '-'}`, '→', `${kind}:${cidNow || '-'}`, 'hasTurns=', !!d.hasTurns);
-        } catch {}
+//        try {
+//          console.debug('[cgtn] nav', `${fKind}:${fCid || '-'}`, '→', `${kind}:${cidNow || '-'}`, 'hasTurns=', !!d.hasTurns);
+//        } catch {}
 
         // --- 非チャット系：クリアのみ（ONならメッセージA）
         if (kind === 'home' || kind === 'project' || kind === 'other' || kind === 'new') {

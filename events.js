@@ -38,15 +38,20 @@
       if (!el) return;
 
       // --- 一覧トグル ---
-      if (el.closest('#cgpt-list-toggle')) {
-        const on = el.closest('#cgpt-list-toggle').checked;
+      const chk = el && el.closest ? el.closest('#cgpt-list-toggle') : null;
+      if (chk) {
+        const on = chk.checked;
+
         LG.setListEnabled?.(on);
+
+        // フォーカスを外して“カーソル残り”を防ぐ
+        try { chk.blur(); } catch {}
 
         // 一覧OFFなら付箋もOFF & 無効化
         const pinOnlyChk = document.getElementById('cgpt-pinonly');
-        if (!on && pinOnlyChk){
+        if (!on && pinOnlyChk) {
           const cur = SH.getCFG() || {};
-          SH.saveSettingsPatch({ list:{ ...(cur.list||{}), pinOnly:false } });
+          SH.saveSettingsPatch({ list: { ...(cur.list || {}), pinOnly: false } });
           pinOnlyChk.checked = false;
           pinOnlyChk.disabled = true;
         }

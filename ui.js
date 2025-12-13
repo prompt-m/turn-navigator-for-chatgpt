@@ -914,21 +914,19 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
       listChk.checked = !!cfg.list?.enabled;
 
       // 一覧トグル：保存 → 表示切替
-      listChk.addEventListener('change', () => {
-        const on  = listChk.checked;
-        const cur = SH.getCFG() || {};
-        const patch = on
-          ? { list:{ ...(cur.list||{}), enabled:true } }
-          : { list:{ ...(cur.list||{}), enabled:false,  Only:false } };
-
-        SH.saveSettingsPatch(patch);
+//      listChk.addEventListener('change', () => {
+//        const on  = listChk.checked;
+//        const cur = SH.getCFG() || {};
+//        const patch = on
+//          ? { list:{ ...(cur.list||{}), enabled:true } }
+//          : { list:{ ...(cur.list||{}), enabled:false,  Only:false } };
+//        SH.saveSettingsPatch(patch);
 //★★★もしかしたら不要？★★★
 //console.debug('[installUI] window.CGTN_LOGIC?.setListEnabled on: ',on);
 //        window.CGTN_LOGIC?.setListEnabled?.(on);
-
         // フォーカスを外して“カーソル残り”を防ぐ ★★★★
-        try{ listChk.blur(); }catch{}
-      });
+//        try{ listChk.blur(); }catch{}
+//      });
     } catch {}
 
     // 既定値反映（復唱：念のため）
