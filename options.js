@@ -17,7 +17,6 @@
 
   /* sync.set の Promise ラッパ（lastError を reject） */
   function syncSetAsync(obj){
-console.log("syncSetAsync",obj);
     return new Promise((resolve, reject)=>{
       chrome.storage.sync.set(obj, ()=>{
         const err = chrome.runtime?.lastError;
@@ -195,7 +194,6 @@ console.log("syncSetAsync",obj);
   // --- near-pointer toast ---
   function toastNearPointer(msg, { ms=1400, dx=18, dy=-22 } = {}){
     const host = document.getElementById('cgtn-floater');
-console.log("近くにポワンtoastNearPointer host:",host);
     if (!host) return;
 
     // 画面端でははみ出さない程度にクランプ
@@ -228,7 +226,6 @@ console.log("近くにポワンtoastNearPointer host:",host);
 
 
   function flashMsgInline(id, key='options.saved'){
-console.log("flashMsgInline id:",id);
     const T = window.CGTN_I18N?.t || (s=>s);
     const el = document.getElementById(id);
     if (!el) return;
@@ -289,36 +286,8 @@ console.log("flashMsgInline id:",id);
         res({}); 
       }
     });
-console.log("renderPinsManager*2 all:",all);
     const cfg = SH.getCFG?.() || {};
-console.log("renderPinsManager*2.1 cfg:",cfg);
     const map = {};
-
-/*
-    for (const [key, val] of Object.entries(all)) {
-      if (!key.startsWith('cgtnPins::')) continue;
-      const chatId  = key.slice('cgtnPins::'.length);
-      const pinsArr = Array.isArray(val?.pins) ? val.pins : [];
-      if (pinsArr.length === 0) continue;
-
-      // ① 付箋データに保存されたタイトルを最優先
-      const savedTitle = (val.title || '').trim();
-
-      // ② インデックス（chatIndex.ids/map）にも同じCIDがあれば補完
-      const live = (cfg.chatIndex?.ids?.[chatId] || cfg.chatIndex?.map?.[chatId]) || {};
-      const proj = (live.project || live.folder || live.group || '').trim();
-      const idxTitle = (live.title || '').trim();
-
-      // ③ 優先度：savedTitle > idxTitle > fallback(CID)
-      let title = savedTitle || idxTitle || chatId;
-      if (proj && !title.startsWith(proj)) title = `${proj} - ${title}`;
-
-      // ④ 更新日時は val.updatedAt をそのまま採用
-      const updated = val.updatedAt || live.updated || null;
-
-      map[chatId] = { pins: pinsArr, title, updatedAt: updated };
-    }
-*/
 
     for (const [key, val] of Object.entries(all)) {
       if (!key.startsWith('cgtnPins::')) continue;
@@ -360,19 +329,14 @@ console.log("renderPinsManager*2.1 cfg:",cfg);
       };
     }
 
-console.log("renderPinsManager*3 map:",map);
     const tbody = document.getElementById('pins-tbody');
     if (!tbody) return;
 
-//    const cfg = (SH.getCFG && SH.getCFG()) || {};
-  
     // サイドバーの“生存チャット索引”があれば補助で使う（無ければ空でOK）
     const liveIdx = (cfg.chatIndex && (cfg.chatIndex.ids || cfg.chatIndex.map)) || {};
-    console.log("renderPinsManager*3.3 liveIdx:", liveIdx);
 
     // 今開いているチャットID（options では基本 null でOK）
     const nowOpen  = cfg.currentChatId ?? null;
-    console.log("renderPinsManager*3.5 nowOpen:", nowOpen);
 
     // ★ rows は配列のまま保持
     const rows = Object.entries(map).map(([cid, rec]) => {
@@ -380,7 +344,6 @@ console.log("renderPinsManager*3 map:",map);
       const turns = pinsArr.length;                 // ★ pinsArr の要素数が「会話数」
       const pinsCount = pinsArr.filter(Boolean).length;
       const t = SH.getTitleForChatId(cid, rec?.title || '');
-console.log("renderPinsManager*3.6 t:", t);
       return {
         cid,
         title: t.slice(0,120),
@@ -389,9 +352,6 @@ console.log("renderPinsManager*3.6 t:", t);
         date : rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : ''
       };
     }).sort((a,b)=> b.count - a.count || (a.title > b.title ? 1 : -1));
-
-console.log("renderPinsManager*4 rows:", rows);
-console.log("renderPinsManager*5 rows.length:",rows.length);
 
     // 空
     if (!rows.length){
@@ -515,7 +475,6 @@ console.log("renderPinsManager*5 rows.length:",rows.length);
     //const ok = await SH.deletePinsForChatAsync(chatId);
   
     if (ok){
-console.log("付箋データ削除 deletePinsFromOptions ok");
       // ChatGPTタブへ同期通知（chatgpt.com と chat.openai.com の両方）
       try {
         const targets = ['*://chatgpt.com/*', '*://chat.openai.com/*'];
@@ -535,7 +494,6 @@ console.log("付箋データ削除 deletePinsFromOptions ok");
       toastNearPointer(T('options.deleted') || 'Deleted');
 
     } else {
-console.log("付箋データ削除 deletePinsFromOptions ng");
 
       // 保存失敗（lastError など）→ UI でアラート/トースト
       try{

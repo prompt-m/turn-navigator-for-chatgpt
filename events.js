@@ -40,7 +40,6 @@
       // --- 一覧トグル ---
       if (el.closest('#cgpt-list-toggle')) {
         const on = el.closest('#cgpt-list-toggle').checked;
-console.debug('bindEvents 一覧トグル #cgpt-list-toggle checked;: ',on);
         LG.setListEnabled?.(on);
 
         // 一覧OFFなら付箋もOFF & 無効化
@@ -113,6 +112,5 @@ console.debug('bindEvents 一覧トグル #cgpt-list-toggle checked;: ',on);
       }
     }, false);
   }
-//console.log("event.js bindEvents");
   NS.bindEvents = bindEvents;
 })();

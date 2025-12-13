@@ -195,15 +195,8 @@
 
   //行へスクロールする関数
   function scrollListToTurn(turnKey){
-console.log("scrollListToTurn*1");
     const sc = document.getElementById('cgpt-list-body');
     if (!sc) return;
-
-    // 未描画/未計測なら次フレームで再試行
-//    if ((sc.scrollHeight === 0) || (sc.clientHeight === 0)) {
-//      requestAnimationFrame(() => scrollListToTurn(turnKey));
-//      return;
-//    }
 
     // ★ 改修: turnKey が未指定なら末尾にスクロール
     if (!turnKey) {
@@ -215,12 +208,10 @@ console.log("scrollListToTurn*1");
     }
 
     const row = sc.querySelector(`.row[data-turn="${CSS.escape(turnKey)}"]`);
-console.log("scrollListToTurn*5 row",row);
     if (!row) return;
 
     // 行をパネル中央付近に出す
     const top = row.offsetTop - (sc.clientHeight/2 - row.clientHeight/2);
-console.log("scrollListToTurn*6 top",top);
 
     sc.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
   }
@@ -282,9 +273,7 @@ console.log("scrollListToTurn*6 top",top);
   // 見出しテキスト：ファイル名＋本文を両方出す（両方ある場合は「 | 」で連結）
   function extractSummaryText(head, maxChars){
 
-console.log("extractSummaryText head:",head);
     const names = collectAttachmentNames(head);
-console.log("extractSummaryText name:",name);
     let filePart = names.length ? names.join('、 ') : '';
 
     // 本文候補
@@ -568,8 +557,6 @@ console.log("extractSummaryText name:",name);
       // もし内部で turnId を振っているなら、そのIDで探索（任意）
       idx = rows.findIndex(n => n?.dataset?.turnId === target.dataset.turnId);
     }
-    // デバッグ
-//console.debug('getTurnKey len:', rows.length, 'idx:', idx);
     return idx >= 0 ? ('turn:' + (idx + 1)) : '';
 
   }
@@ -684,18 +671,6 @@ console.log("extractSummaryText name:",name);
         next = !!(await SH.isPinnedByIndex?.(idx1, chatId));
       }
 
-/*
-      // そのターンに属する全行をON/OFF '25.12.3
-      const turnKey = rowEl.dataset.turn || ('turn:' + idx1);
-      const rows = rowsByTurn(turnKey);
-console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",turnKey);
-
-      (rows.length ? rows : [rowEl]).forEach(r => {
-        if (next) r.dataset.pin = '1';
-        else      r.removeAttribute('data-pin');
-        paintPinRow(r, next);   // 添付行/本文行まとめて更新
-      });
-*/
       // そのターンに属する全行を ON/OFF（添付行＋本文行） '25.12.3 改
       try {
         const listBody = document.getElementById('cgpt-list-body');
@@ -849,14 +824,9 @@ console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",tu
 
     // --- 付箋のみ表示フラグ ---
     const cfg         = SH.getCFG?.() || {};
-//    const pinOnlyMode = !!cfg.list?.pinOnly;
-
-    // --- ST.* から「対象ターン idx1 一覧」を決定 ---
-//    const targets = collectTargetsForBulk(role, doPinOn, pinOnlyMode, ST);
     // '25.12.3 変更
     const targets = collectTargetsForBulk(role, ST);
     if (!targets.length){
-      console.debug('[bulkSetPins] no targets', { role, mode: doPinOn });
       return;
     }
 
@@ -984,7 +954,6 @@ console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",tu
         return r.height > 10 && disp !== 'none';
       } catch { return false; }
     });
-//console.log("pickAllTurns 3 visible.length",visible.length);
 
     return visible;
   }
@@ -1056,7 +1025,6 @@ console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",tu
         prevH = h;
       }
     }
-    console.debug('[logic] ensureTurnsReady done');
   }
 
   // ST: 現在ページ（チャット）内のターン情報を保持する状態オブジェクト。
@@ -1105,11 +1073,9 @@ console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",tu
     const t0 = performance.now();
     const allRaw = pickAllTurns().filter(isRealTurn);
     nextST.all = sortByY(allRaw);
-    console.debug('[cgtn:rebuild] turns=', nextST.all.length, 'in', (performance.now()-t0).toFixed(1), 'ms');
 
     // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
     if (nextST.all.length === 0) {
-      console.debug('[rebuild] no <article> found → reset list panel');
       CGTN_LOGIC.clearListPanelUI?.();
       // ↓ この後の確定ブロックで my/cid の照合を通す
     } else {
@@ -1145,10 +1111,8 @@ console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",tu
     ST._userSet   = nextST._userSet || new Set(ST.user);
     ST._asstSet   = nextST._asstSet || new Set(ST.assistant);
 
-    // デバッグ公開（任意）
+    // デバッグ公開
     NS.ST = ST;
-    console.debug('[rebuild] turns:', ST.all.length, 'user:', ST.user.length, 'asst:', ST.assistant.length);
-//    console.debug('[rebuild] turns:', ST.all, 'user:', ST.user, 'asst:', ST.assistant);
   }
 
 
@@ -1160,12 +1124,10 @@ console.log("bindDelegatedClipPinHandler rows.length",rows.length," turnKey:",tu
     try {
       const role = el?.dataset?.turn || (el.matches?.('[data-message-author-role="assistant"]') ? 'assistant' :
                                          el.matches?.('[data-message-author-role="user"]') ? 'user' : 'unknown');
-console.log("getDownloadLabelForTurn role:",role);
 
       // headNodeOf() で主要ノードを取得し、そのテキストをtrimして本文扱いとする。
       const head = headNodeOf(el);
       const text = (head?.textContent || head?.innerText || '').trim();
-//console.log("getDownloadLabelForTurn test:",text);
       // 「〇〇をダウンロード」 or 「この〇〇をダウンロード」の検出
       const m = text.match(/(.+?)をダウンロード/);
       if (m) {
@@ -1182,7 +1144,6 @@ console.log("getDownloadLabelForTurn role:",role);
       return '';
    
     } catch {
-console.log("getDownloadLabelForTurn catch");
       return ''; 
     }
   }
@@ -1190,19 +1151,15 @@ console.log("getDownloadLabelForTurn catch");
   // 追加：パネルを完全クリア（タイトル/バッジ/本文）
   CGTN_LOGIC.clearListPanelUI = function clearListPanelUI(){
     try {
-console.log("clearListPanelUI*1");
       const body  = document.getElementById('cgpt-list-body');
       if (body) body.innerHTML = '';
       const el = document.getElementById('cgpt-chat-title');
       if (el) {
-console.log("clearListPanelUI el.textContent:",el.textContent);
         el.textContent = '';
         el.title = ''; 
       }
       // バッジの場所を変更 '25.11.28
       const host  = document.getElementById('lv-lab-pin');
-//      const badge = host?.querySelector('.cgtn-badge');
-//      if (badge) { badge.textContent = ''; badge.hidden = true; }
       if (host) {
         host.removeAttribute('aria-pressed');
         host.classList.remove('active');
@@ -1216,7 +1173,6 @@ console.log("clearListPanelUI el.textContent:",el.textContent);
 
     // 状態も空に
     try {
-console.log("clearListPanelUI*2");
       const ST = CGTN_LOGIC.ST || (CGTN_LOGIC.ST = {});
       ST.all = []; ST.user = []; ST.assistant = [];
 
@@ -1224,10 +1180,8 @@ console.log("clearListPanelUI*2");
       try { CGTN_LOGIC.updatePinOnlyBadge?.(); } catch {}
       // ここではフッターは触らない（↑で empty 済）
     } catch {
-console.log("clearListPanelUI catch");
     }
   };
-
 
   CGTN_LOGIC.updateListChatTitle = function updateListChatTitle(){
     const el = document.getElementById('cgpt-chat-title');
@@ -1394,7 +1348,6 @@ console.log("clearListPanelUI catch");
     if (refreshBtn && !refreshBtn._cgtnBound) {
       refreshBtn._cgtnBound = true;
       refreshBtn.addEventListener('click', (e) => {
-console.log("******logic.js refreshBtn click");
 
         e.preventDefault();
         e.stopPropagation();
@@ -1578,14 +1531,12 @@ console.log("******logic.js refreshBtn click");
 
       const applyFromChecked = () => {
         const checked = box.querySelector('input[name="cgtn-lv"]:checked');
-console.log("******bindRoleFilter checked:",checked);
         if (!checked) return;
         // ---- ロール決定（User / Assistant / それ以外は All）----
         let role = 'all';
         if (checked.id === 'lv-user')   role = 'user';
         if (checked.id === 'lv-assist') role = 'assistant';
         NS.viewRole = role;
-console.log("******bindRoleFilter role:",role);
         // ---- ★ pinOnly 状態を cfg に同期（Pinned ラジオが ON なら true）---- '25.11.28
         try {
           const cfg = SH.getCFG?.() || {};
@@ -1618,7 +1569,6 @@ console.log("******bindRoleFilter role:",role);
       btn._cgtnBound = true;
 
       btn.addEventListener('click', () => {
-console.log("******logic.js 畳む開く click");
         const collapsed = panel.classList.toggle('collapsed');
         const on = !collapsed; // 展開=true
         btn.textContent = on ? '▴' : '▾';       // 開=▴ / 閉=▾
@@ -1722,7 +1672,6 @@ console.log("******logic.js 畳む開く click");
 
   let _renderTicket = 0;
   NS.renderList = async function renderList(forceOn=false, opts={}){
-//console.log('[renderList 冒頭]');
     const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
 
     // 0) Shared 初期化待ち（最大4秒で打ち切り）
@@ -1734,14 +1683,12 @@ console.log("******logic.js 畳む開く click");
         ]);
       } catch(_) {}
     }
-//console.log('[renderList *1]');
 
     // 1) チャットページかどうか（getPageInfo → URL フォールバック）
     const info = SH?.getPageInfo?.() || {};
     const kind = info.kind || (location.pathname.includes('/c/') ? 'chat' : 'other');
     if (kind !== 'chat') {
       LG?.clearListPanelUI?.();
-//console.log('[renderList *2]');
       return;
     }
 
@@ -1762,23 +1709,18 @@ console.log("******logic.js 畳む開く click");
     panel.style.display = 'flex';          // CSS 既定の display:none を解除
     panel.style.visibility = 'hidden';     // レイアウト確定まで
 
-//console.log('[renderList *3 panel.style.display:]',panel.style.display);
-
     // 3) 競合キャンセル用チケット（待機後に採番）
     const my = ++_renderTicket;
-//console.log('[renderList*4] my:',my);
 
     // 4) ST が空なら一度だけ再構築
     if (!LG?.ST?.all?.length) {
       LG?.rebuild?.();
       if (!LG?.ST?.all?.length) {
-//console.log('[renderList *5]');
         return;
       }
     }
 
     const cidAtStart = SH.getChatId?.();
-    console.log('[renderList] start cid=', cidAtStart, 'ticket=', my);
 
     const body  = panel.querySelector('#cgpt-list-body');
     body.style.maxHeight = 'min(75vh, 700px)';
@@ -1791,12 +1733,6 @@ console.log("******logic.js 畳む開く click");
       ? !!opts.pinOnlyOverride
       : !!cfg.list?.pinOnly;
 
-console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length);
-
-//    const pinBtn = panel.querySelector('#cgpt-pin-filter');
-//    if (pinBtn) pinBtn.setAttribute('aria-pressed', String(pinOnly));
-//    applyPinTheme?.();
-
     const chatId  = SH.getChatId?.();
     //const pinsArr = SH.getPinsArr?.(chatId) || [];
     const pinsArr = await SH.getPinsArrAsync(chatId) || [];//←★★★★
@@ -1806,8 +1742,6 @@ console.debug('[renderList] pinOnly=%s turns(before)=%d',pinOnly, ST.all.length)
 
     // pinOnly のときは「配列」でフィルタ
     if (pinOnly) turns = turns.filter((_, i) => !!pinsArr[i]);
-
-console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object.keys(_pinsCache||{}).length);
 
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx   = (cfg.list?.fontSize || 12) + 'px';
@@ -2079,9 +2013,6 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
       panel.style.visibility = 'visible'; // 最後に見せる（任意）
     }
 
-//    console.debug('[renderList 末尾] panel.style.display:',panel.style.display);
-//    console.debug('[renderList 末尾] panel.style.visibility:',panel.style.visibility);
-    console.debug('[renderList 末尾] NS._currentTurnKey:',NS._currentTurnKey);
   }
 
   // ======================================================
@@ -2112,15 +2043,12 @@ console.debug('[renderList] turns(after)=%d pinsCount=%d',  turns.length, Object
         const maxChars = (SHX.getCFG?.()?.list?.maxChars) || 52;
         CGTN_LOGIC.applyPanelWidthByChars?.(maxChars);
       } catch(e){}
-console.debug('[setListEnabled]再アタッチ ');
       try { installAutoSyncForTurns?.(); } catch(e){} // 再アタッチ
 
       // ★ 元の「rAF×2＋setTimeout 180ms」方式に戻す
       requestAnimationFrame(() => requestAnimationFrame(() => {
-console.debug('[setListEnabled]setTimeout ');
         setTimeout(() => {
           try {
-console.debug('[setListEnabled]rebuild/renderList ');
             rebuild?.();
             NS.renderList?.(true);      // pinOnly:false の状態でフル描画
           } catch(e){
@@ -2128,7 +2056,6 @@ console.debug('[setListEnabled]rebuild/renderList ');
           }
         }, 180);
       }));
-console.debug('[setListEnabled]一覧ON');
 
     } else {
       // --- OFF 時：enabled:false / pinOnly:false にして保存 ---
@@ -2151,7 +2078,6 @@ console.debug('[setListEnabled]一覧ON');
       try { NS.updatePinOnlyBadge?.(); } catch(e){}
       try { NS.updatePinOnlyView?.(); } catch(e){}
     }
-console.debug('[setListEnabled]一覧OFF');
 
   }
 
@@ -2175,7 +2101,6 @@ console.debug('[setListEnabled]一覧OFF');
 
   // === 付箋バッジ更新（唯一の正規処理）=== '25.12.2
   function updatePinOnlyBadge(){
-    console.debug('[*****updatePinOnlyBadge]');
     try {
       const cfg = SH.getCFG?.() || {};
       const cid = SH.getChatId?.();
@@ -2193,11 +2118,7 @@ console.debug('[setListEnabled]一覧OFF');
       const btn   = document.getElementById('lv-lab-pin');
       const badge = btn?.querySelector('.cgtn-badge');
 
-      console.log('[*****updatePinOnlyBadge] pinsCount:', pinsCount,
-                  ' btn:', btn, ' badge:', badge);
-
       if (!btn || !badge) {
-        console.log('[*****updatePinOnlyBadge] return (no btn/badge)');
         return;
       }
 
@@ -2251,7 +2172,6 @@ console.debug('[setListEnabled]一覧OFF');
   // ===== フッター：状態セーフに更新 =====
 
   function clearListFooterInfo(){
-console.log("**clearListFooterInfo ");
     const foot = document.getElementById('cgpt-list-foot-info');
     if (!foot) return;
     foot.dataset.state = 'empty';
@@ -2500,30 +2420,52 @@ console.log("**clearListFooterInfo ");
 
   function goTop(role){
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
-console.log("goTop L.length:",L.length," role:",role);
     if (!L?.length) return;
     scrollToHead(L[0]);
   }
 
   function goBottom(role){
     const sc = getTrueScroller();
-    if (role==='all'){
+
+    // 末尾へ「確実に」到達させる（scrollHeightが途中で伸びても追従）
+    const scrollBottomReliable = () => {
+      const maxTry = 12;
+      let n = 0;
+
+      const kick = () => {
+        const target = sc.scrollHeight;
+
+        // 最初は smooth、以降は auto にして取りこぼしを潰す
+        sc.scrollTo({ top: target, behavior: (n < 2 ? 'smooth' : 'auto') });
+
+        n++;
+        if (n >= maxTry) return;
+
+        // まだ末尾に届いていなければ追い打ち
+        const remain = sc.scrollHeight - (sc.scrollTop + sc.clientHeight);
+        if (remain > 2) {
+          setTimeout(kick, 120);
+        }
+      };
+
+      kick();
+    };
+
+    if (role === 'all'){
       lockFor(SH.getCFG().lockMs);
-      sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
-console.log("goBottom role all");
+      scrollBottomReliable();
       return;
     }
-    const L = role==='user' ? ST.user : ST.assistant;
-console.log("goBottom L.length:",L.length," role:",role);
+
+    const L = role === 'user' ? ST.user : ST.assistant;
     if (!L?.length) return;
-console.log("goBottom L[L.length-1]:",L[L.length-1]);
-    scrollToHead(L[L.length-1]);
+
+    // role別は scrollToHead 側に「安定するまで追う」処理があるので任せる
+    scrollToHead(L[L.length - 1]);
   }
 
   function goPrev(role){
-console.log("goPrev");
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
-console.log("goPrev L.length:",L.length," role:",role);
     if (!L?.length || NS._navBusy) return;
     const sc    = getTrueScroller();
     const yStar = sc.scrollTop + currentAnchorY();
@@ -2534,7 +2476,6 @@ console.log("goPrev L.length:",L.length," role:",role);
   }
 
   function goNext(role){
-console.log("goNext");
     const L = role==='user' ? ST.user : role==='assistant' ? ST.assistant : ST.all;
     if (!L?.length || NS._navBusy) return;
     const sc    = getTrueScroller();

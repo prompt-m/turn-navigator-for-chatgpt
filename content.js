@@ -43,7 +43,6 @@
     let sawPos  = (lastCnt > 0);
     let printed0toN = false;           // 転換ログの多重出力防止
     let printedNto0 = false;
-    console.debug('[***settle] boot cnt=%d, h=%d', lastCnt, lastH);
 
     const turnsQ = 'article,[data-testid^="conversation-turn"]';
     const isTurnNode = (n) => n?.nodeType === 1 && (n.matches?.('article,[data-testid^="conversation-turn"]') || n.querySelector?.(turnsQ));
@@ -58,16 +57,11 @@
             if (cnt !== lastCnt || h !== lastH){
 
               if (!printed0toN && lastCnt === 0 && cnt > 0) {
-                console.debug('[***settle] turns: 0→%d', cnt);
                 printed0toN = true;
               }
               if (!printedNto0 && lastCnt > 0 && cnt === 0) {
-                console.debug('[***settle] turns: %d→0', lastCnt);
                 printedNto0 = true;
               }
-              if (cnt !== lastCnt) console.debug('[***settle] turns   %d→%d', lastCnt, cnt);
-              if (h   !== lastH)   console.debug('[***settle] scroll.h %d→%d', lastH, h);
-
               lastCnt = cnt; lastH = h; lastAt = performance.now();
               if (cnt === 0) sawZero = true;
               if (cnt  > 0)  sawPos  = true;
@@ -83,7 +77,6 @@
     mo.observe(root, { subtree:true, childList:true, attributes:true });
 
     if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) {
-      console.debug('[***settle] aborted: cid changed');
       return false; // 逆戻り/別タブ割込み
     }
     const now = performance.now();
@@ -111,18 +104,14 @@
 
         while (performance.now() - start < maxMs){
           if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) {
-            console.debug('[***settle] aborted: cid changed');
             return false;
           }
           const h   = cgtnScrollStats().h;
           const cnt = cgtnCountTurns();
           if (cnt !== lastCnt || h !== lastH){
-            if (cnt !== lastCnt) console.debug('[settle] turns   %d→%d', lastCnt, cnt);
-            if (h   !== lastH)   console.debug('[settle] scroll.h %d→%d', lastH, h);
             lastCnt = cnt; lastH = h; lastAt = performance.now();
           }
           if (performance.now() - lastAt >= idleMs) {
-            console.debug('[***settle] idle ok (cnt=%d, h=%d)', cnt, h);
             return true; // 静穏
           }
 
@@ -132,7 +121,6 @@
       // フェーズB：変化が idleMs 止まるのを待つ（安定化）
         await new Promise(r => setTimeout(r, tickMs));
       }
-      console.debug('[settle] timeout (%.0fms)', performance.now() - start);
       return false; // タイムアウト
     } finally {
       try{ mo.disconnect(); }catch{}
@@ -141,9 +129,7 @@
 
   // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
   (function bindCgtnMessageOnce(){
-console.log("bindCgtnMessageOnce*0");
     if (window.__CGTN_MSG_BOUND__) return;
-console.log("bindCgtnMessageOnce*1");
     window.__CGTN_MSG_BOUND__ = true;
 
     let __lastCid  = null;  // 直近のchatId
@@ -154,7 +140,6 @@ console.log("bindCgtnMessageOnce*1");
     window.addEventListener('message', (ev) => {
       (async () => {  // ← async ラッパーで await が使えるように
         const d = ev && ev.data;
-console.log("bindCgtnMessageOnce*2 d.source:",d.source);
         if (!d || d.source !== 'cgtn') return;
 
         const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
@@ -204,7 +189,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
                 if (myGen !== __gen) return; // 競合キャンセル
                 // 一括待機＋rebuild＋必要ならrenderList（一覧OFFなら内部でスキップ）
                 await rebuildAndRenderSafely({ /* forceList:false */ });
-                console.debug(`[cgtn] ${changed ? 'chat-switch' : 'turn-added'} → rebuild(+render) done`);
               })().catch(err => console.warn('[cgtn] rebuildAndRenderSafely error:', err))
                 .finally(() => { try { setUiBusy?.(false); } catch {} });
             });
@@ -307,7 +291,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
             pinned: !!pinned
           }
         });
-//console.log("saveDockState pinned:",pinned," w:",dock.style.width," h:",dock.style.height," x:",dock.style.left," y:",dock.style.top);
       }
 
       // 保存済み状態を復元（呼ぶだけで反映）
@@ -332,8 +315,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
           dock.setAttribute('data-pinned','1');
         }
 
-// デバッグ
-//console.log("restoreDock pinned:",pinned," w:",dock.style.width," h:",dock.style.height," x:",dock.style.left," y:",dock.style.top);
       }
 
 
@@ -467,7 +448,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
         h: Math.max(minH, Math.round(r.height)),
         sig: { vp: _vp(), lr: _listRect() }
       };
-//        console.log("_savePlace pinned:",pinned," w:",Math.round(r.width)," h:",Math.round(r.height)," x:",Math.round(r.left)," y:",Math.round(r.top));
       window.CGTN_SHARED?.saveSettingsPatch?.({ previewDockPlace: place });
     }
 
@@ -560,7 +540,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
       body.textContent = text;
       body.scrollTop = 0;
  
-//console.log("updateDock pinned:",pinned);
     }
 
     // A) マウスムーブ：常時差し替え（見せない）
@@ -570,7 +549,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
       const btn = e.target.closest?.(BTN_SEL);
       if (!btn) return;
       cancelAnimationFrame(raf);
-//console.log("mousemove pinned:",pinned);
       raf = requestAnimationFrame(() => updateDock(btn));
     }, true);
 
@@ -639,21 +617,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
     // 初回も一度呼ぶ（初期描画）
     requestAnimationFrame(redraw); // 初期描画
   }
-/*
-  // ========= 4) DOM変化→rebuild（自作UIは無視） =========
-  function observeAndRebuild(){
-    // 自前UIの変化は無視してループを断つ
-    const mo = new MutationObserver(muts=>{
-      for (const m of muts){ if (inOwnUI(m.target)) return; }
-      // 既存の「再初期化」フローに便乗して閉じる（併用可）
-      window.CGTN_PREVIEW?.hide?.('reinit');
-//console.debug('[observeAndRebuild]LG.rebuild() ');
-      //LG.rebuild();
-    });
-    mo.observe(document.body, { childList:true, subtree:true });
-    return mo;
-  }
-*/
   // ========= 5) URL変化でのクローズ・再描画 =========
 
   function closeDockOnUrlChange(){
@@ -662,7 +625,6 @@ console.log("bindCgtnMessageOnce*2 d.source:",d.source);
      // ここに既存の popstate/hashchange/setInterval(check, …) などを有効のまま
     // インジェクト方式を使う場合は発火源が二重になるのでバイパス
 
-console.log("＊＊＊＊closeDockOnUrlChange＊＊＊＊");
       let last = location.pathname + location.search;
 
       // リスト開状態なら自動で中身を新チャットへ差し替える
@@ -670,32 +632,25 @@ console.log("＊＊＊＊closeDockOnUrlChange＊＊＊＊");
 
       const check = () => {
         const cur = location.pathname + location.search;
-console.log("＊＊＊＊closeDockOnUrlChange 1＊＊＊＊ cur:",cur);
         if (cur === last) return;
 
-console.log("＊＊＊＊closeDockOnUrlChange 2＊＊＊＊");
         last = cur;
         window.CGTN_PREVIEW?.hide?.('url-change');
 
         // ★ 開いている時だけ自動更新（閉じているなら何もしない）
         if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()) {
           try {
-console.log("＊＊＊＊closeDockOnUrlChange 3 open＊＊＊＊");
             const cid = SH.getChatId?.();
             // pins → 新チャットへ切替（引数省略版でもOK）
             if (cid) LG?.hydratePinsCache?.(cid); else LG?.hydratePinsCache?.();
-console.log("content.js rebuild call *3");
             LG?.rebuild?.('auto:chat-switch');
             LG?.renderList?.(true);
           } catch (e) {
             console.debug('[auto-sync] chat switch update failed:', e);
           }
         }
-console.log("＊＊＊＊closeDockOnUrlChange 4 close＊＊＊＊");
         // ※ 閉じている時は描画しない＝無駄コストをかけない
       };
-
-console.log("＊＊＊＊closeDockOnUrlChange 5 ＊＊＊＊");
 
       window.addEventListener('popstate', check);
       window.addEventListener('hashchange', check);
@@ -705,80 +660,16 @@ console.log("＊＊＊＊closeDockOnUrlChange 5 ＊＊＊＊");
       history.pushState = function(...args){
         const ret = _push.apply(this, args);
         try { check(); } catch {}
-console.log("＊＊＊＊closeDockOnUrlChange 6 ＊＊＊＊");
         return ret;
       };
       const _repl = history.replaceState;
       history.replaceState = function(...args){
         const ret = _repl.apply(this, args);
         try { check(); } catch {}
-console.log("＊＊＊＊closeDockOnUrlChange 7 ＊＊＊＊");
         return ret;
       };
     }
 }
-/*
-  // ========= 6) 一覧パネルの初期状態をOFFに強制 =========
-  function forceListPanelOffOnBoot(){
-    try {
-      const cur = SH.getCFG() || {};
-      SH.saveSettingsPatch({ list: { ...(cur.list||{}), enabled:false, pinOnly:false } });
-      document.getElementById('cgpt-list-toggle').checked = false;
-      const pinOnlyChk = document.getElementById('cgpt-pinonly');
-      if (pinOnlyChk){ pinOnlyChk.checked = false; pinOnlyChk.disabled = true; }
-console.debug('[forceListPanelOffOnBoot] LG?.setListEnabled false ');
-      LG?.setListEnabled?.(false,  false);
-    } catch {}
-  }
-
-  // ========= 7) リスト「最新にする」ボタン =========
-  function bindListRefreshButton(){
-    document.addEventListener('click', (e) => {
-console.log("******content.js bindListRefreshButton click");
-      const btn = e.target.closest?.('#cgpt-list-refresh'); if (!btn) return;
-      e.preventDefault(); e.stopPropagation();
-
-      const sc   = document.querySelector('#cgpt-list-body');
-      const rows = sc ? [...sc.querySelectorAll('.row')] : [];
-      const top  = sc ? sc.scrollTop : 0;
-      // 1) フォーカス中の行を最優先
-      let anchor = document.activeElement?.closest?.('#cgpt-list-body .row') || null;
-
-      // 2) なければ _currentTurnKey を採用
-      if (!anchor) {
-        const k = LG?._currentTurnKey; if (k) anchor = sc?.querySelector(`.row[data-turn="${k}"]`) || null;
-      }
-
-      // 3) それでも無ければ可視領域の先頭行
-      if (!anchor) anchor = rows.find(r => (r.offsetTop + r.offsetHeight) > top) || rows[0] || null;
-
-      // 相対オフセット（行先頭からの距離）
-      const delta = anchor ? (top - anchor.offsetTop) : 0;
-      const aKey  = anchor?.dataset?.turn || null;
-      const aKind = anchor?.dataset?.kind || null;
-
-      // 再スキャン & 再描画
-console.log("content.js rebuild call *4");
-console.debug('[bindListRefreshButton]LG.rebuild() ');
-      LG?.rebuild?.();
-      LG?.renderList?.(true);
-      // 復元
-      requestAnimationFrame(() => {
-        const sc2 = document.querySelector('#cgpt-list-body'); if (!sc2) return;
-        let target = null;
-        // まずはフォーカス/選択と同じ行を探す（turn+kind が取れていればそれで特定）
-        if (aKey && aKind) target = sc2.querySelector(`.row[data-turn="${aKey}"][data-kind="${aKind}"]`);
-       // だめなら turn だけで探す
-        if (!target && aKey) target = sc2.querySelector(`.row[data-turn="${aKey}"]`);
-        if (target) sc2.scrollTop = Math.max(0, target.offsetTop + delta);
-        else {
-          // 最後の保険：現在ターンへ
-          const k = LG?._currentTurnKey; if (k) LG?.scrollListToTurn?.(k);
-        }
-      });
-    }, true);
-  }
-*/
 
 // 基準線の表示ON/OFF 設定画面より受信
   // === options.html からの即時反映メッセージを受ける ===
@@ -814,7 +705,6 @@ console.debug('[bindListRefreshButton]LG.rebuild() ');
             uploads   += up;
             downloads += dl;
           });
-console.log("******content.js sendResponse  uploads:",uploads," downloads:",downloads);
           sendResponse({ ok:true, chatId, turns, uploads, downloads });
         } catch(e) {
           sendResponse({ ok:false, error:String(e) });
@@ -832,7 +722,6 @@ console.log("******content.js sendResponse  uploads:",uploads," downloads:",down
         //if (wasOpen) window.CGTN_LOGIC?.renderList?.(false);
         // isListOpen === true のときだけ描画（閉じていれば何もしない）
         //　設定画面で付箋データが削除されたとき、リストを更新する処理
-console.log("設定画面で付箋データが削除されたとき、リストを更新する処理");
         if (SH.isListOpen?.()) window.CGTN_LOGIC?.renderList?.(false);
 
       }
@@ -851,7 +740,6 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     let prev = null;
     setInterval(() => {
       const cur = SH.getChatId?.();
-//console.debug('[watch] chat switch ->', cur);
       if (cur && cur !== prev) {
         prev = cur;
         //チャットを切り替えたらリストを閉じる処理
@@ -873,12 +761,10 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
     try {
       // すでに差し込まれていればスキップ
       if (document.getElementById('cgtn-url-hook')) {
-        console.debug('[cgtn] inject_url_hook already injected');
         return;
       }
       // すでにIIFEが起動済みならスキップ（page側フラグを拾えない場合もあるので二段ガード）
       if (window.__CGTN_URL_HOOKED__ === true) {
-        console.debug('[cgtn] page reports URL_HOOKED — skip injecting');
         return;
       }
 
@@ -888,14 +774,12 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
       s.src     = url;
       s.async   = false; // 実行順の安定化
       s.onload  = () => {
-        console.debug('[cgtn] inject_url_hook loaded:', url);
         // 読み込み完了後に掃除したい場合はここで remove する（実行済みだからOK）
         // s.remove();
       };
       s.onerror = (e) => console.warn('[cgtn] inject_url_hook failed:', e);
 
       (document.documentElement || document.head || document.body).appendChild(s);
-      console.debug('[cgtn] inject_url_hook injecting:', url);
 
     } catch (e) {
       console.warn('injectUrlChangeHook failed', e);
@@ -908,7 +792,6 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
   function handleUrlChangeMessage(){
     const cur = location.pathname + location.search;
     if (cur === _lastUrlSig){
-      console.debug('[cgtn:url] same-url ignored:', cur);
       return;
     }
     _lastUrlSig = cur;
@@ -932,17 +815,13 @@ console.log("設定画面で付箋データが削除されたとき、リスト�
       LG?.updatePinOnlyBadge?.();
       LG?.updateListChatTitle?.();
 
-      console.debug('[cgtn:url] navigated → list closed & cleared:', cur);
-
       // （任意の追加）“一覧チェックはONのまま”なら、描画準備完了後に自動再オープン★★★★
       // ※ 自動再構築はここではせず、setListEnabled(true) に任せる
       const wantReopen = !!(SH.getCFG?.().list?.enabled);
 
       if (wantReopen){
-console.warn('[handleUrlChangeMessage] wantReopen', wantReopen);
         waitForChatMain(()=>{ if (mySeq===_navSeq) LG?.setListEnabled?.(true); });
       }
-
     }catch(e){
       console.warn('[cgtn:url] close-on-nav failed', e);
     }
@@ -953,11 +832,9 @@ console.warn('[handleUrlChangeMessage] wantReopen', wantReopen);
   function waitForChatMain(onReady, onIdle, timeout = 4000) {
     const started = performance.now();
     const ok = () => {
-      console.debug('[waitForChatMain] ready in', (performance.now()-started).toFixed(1), 'ms');
       onReady?.();
     };
     const idle = () => {
-      console.debug('[waitForChatMain] timeout, will watch for first article');
       onIdle?.();
     };
 
@@ -1002,17 +879,14 @@ console.warn('[handleUrlChangeMessage] wantReopen', wantReopen);
   //  function installAutoSyncForTurns(){
   CGTN_LOGIC.installAutoSyncForTurns = function installAutoSyncForTurns(){
     const LG = CGTN_LOGIC, SH = CGTN_SHARED;
-console.log("installAutoSyncForTurns top");
 
     // 自作UI除外（無限ループ防止）
     const inOwnUI = (node) => {
       if (!node || node.nodeType !== 1) return false;
-console.log("installAutoSyncForTurns 1");
       return node.closest?.('[data-cgtn-ui]') ||
          document.getElementById('cgpt-nav')?.contains(node) ||
          document.getElementById('cgpt-list-panel')?.contains(node);
     };
-console.log("installAutoSyncForTurns 2");
 
     const root = document.querySelector('main') || document.body;
 
@@ -1020,21 +894,17 @@ console.log("installAutoSyncForTurns 2");
     // 旧rootを解除 → 新rootに張替え
     CGTN_LOGIC.detachTurnObserver();
 
-
     let to = 0;
     const kick = () => {
       if (!SH.isListOpen?.()) return;        // 閉じている間は完全ノーオペ
       clearTimeout(to);
       to = setTimeout(() => {
         try{
-console.log("content.js rebuild call *5");
           LG.rebuild?.();
           LG.renderList?.(true);
-          console.debug('[auto-sync] turns+ (list open) → rebuild+render');
         }catch(e){}
       }, 300); // 300msデバウンス
     };
-console.log("installAutoSyncForTurns 3");
     _turnObs = new MutationObserver((muts)=>{
 
       // リストが閉じていてもナビの ST 更新が必要なので常に監視する '25.11.20
@@ -1058,7 +928,6 @@ console.log("installAutoSyncForTurns 3");
       }
     });
 
-console.log("installAutoSyncForTurns 4");
     try {
       _turnObs.observe(root, {
         childList:true,
@@ -1067,7 +936,6 @@ console.log("installAutoSyncForTurns 4");
         attributes:false
       });
       _observedRoot = root;
-      console.debug('[auto-sync] observe attached to', root.tagName);
     } catch(e) {
       console.warn('[auto-sync] observe failed', e);
     }
@@ -1225,56 +1093,6 @@ console.log("installAutoSyncForTurns 4");
     );
   }
 
-/*
-  async function initialize(){
-
-    // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    await SH.loadSettings();
-    // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
-    try { await SH.migratePinsStorageOnce?.(); } catch {}
-    UI.installUI();
-    ensureFocusPark();
-    installFocusStealGuard();
-    UI.applyLang();
-    UI.clampPanelWithinViewport();
-
-    // 基準線の初期表示（保存 showViz を尊重）
-    try {
-      const cfg = SH?.getCFG?.();
-      SH?.renderViz?.(cfg, !!cfg?.showViz);
-    } catch {}
-
-    EV.bindEvents();
-    bindPreviewDockOnce();
-    bindBaselineAutoFollow();
-
-    if (USE_INJECT_URL_HOOK)injectUrlChangeHook();
-
-    try { SH.cleanupZeroPinRecords?.(); } catch {}
-
-    // content.js → initialize() 内の最初の rebuild 呼び出しを置き換え
-    (async () => {
-        // rebuild の初回実行を遅らせる
-        setTimeout(() => {
-          rebuildAndRenderSafely({ forceList:true }).catch(e => console.warn(e));
-        }, 1200);
-
-//      try {
-//        await rebuildAndRenderSafely({ forceList:true });
-//      } catch(e) {
-//        console.warn('[init] rebuildAndRenderSafely failed', e);
-//      }
-
-    })();
-
-    // viewport 変化でナビ位置クランプ
-    window.addEventListener('resize', () => UI.clampPanelWithinViewport(), { passive:true });
-    window.addEventListener('orientationchange', () => UI.clampPanelWithinViewport());
-
-  }
-*/
   // ========= 10) DOM Ready =========
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize, { once:true });

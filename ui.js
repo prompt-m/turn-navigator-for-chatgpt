@@ -638,11 +638,6 @@ const MISC_CSS = `
 #cgpt-list-foot { display:flex; align-items:center; gap:2px; }
 #cgpt-list-foot-info { margin-left:auto; }
 
-/* トグルラベルの文字色を黒固定 
-.cgpt-viz-toggle span[data-i18n="line"] { color: #000; }
-.cgpt-list-toggle span[data-i18n="list"] { color: #000; }
-*/
-
 /* フッタ系ボタンの色 */
 #cgpt-list-foot,      /* リストパネルのフッタ */
 #cgpt-list-refresh,   /* 最新にする */
@@ -825,8 +820,8 @@ injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
         <div class="cgpt-nav-label" data-i18n="all"></div>
 
         <div class="cgpt-grid2">
-          <button class="cgtn-pill-btn" data-act="top">▲</button>
-          <button class="cgtn-pill-btn" data-act="bottom">▼</button>
+          <button class="cgtn-pill-btn" data-act="top" title="Top">▲</button>
+          <button class="cgtn-pill-btn" data-act="bottom" title="Bottom" >▼</button>
         </div>
 
         <!-- 言語切替 -->
