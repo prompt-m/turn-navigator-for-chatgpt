@@ -1,17 +1,21 @@
 # Turn Navigator for ChatGPT
 
-**Turn Navigator for ChatGPT** is a Chrome extension that helps you navigate long ChatGPT conversations efficiently.
+*(English first / 日本語は下にあります)*
+
+# 🇺🇸 English Version
+
+**Turn Navigator for ChatGPT** is a Chrome extension (Manifest V3) that dramatically improves your ability to **navigate, review, and manage long ChatGPT conversations**.
 
 - ✅ Available on the Chrome Web Store
 - 🔒 No external data transmission
 - 🔒 No AI API calls
 - 💾 All data stays inside your browser
 
-*(English first / 日本語は下にあります)*
+📄 Privacy Policy  
+https://turn-navigator.prompt-net.jp/chatgpt/privacy.html
 
-# 🇺🇸 English Version
+For details about data handling and permissions, please see the Privacy Policy above.
 
-**Turn Navigator for ChatGPT** is a Chrome Extension (Manifest V3) that dramatically improves your ability to **navigate, review, and manage long ChatGPT conversations**.
 
 It adds:
 
@@ -19,7 +23,7 @@ It adds:
 * A full turn list with jump navigation
 * Pin management (🔖)
 * Turn preview
-* **Image attachment detection**
+* **Image attachment detection (ChatGPT-generated images only)**
 * JA / EN language toggle
 
 Designed for long research threads, programming work, documentation, project logs, and any ChatGPT workflow that grows beyond a few dozen turns.
@@ -115,6 +119,7 @@ A horizontal guideline helps maintain visual orientation when scrolling.
 
 ## 📦 Installation
 
+Note: The Chrome Web Store version is recommended for general users.
 1. Download and extract ZIP
 2. Open Chrome → `chrome://extensions/`
 3. Enable **Developer mode**
@@ -199,8 +204,18 @@ MIT License
 
 # 🇯🇵 日本語版
 
-**Turn Navigator for ChatGPT** は、長くなった ChatGPT の会話を
-**高速に移動・把握・管理できるようにする** Chrome 拡張機能（MV3）です。
+**Turn Navigator for ChatGPT** は、長くなった ChatGPT の会話を  
+**高速に移動・把握・管理できるようにする** Chrome 拡張機能（Manifest V3）です。
+
+- ✅ Chrome Web Store で公開中
+- 🔒 外部へのデータ送信は行いません
+- 🔒 AI API との通信は行いません
+- 💾 すべてのデータはブラウザ内に保存されます
+
+📄 プライバシーポリシー  
+https://turn-navigator.prompt-net.jp/chatgpt/privacy.html
+
+データの取り扱いや、権限の利用目的については、上記のプライバシーポリシーをご確認ください。
 
 ナビパネル、一覧パネル、付箋（🔖）、プレビュー、
 **画像添付の検出（Download添付は次版で対応予定）** など、
@@ -277,6 +292,7 @@ Navigator が検出できるのは **ChatGPT が生成した画像添付のみ**
 
 ## 📦 インストール方法
 
+※ 通常の利用には Chrome Web Store 版を推奨します。
 1. ZIP を展開
 2. Chrome → `chrome://extensions/`
 3. デベロッパーモードを ON
