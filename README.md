@@ -1,10 +1,10 @@
-# ChatGPT Turn Navigator
+# Turn Navigator for ChatGPT
 
 *(English version first / 日本語は下にあります)*
 
 # 🇺🇸 English Version
 
-**ChatGPT Turn Navigator** is a Chrome Extension (Manifest V3) that dramatically improves your ability to **navigate, review, and manage long ChatGPT conversations**.
+**Turn Navigator for ChatGPT** is a Chrome Extension (Manifest V3) that dramatically improves your ability to **navigate, review, and manage long ChatGPT conversations**.
 
 It adds:
 
@@ -192,7 +192,7 @@ MIT License
 
 # 🇯🇵 日本語版
 
-**ChatGPT Turn Navigator** は、長くなった ChatGPT の会話を
+**Turn Navigator for ChatGPT** は、長くなった ChatGPT の会話を
 **高速に移動・把握・管理できるようにする** Chrome 拡張機能（MV3）です。
 
 ナビパネル、一覧パネル、付箋（🔖）、プレビュー、
