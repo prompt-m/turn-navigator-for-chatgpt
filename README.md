@@ -109,11 +109,11 @@ A horizontal guideline helps maintain visual orientation when scrolling.
 
 ## 🖼 Screenshots
 
-### **Main UI: Navigator + Turn List**
-![Main UI](docs/screenshot_ui_e.png)
+### **UI: Navigator + Turn List**
+![UI](docs/screenshot_ui_list.png)
 
-### **Settings Panel**
-![Settings Panel](docs/screenshot_settings_e.png)
+### **UI: Navigator + Turn List + Preview Panel**
+![UI](docs/screenshot_ui_prev.png)
 
 ---
 
@@ -282,11 +282,11 @@ Navigator が検出できるのは **ChatGPT が生成した画像添付のみ**
 
 ## 🖼 スクリーンショット
 
-### **主要UI（ナビ + 一覧パネル）**
-![主要UI](docs/screenshot_ui.png)
+### **UI（ナビ + 一覧パネル）**
+![UI](docs/screenshot_ui_list.png)
 
-### **設定パネル**
-![設定パネル](docs/screenshot_settings.png)
+### **UI（ナビ + 一覧パネル + プレビューパネル）**
+![UI](docs/screenshot_ui_prev.png)
 
 ---
 
