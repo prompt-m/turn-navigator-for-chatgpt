@@ -1,6 +1,13 @@
 # Turn Navigator for ChatGPT
 
-*(English version first / 日本語は下にあります)*
+**Turn Navigator for ChatGPT** is a Chrome extension that helps you navigate long ChatGPT conversations efficiently.
+
+- ✅ Available on the Chrome Web Store
+- 🔒 No external data transmission
+- 🔒 No AI API calls
+- 💾 All data stays inside your browser
+
+*(English first / 日本語は下にあります)*
 
 # 🇺🇸 English Version
 
