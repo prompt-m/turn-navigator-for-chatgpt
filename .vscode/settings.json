@@ -1,0 +1,24 @@
+{
+  // プロジェクトのTypeScriptを使う（VS Code内蔵より安定）
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // まずは保存時整形を有効化（Prettier前提）
+  "editor.formatOnSave": true,
+
+  // フォーマッタの衝突を避ける（Prettierを使う）
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // JS/TSでも同じように整形
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+  // ESLintの自動修正も保存時に走らせる（後で効いてくる）
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // 余計なAI提案はこのプロジェクトでは切る（入ってても無効化済みだが念のため）
+  "github.copilot.enable": {
+    "*": false
+  }
+}

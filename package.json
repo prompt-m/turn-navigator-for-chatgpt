@@ -1,0 +1,27 @@
+{
+  "name": "turn-navigator-ts",
+  "version": "1.0.0",
+  "description": "*(English version first / 日本語は下にあります)*",
+  "main": "content.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prompt-m/chatgpt-turn-navigator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/prompt-m/chatgpt-turn-navigator/issues"
+  },
+  "homepage": "https://github.com/prompt-m/chatgpt-turn-navigator#readme",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
