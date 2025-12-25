@@ -4,15 +4,24 @@
 
 # 🇺🇸 English Version
 
-**Turn Navigator for ChatGPT** is a Chrome extension (Manifest V3) that dramatically improves your ability to **navigate, review, and manage long ChatGPT conversations**.
+**Turn Navigator for ChatGPT** is a Chrome extension that dramatically improves your ability to
+**navigate, review, and manage long ChatGPT conversations**.
 
-- ✅ Available on the Chrome Web Store
+Built with Manifest V3.
+
+- ✅ Available on the Chrome Web Store:https://chromewebstore.google.com/detail/necbiceedpjbaedficfffcfgjdammpmd?utm_source=item-share-cb
 - 🔒 No external data transmission
 - 🔒 No AI API calls
 - 💾 All data stays inside your browser
 
+📄 Product Page  
+https://turn-navigator.prompt-net.jp/chatgpt/
+
 📄 Privacy Policy  
 https://turn-navigator.prompt-net.jp/chatgpt/privacy.html
+
+📄 Support  
+Coming soon. For now, please use GitHub Issues.
 
 For details about data handling and permissions, please see the Privacy Policy above.
 
@@ -207,13 +216,19 @@ MIT License
 **Turn Navigator for ChatGPT** は、長くなった ChatGPT の会話を  
 **高速に移動・把握・管理できるようにする** Chrome 拡張機能（Manifest V3）です。
 
-- ✅ Chrome Web Store で公開中
+- ✅ Chrome Web Store で公開中:https://chromewebstore.google.com/detail/necbiceedpjbaedficfffcfgjdammpmd?utm_source=item-share-cb
 - 🔒 外部へのデータ送信は行いません
 - 🔒 AI API との通信は行いません
 - 💾 すべてのデータはブラウザ内に保存されます
 
+📄 製品ページ  
+https://turn-navigator.prompt-net.jp/chatgpt
+
 📄 プライバシーポリシー  
 https://turn-navigator.prompt-net.jp/chatgpt/privacy.html
+
+📄 サポート  
+準備中（当面は GitHub Issues をご利用ください）
 
 データの取り扱いや、権限の利用目的については、上記のプライバシーポリシーをご確認ください。
 
