@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Turn Navigator for ChatGPT",
-  "version": "1.0.0",
-  "version_name": "1.0.0 (2025-12-13 23:00 JST)",
-  "description": "長いチャットのスクロール地獄から解放します - Escape the endless scrolling in long chats",
+  "version": "1.0.1",
+  "version_name": "1.0.1 (2025-12-30 23:00 JST)",
+  "description": "Jump to the turn you need—instantly. Navigate ChatGPT conversations turn by turn, preview messages, and pin what matters. A small extension that makes long chats just a little more convenient.",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",
@@ -54,6 +54,6 @@
     "type": "module"
   },
   "action": {
-    "default_title": "ChatGPT Turn Navigator"
+    "default_title": "Turn Navigator for ChatGPT"
   }
 }

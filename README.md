@@ -4,8 +4,13 @@
 
 # 🇺🇸 English Version
 
-**Turn Navigator for ChatGPT** is a Chrome extension that dramatically improves your ability to
-**navigate, review, and manage long ChatGPT conversations**.
+**Turn Navigator for ChatGPT** is a lightweight Chrome extension that helps you
+**jump to the turn you need, review conversations efficiently, and keep long chats easy to follow**.
+
+It adds turn-by-turn navigation, a searchable list with previews, and pinning—  
+a small set of features designed to make ChatGPT just a little more convenient.
+
+No setup. No accounts. No data leaves your browser.
 
 Built with Manifest V3.
 
@@ -213,8 +218,16 @@ MIT License
 
 # 🇯🇵 日本語版
 
-**Turn Navigator for ChatGPT** は、長くなった ChatGPT の会話を  
-**高速に移動・把握・管理できるようにする** Chrome 拡張機能（Manifest V3）です。
+**Turn Navigator for ChatGPT** は、
+**必要なターンにすぐ戻り、会話を効率よく確認し、長いチャットを追いやすくする**
+軽量な Chrome 拡張機能です。
+
+ターン単位のナビゲーション、プレビュー付き一覧、付箋（ピン）機能を追加し、
+ChatGPT を **ちょっとだけ便利にするための最小限の機能** を提供します。
+
+セットアップ不要。アカウント不要。データはブラウザ外へ送信されません。
+
+Manifest V3 対応。
 
 - ✅ Chrome Web Store で公開中:https://chromewebstore.google.com/detail/necbiceedpjbaedficfffcfgjdammpmd?utm_source=item-share-cb
 - 🔒 外部へのデータ送信は行いません
