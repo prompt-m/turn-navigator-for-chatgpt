@@ -26,7 +26,7 @@ https://turn-navigator.prompt-net.jp/chatgpt/
 https://turn-navigator.prompt-net.jp/chatgpt/privacy.html
 
 📄 Support  
-Coming soon. For now, please use GitHub Issues.
+https://turn-navigator.prompt-net.jp/chatgpt/support.html
 
 For details about data handling and permissions, please see the Privacy Policy above.
 
@@ -241,7 +241,7 @@ https://turn-navigator.prompt-net.jp/chatgpt
 https://turn-navigator.prompt-net.jp/chatgpt/privacy.html
 
 📄 サポート  
-準備中（当面は GitHub Issues をご利用ください）
+https://turn-navigator.prompt-net.jp/chatgpt/support.html
 
 データの取り扱いや、権限の利用目的については、上記のプライバシーポリシーをご確認ください。
 
