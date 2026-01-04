@@ -2022,6 +2022,7 @@
     const cfg = SHX.getCFG?.() || {};
     const curList = cfg.list || {};
     const panel = document.getElementById('cgpt-list-panel');
+console.debug('[setListEnabled]', on, new Error().stack);
 
     if (on){
       // --- ON 時：必ず enabled:true / pinOnly:false にして保存 ---

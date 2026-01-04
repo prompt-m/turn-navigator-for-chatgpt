@@ -703,6 +703,11 @@ console.log("付箋データ削除deletePinsForChat chatId:",chatId);
 
   // ========= saveSettingsPatch（書き込みガード付き）=========
   SH.saveSettingsPatch = async function saveSettingsPatch(patch = {}, cb){
+
+if (patch?.list && 'enabled' in patch.list) {
+  console.debug('[PATCH list.enabled]', patch.list.enabled, new Error().stack);
+}
+
     const before = SH.getCFG?.() || {};
 //console.log("saveSettingsPatch");
     const merged = deepMerge(structuredClone(before), patch);
