@@ -5,7 +5,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "strict": false,
-    "noEmitOnError": true
+    "noEmitOnError": true,
+    "types": ["chrome"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]

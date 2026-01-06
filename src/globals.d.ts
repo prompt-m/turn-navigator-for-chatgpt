@@ -11,6 +11,7 @@ declare global {
 
     __CGTN_URL_HOOKED__?: boolean;
     __CGTN_MSG_BOUND__?: boolean;
+    __CGTN_TURN_HOOKED__?: boolean;
   }
   interface Document {
     _cgtnPreviewDockBound?: boolean;

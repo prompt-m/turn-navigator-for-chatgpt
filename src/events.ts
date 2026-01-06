@@ -53,18 +53,24 @@
       "click",
       (e) => {
         // プレビューボタンは行内で処理（ここでは素通りにせず即終了）
-        if (e.target.closest(".cgtn-preview-btn")) {
+        const t = e.target; // !!!!
+        if (!(t instanceof Element)) return;
+
+        // if (e.target.closest(".cgtn-preview-btn")) {
+        if (t.closest(".cgtn-preview-btn")) {
           e.preventDefault();
           e.stopPropagation();
           return;
         }
 
-        const el = e.target.closest("*");
+        // const el = e.target.closest("*"); !!!!
+        const el = t.closest("*");
         if (!el) return;
 
         // --- 一覧トグル ---
         const chk = el && el.closest ? el.closest("#cgpt-list-toggle") : null;
-        if (chk) {
+        // if (chk) { !!!!
+        if (chk instanceof HTMLInputElement) {
           const on = chk.checked;
 
           LG.setListEnabled?.(on);
@@ -76,7 +82,8 @@
 
           // 一覧OFFなら付箋もOFF & 無効化
           const pinOnlyChk = document.getElementById("cgpt-pinonly");
-          if (!on && pinOnlyChk) {
+          // if (!on && pinOnlyChk) { !!!!
+          if (!on && pinOnlyChk instanceof HTMLInputElement) {
             const cur = SH.getCFG() || {};
             SH.saveSettingsPatch({
               list: { ...(cur.list || {}), pinOnly: false },
@@ -88,8 +95,16 @@
         }
 
         // --- 基準線トグル ---
+        /*
         if (el.closest("#cgpt-viz")) {
           const on = el.closest("#cgpt-viz").checked;
+          SH.toggleViz?.(on);
+          SH.saveSettingsPatch?.({ showViz: !!on });
+          return;
+        }*/
+        const viz = el.closest("#cgpt-viz");
+        if (viz instanceof HTMLInputElement) {
+          const on = viz.checked;
           SH.toggleViz?.(on);
           SH.saveSettingsPatch?.({ showViz: !!on });
           return;
@@ -146,9 +161,13 @@
 
         // --- ナビゲーション（Top/Bottom/Prev/Next） ---
         const btn = el.closest("button[data-act]");
-        if (btn) {
+        // if (btn) { !!!!
+        if (btn instanceof HTMLButtonElement) {
           const act = btn.dataset.act;
-          const role = btn.closest(".cgpt-nav-group")?.dataset.role || "all";
+          //const role = btn.closest(".cgpt-nav-group")?.dataset.role || "all";
+          const grp = btn.closest(".cgpt-nav-group");
+          const role =
+            (grp instanceof HTMLElement ? grp.dataset.role : null) || "all";
           switch (act) {
             case "top":
               LG.goTop?.(role);
