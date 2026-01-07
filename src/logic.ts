@@ -1310,6 +1310,7 @@
   //
   //   これらの改修により、チャット切替・リロード・ON/OFF操作の並行タイミングでも
   //   一貫して「最新チャットの確定データだけが ST に反映」されるようになった。
+  /* !!!!
   const ST = { all: [], user: [], assistant: [], page: 1 };
 
   let _rebuildTicket = 0,
@@ -1366,6 +1367,70 @@
     ST.assistant = nextST.assistant;
     ST._userSet = nextST._userSet || new Set(ST.user);
     ST._asstSet = nextST._asstSet || new Set(ST.assistant);
+
+    // デバッグ公開
+    NS.ST = ST;
+  }
+*/
+  // ===== ST の型を先に定義（_userSet/_asstSet を optional で持たせる）=====
+  type TurnEl = HTMLElement;
+
+  type TurnState = {
+    all: TurnEl[];
+    user: TurnEl[];
+    assistant: TurnEl[];
+    page: number;
+    _userSet?: Set<TurnEl>;
+    _asstSet?: Set<TurnEl>;
+  };
+
+  // ST: 現在ページ内のターン情報
+  const ST: TurnState = { all: [], user: [], assistant: [], page: 1 };
+
+  let _rebuildTicket = 0;
+  let _rebuildCid: string | null = null;
+
+  function rebuild(cidFromMsg?: string) {
+    const my = ++_rebuildTicket;
+
+    // この実行の “対象チャットID” を確定（以降はこれで評価）
+    const startCid = cidFromMsg || SH.getChatId?.();
+    _rebuildCid = startCid || _rebuildCid;
+
+    NS._scroller = getTrueScroller();
+
+    // ===== 材料スナップショットを nextST に作る =====
+    const nextST: TurnState = { all: [], user: [], assistant: [], page: 1 };
+
+    const allRaw = pickAllTurns().filter(isRealTurn);
+    nextST.all = sortByY(allRaw);
+
+    // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
+    if (nextST.all.length === 0) {
+      NS.clearListPanelUI?.();
+      // ↓ この後の確定ブロックで my/cid の照合を通す
+    } else {
+      const roleOf = (a: TurnEl) => getTurnRole(a); // 既存ヘルパに委譲
+
+      nextST.user = nextST.all.filter((a) => roleOf(a) === "user");
+      nextST.assistant = nextST.all.filter((a) => roleOf(a) === "assistant");
+
+      // 可能なら Set も用意（描画側が速くなる）
+      nextST._userSet = new Set(nextST.user);
+      nextST._asstSet = new Set(nextST.assistant);
+    }
+
+    // ===== 確定直前ガード & コミット =====
+    if (my !== _rebuildTicket) return;
+
+    const curCid = SH.getChatId?.();
+    if (startCid && curCid && startCid !== curCid) return;
+
+    ST.all = nextST.all;
+    ST.user = nextST.user;
+    ST.assistant = nextST.assistant;
+    ST._userSet = nextST._userSet ?? new Set(ST.user);
+    ST._asstSet = nextST._asstSet ?? new Set(ST.assistant);
 
     // デバッグ公開
     NS.ST = ST;
@@ -1723,15 +1788,19 @@
       );
 
       let park = document.getElementById("cgtn-focus-park");
-      if (!park) {
-        park = document.createElement("button");
-        park.id = "cgtn-focus-park";
-        park.type = "button";
-        park.tabIndex = -1;
-        park.style.cssText =
+
+      if (!(park instanceof HTMLButtonElement)) {
+        const btn = document.createElement("button");
+        btn.id = "cgtn-focus-park";
+        btn.type = "button";
+        btn.tabIndex = -1;
+        btn.style.cssText =
           "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
-        document.body.appendChild(park);
+        document.body.appendChild(btn);
+        park = btn;
       }
+
+      // ここ以降、park は HTMLButtonElement として扱える
 
       const INTERACTIVE = "button, label, input[type=checkbox]";
       panel.addEventListener(
@@ -1801,7 +1870,9 @@
         () => {
           try {
             const ae = document.activeElement;
-            if (ae && typeof ae.blur === "function") ae.blur();
+            if (ae instanceof HTMLElement) {
+              ae.blur();
+            }
           } catch {}
         },
         { capture: true }
@@ -2020,7 +2091,13 @@
     "</svg>";
 
   let _renderTicket = 0;
-  NS.renderList = async function renderList(forceOn = false, opts = {}) {
+  type RenderListOptions = {
+    pinOnlyOverride?: boolean;
+  };
+  NS.renderList = async function renderList(
+    forceOn = false,
+    opts: RenderListOptions = {}
+  ) {
     const SH = window.CGTN_SHARED,
       LG = window.CGTN_LOGIC;
 
@@ -2190,18 +2267,21 @@
         row.querySelector(".txt").textContent = attachLine;
         //row.addEventListener('click', () => scrollToHead(art));
         row.addEventListener("click", (ev) => {
-          //scrollToHead(art);
+          const t = ev.target;
+          if (!(t instanceof Element)) return;
+
           // 他のUIパーツやリンクはスルー
-          if (ev.target.closest(".cgtn-preview-btn, .cgtn-clip-pin, a")) return;
-          const txt = ev.target.closest(".txt");
-          if (txt) {
-            scrollToHead(art);
-          } else {
-            return;
-          }
-          const row = txt.closest(".row");
-          if (!row) return;
+          if (t.closest(".cgtn-preview-btn, .cgtn-clip-pin, a")) return;
+
+          const txt = t.closest(".txt");
+          if (!txt) return;
+
+          scrollToHead(art);
+
+          const rowEl = txt.closest(".row");
+          if (!rowEl) return;
         });
+
         row.dataset.preview = previewText || attachLine || "";
         row.dataset.role = isUser ? "user" : "assistant";
         // 付箋の色設定(初期ピン色)：配列の index で決める
@@ -2278,20 +2358,22 @@
           if (isAsst) downloads++; //←ダウンロードターン数
         }
 
-        //        row2.addEventListener('click', () => scrollToHead(art));
         row2.addEventListener("click", (ev) => {
+          const t = ev.target;
+          if (!(t instanceof Element)) return;
+
           // 他のUIパーツやリンクはスルー
-          if (ev.target.closest(".cgtn-preview-btn, .cgtn-clip-pin, a")) return;
-          //const txt = ev.target.closest('.txt');
-          const txt = ev.target.closest(".txt, .attach"); // ★ .attach もクリックでジャンプ
-          if (txt) {
-            scrollToHead(art);
-          } else {
-            return;
-          }
-          const row = txt.closest(".row");
-          if (!row) return;
+          if (t.closest(".cgtn-preview-btn, .cgtn-clip-pin, a")) return;
+
+          const txt = t.closest(".txt");
+          if (!txt) return;
+
+          scrollToHead(art);
+
+          const rowEl = txt.closest(".row");
+          if (!rowEl) return;
         });
+
         row2.dataset.preview = previewText || bodyLine || "";
 
         const on2 = !!pinsArr[index1 - 1];
@@ -2339,7 +2421,12 @@
 
           // ラジオを「全体」に戻す
           const allRadio = document.getElementById("lv-all");
-          if (allRadio) allRadio.checked = true;
+          if (allRadio instanceof HTMLInputElement) {
+            allRadio.checked = true;
+          }
+          //"lv-all" が input じゃなく label 等に変わる可能性があるなら、より安全に↓
+          //const allRadio = document.querySelector<HTMLInputElement>("#lv-all");
+          //if (allRadio) allRadio.checked = true;
 
           // リスト再描画 & フッター更新
           NS.renderList?.(true, { pinOnlyOverride: false });
@@ -2413,7 +2500,7 @@
         NS.applyPanelWidthByChars?.(maxChars);
       } catch (e) {}
       try {
-        installAutoSyncForTurns?.();
+        NS.installAutoSyncForTurns?.();
       } catch (e) {} // 再アタッチ
 
       // ★ 元の「rAF×2＋setTimeout 180ms」方式に戻す
@@ -2446,7 +2533,7 @@
 
       // オブザーバ解除・フッター等クリア
       try {
-        detachTurnObserver?.();
+        NS.detachTurnObserver?.();
       } catch (e) {}
       try {
         clearListFooterInfo?.();
@@ -2501,6 +2588,10 @@
         return;
       }
 
+      if (!(badge instanceof HTMLElement)) {
+        return;
+      }
+
       // --- バッジ表示制御 ---
       if (pinsCount > 0) {
         badge.textContent = String(pinsCount);
@@ -2531,11 +2622,11 @@
       const onBtn = document.getElementById("cgpt-pin-all-on");
       const offBtn = document.getElementById("cgpt-pin-all-off");
 
-      if (onBtn) {
+      if (onBtn instanceof HTMLButtonElement) {
         // リストOFF か pinOnly 中は All ON 無効
         onBtn.disabled = !enabled || pinOnly;
       }
-      if (offBtn) {
+      if (offBtn instanceof HTMLButtonElement) {
         // リストOFF のときだけ無効。pinOnly中は OFF だけ有効。
         offBtn.disabled = !enabled;
       }
@@ -2554,30 +2645,6 @@
     foot.dataset.state = "empty";
     foot.textContent = T("list.empty") || "リストはありません";
   }
-
-  // ★ 全ON/全OFFボタンの活性/非活性制御 '23.11.23
-  function updateBulkPinButtonsState() {
-    try {
-      const cfg = SH.getCFG?.() || {};
-      const enabled = !!cfg.list?.enabled;
-      const pinOnly = !!cfg.list?.pinOnly;
-
-      const onBtn = document.getElementById("cgpt-pin-all-on");
-      const offBtn = document.getElementById("cgpt-pin-all-off");
-
-      if (onBtn) {
-        // リストOFF か pinOnly 中は All ON 無効
-        onBtn.disabled = !enabled || pinOnly;
-      }
-      if (offBtn) {
-        // リストOFF のときだけ無効。pinOnly中は OFF だけ有効にする仕様。
-        offBtn.disabled = !enabled;
-      }
-    } catch (e) {
-      console.warn("[updateBulkPinButtonsState]", e);
-    }
-  }
-  NS.updateBulkPinButtonsState = updateBulkPinButtonsState;
 
   // フッター更新 '25.11.28変更
   function updateListFooterInfo() {
@@ -2635,7 +2702,7 @@
         const anchors = body.querySelectorAll(".turn-idx-anchor");
         anchors.forEach((el) => {
           const row = el.closest(".row");
-          if (!row) return;
+          if (!(row instanceof HTMLElement)) return;
           if (row.offsetParent === null) return; // 非表示行は除外
 
           const r = row.getAttribute("data-role"); // user / assistant
@@ -2753,14 +2820,17 @@
   // 保存失敗時のロールバック（再読込→再描画）
   window.addEventListener("cgtn:save-error", (ev) => {
     try {
-      const cid = ev?.detail?.chatId || SH.getChatId?.();
+      const cev = ev as CustomEvent<{ chatId?: string }>;
+      const cid = cev.detail?.chatId || SH.getChatId?.();
       if (cid) hydratePinsCache?.(cid);
-      if (SH.isListOpen?.()) renderList?.(true);
+      if (SH.isListOpen?.()) NS.renderList?.(true);
       UI?.toast?.("保存に失敗しました（容量または通信エラー）", "error");
     } catch {}
   });
 
   window.addEventListener("cgtn:pins-updated", (ev) => {
+    if (!(ev instanceof CustomEvent)) return;
+
     const { chatId, count } = ev.detail || {};
 
     // renderListは呼ばない '25.11.27
