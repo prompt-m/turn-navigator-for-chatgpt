@@ -37,6 +37,7 @@
   padding:4px 12px;
   border-radius:999px;
   background:#fff;
+  color:#000;
   border:1px solid rgba(0,0,0,.06);
   box-shadow:0 4px 14px rgba(0,0,0,.12);
   transition:
