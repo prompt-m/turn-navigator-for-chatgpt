@@ -875,34 +875,8 @@
       () =>
         window.CGTN_UI?.getLang?.() ||
         window.CGTN_SHARED?.getCFG?.()?.lang ||
-        (window.CGTN_SHARED?.getCFG?.()?.english ? "en" : "ja")
+        (window.CGTN_SHARED?.getCFG?.()?.english ? "en" : "ja"),
     );
-
-    // ドラッグ移動（保存は shared 側）
-    /* !!!!
-    (function enableDragging(){
-      const grip = box.querySelector('#cgpt-drag');
-      let dragging=false, offX=0, offY=0;
-      grip.addEventListener('pointerdown',e=>{
-        dragging=true; const r=box.getBoundingClientRect();
-        offX=e.clientX-r.left; offY=e.clientY-r.top;
-        try{ grip.setPointerCapture(e.pointerId); }catch{}
-      });
-      window.addEventListener('pointermove',e=>{
-        if(!dragging) return;
-        box.style.left=(e.clientX-offX)+'px';
-        box.style.top =(e.clientY-offY)+'px';
-      },{passive:true});
-      window.addEventListener('pointerup',e=>{
-        if(!dragging) return;
-        dragging=false;
-        try{ grip.releasePointerCapture(e.pointerId); }catch{}
-        clampPanelWithinViewport();
-        const r=box.getBoundingClientRect();
-        SH.saveSettingsPatch({ panel:{ x:r.left, y:r.top } });
-      });
-    })();
-*/
 
     // ドラッグ移動（保存は shared 側）
     (function enableDragging() {
@@ -930,7 +904,7 @@
           box.style.left = e.clientX - offX + "px";
           box.style.top = e.clientY - offY + "px";
         },
-        { passive: true }
+        { passive: true },
       );
 
       window.addEventListener("pointerup", (e: PointerEvent) => {
@@ -947,26 +921,6 @@
 
     // 初期表示：文言と保存状態
     applyLang();
-    /* !!!!
-    try {
-      box.querySelector("#cgpt-viz").checked = !!SH.getCFG().showViz;
-    } catch {}
-
-    // === チェック群の初期反映とイベント ===
-    try {
-      const cfg = SH.getCFG() || {};
-      const listChk = box.querySelector("#cgpt-list-toggle");
-      listChk.checked = !!cfg.list?.enabled;
-    } catch {}
-
-    // 既定値反映（復唱：念のため）
-    try {
-      box.querySelector("#cgpt-viz").checked = !!SH.getCFG().showViz;
-      box.querySelector("#cgpt-list-toggle").checked =
-        !!SH.getCFG().list?.enabled;
-    } catch {}
-*/
-
     const viz = box.querySelector("#cgpt-viz");
     if (viz instanceof HTMLInputElement) {
       viz.checked = !!SH.getCFG().showViz;
@@ -1003,7 +957,7 @@
         "#cgpt-navi-refresh": "nav.refresh",
         "#cgtn-open-settings": "nav.openSettings",
       },
-      document
+      document,
     );
 
     // === 手動リフレッシュ（ナビパネル） ===
@@ -1025,7 +979,7 @@
           }
 
           console.debug(
-            "[CGTN] manual refresh (nav): rebuild + optional renderList"
+            "[CGTN] manual refresh (nav): rebuild + optional renderList",
           );
         } catch (e) {
           console.warn("[CGTN] nav refresh failed", e);
@@ -1046,32 +1000,18 @@
         () => {
           lastWasKeyboard = true;
         },
-        { capture: true }
+        { capture: true },
       );
       window.addEventListener(
         "pointerdown",
         () => {
           lastWasKeyboard = false;
         },
-        { capture: true }
+        { capture: true },
       );
 
-      // フォーカスの逃がし先（画面外・不可視）
-      /* !!!!
-      let park = document.getElementById("cgtn-focus-park");
-      if (!park) {
-        park = document.createElement("button");
-        park.id = "cgtn-focus-park";
-        park.type = "button";
-        park.tabIndex = -1;
-        park.style.cssText =
-          "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
-        document.body.appendChild(park);
-      }
-*/
-
       let park = document.getElementById(
-        "cgtn-focus-park"
+        "cgtn-focus-park",
       ) as HTMLButtonElement | null;
 
       if (!park) {
@@ -1085,26 +1025,6 @@
       }
 
       const INTERACTIVE = "button, label, input[type=checkbox]";
-
-      // マウス系で root 内に focusin したら即座に追い出す
-      /* !!!!
-      root.addEventListener(
-        "focusin",
-        (e) => {
-          const el = e.target && e.target.closest(INTERACTIVE);
-          if (el && !lastWasKeyboard) {
-            // クリック・ドラッグ等で入ったフォーカスは排除
-            try {
-              el.blur();
-            } catch {}
-            try {
-              park.focus({ preventScroll: true });
-            } catch {}
-          }
-        },
-        true
-      ); // ← capture
-*/
 
       root.addEventListener(
         "focusin",
@@ -1123,7 +1043,7 @@
             } catch {}
           }
         },
-        true
+        true,
       ); // ← capture
 
       // 念押し：マウスアップで常にパークへ
@@ -1140,7 +1060,7 @@
             }
           } catch {}
         },
-        { capture: true }
+        { capture: true },
       );
     })();
   }
@@ -1154,17 +1074,6 @@
     // 共通翻訳関数を取得
     const t = window.CGTN_I18N?.t || ((k) => k);
 
-    // data-i18n属性を持つ要素すべてに適用
-    /*
-    box.querySelectorAll("[data-i18n]").forEach((el) => {
-      const key = el.getAttribute("data-i18n");
-      const txt = t(key);
-      if (!key || !txt) return;
-      // テキスト＆タイトルを同時更新（title不要な要素は上書きしても無害）
-      el.textContent = txt;
-      el.title = txt;
-    });
-*/
     box.querySelectorAll("[data-i18n]").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
 
@@ -1176,15 +1085,6 @@
       el.textContent = txt;
       el.title = txt;
     });
-
-    // 言語ボタン
-    /*
-    const langBtn = box.querySelector(".cgpt-lang-btn");
-    if (langBtn) langBtn.textContent = T("langBtn");
-    // ドラッグタイトル
-    const drag = box.querySelector("#cgpt-drag");
-    if (drag) drag.title = T("nav.drag");
-*/
 
     // 言語ボタン
     const langBtn = box.querySelector(".cgpt-lang-btn");

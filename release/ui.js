@@ -1,27 +1,27 @@
 // ui.js — パネルUI生成 / 言語 / 位置クランプ
 (() => {
-    "use strict";
-    const NS = (window.CGTN_UI = window.CGTN_UI || {});
-    const SH = window.CGTN_SHARED || {};
-    const LG = window.CGTN_LOGIC || {};
-    const T = (k) => window.CGTN_I18N?.t?.(k) || k;
-    // 初期言語をブラウザの設定から決める
-    let LANG = (navigator.language || "").toLowerCase().startsWith("ja")
-        ? "ja"
-        : "en";
-    // いつでも <html lang> を真とする（fallback は LANG）
-    document.documentElement.lang = LANG;
-    // 外部から現在言語を取得できるように公開
-    NS.getLang = () => LANG;
-    SH.getLang = () => LANG;
-    SH.setLangResolver?.(SH.getLang); // shared.js 側の言語解決に供給
-    // ★ curLang() がこれを拾えるように resolver にも設定
-    SH.setLangResolver?.(SH.getLang);
-    // === Cursor assets ===
-    const pinCurURL = chrome.runtime.getURL("assets/pin16.png");
-    const prvCurURL = chrome.runtime.getURL("assets/prev16.png");
-    /* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
-    const NAV_CSS = `
+  "use strict";
+  const NS = (window.CGTN_UI = window.CGTN_UI || {});
+  const SH = window.CGTN_SHARED || {};
+  const LG = window.CGTN_LOGIC || {};
+  const T = (k) => window.CGTN_I18N?.t?.(k) || k;
+  // 初期言語をブラウザの設定から決める
+  let LANG = (navigator.language || "").toLowerCase().startsWith("ja")
+    ? "ja"
+    : "en";
+  // いつでも <html lang> を真とする（fallback は LANG）
+  document.documentElement.lang = LANG;
+  // 外部から現在言語を取得できるように公開
+  NS.getLang = () => LANG;
+  SH.getLang = () => LANG;
+  SH.setLangResolver?.(SH.getLang); // shared.js 側の言語解決に供給
+  // ★ curLang() がこれを拾えるように resolver にも設定
+  SH.setLangResolver?.(SH.getLang);
+  // === Cursor assets ===
+  const pinCurURL = chrome.runtime.getURL("assets/pin16.png");
+  const prvCurURL = chrome.runtime.getURL("assets/prev16.png");
+  /* 4ブロック：NAV / LIST / PREVIEW / MISC（補助） */
+  const NAV_CSS = `
 /* === 共通：丸いピル型ボタン === */
 .cgtn-pill-btn{
   font:12px/1.1 system-ui,-apple-system,sans-serif;
@@ -216,7 +216,7 @@
 }
 
 `;
-    const LIST_CSS = `
+  const LIST_CSS = `
 /* =========================
    2) LIST PANEL（外枠/配置）
 ========================= */
@@ -587,7 +587,7 @@
   .cgtn-dock .cgtn-dock-resize{ color:#cfd8e3; }
 }
 `;
-    const MISC_CSS = `
+  const MISC_CSS = `
 /* =========================
    7) リスト補助（情報/色/スクロールバー）
 ========================= */
@@ -672,17 +672,17 @@
 .cgtn-dock-body::-webkit-scrollbar,
 #cgpt-list-body::-webkit-scrollbar-thumb:hover{ background: rgba(0,0,0,.45); }
 `;
-    /* 注入ヘルパ */
-    function injectCss(css) {
-        const s = document.createElement("style");
-        s.textContent = css;
-        document.head.appendChild(s);
-    }
-    function injectCssMany(...chunks) {
-        injectCss(chunks.join("\n"));
-    }
-    // 4) Preview: プレビューウィンドウ
-    const PREVIEW_CSS = `
+  /* 注入ヘルパ */
+  function injectCss(css) {
+    const s = document.createElement("style");
+    s.textContent = css;
+    document.head.appendChild(s);
+  }
+  function injectCssMany(...chunks) {
+    injectCss(chunks.join("\n"));
+  }
+  // 4) Preview: プレビューウィンドウ
+  const PREVIEW_CSS = `
 /* ---------- Preview window ---------- */
 #cgpt-preview{ border-radius:var(--cgtn-radius); }
 #cgpt-preview .header .cgtn-iconbtn{ /* 共通ボタン */ }
@@ -751,16 +751,15 @@
 
 
 `;
-    /* ここで一括注入（順序固定） */
-    injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
-    /*ｺｺｶﾗ*/
-    // いちばん最後に差すフォーカス無効CSS（:focus-visible は保持）
-    (function injectFocusKillerCss() {
-        if (document.getElementById("cgtn-focus-css"))
-            return;
-        const s = document.createElement("style");
-        s.id = "cgtn-focus-css";
-        s.textContent = `
+  /* ここで一括注入（順序固定） */
+  injectCssMany(NAV_CSS, LIST_CSS, PREVIEW_CSS /*←上で宣言*/, MISC_CSS);
+  /*ｺｺｶﾗ*/
+  // いちばん最後に差すフォーカス無効CSS（:focus-visible は保持）
+  (function injectFocusKillerCss() {
+    if (document.getElementById("cgtn-focus-css")) return;
+    const s = document.createElement("style");
+    s.id = "cgtn-focus-css";
+    s.textContent = `
 #cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
 #cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible){
   outline: none !important;
@@ -772,15 +771,14 @@
 
 }
   `;
-        document.head.appendChild(s);
-    })();
-    /*ｺｺﾏﾃﾞ*/
-    function installUI() {
-        if (document.getElementById("cgpt-nav"))
-            return;
-        const box = document.createElement("div");
-        box.id = "cgpt-nav";
-        box.innerHTML = `
+    document.head.appendChild(s);
+  })();
+  /*ｺｺﾏﾃﾞ*/
+  function installUI() {
+    if (document.getElementById("cgpt-nav")) return;
+    const box = document.createElement("div");
+    box.id = "cgpt-nav";
+    box.innerHTML = `
       <div id="cgpt-drag" title=""></div>
 
       <!-- === ユーザー === -->
@@ -854,244 +852,189 @@
       </div>
       </div>
     `;
-        document.body.appendChild(box);
-        // 言語リゾルバ（tooltipsの言語切替に使用）
-        window.CGTN_SHARED?.setLangResolver?.(() => window.CGTN_UI?.getLang?.() ||
-            window.CGTN_SHARED?.getCFG?.()?.lang ||
-            (window.CGTN_SHARED?.getCFG?.()?.english ? "en" : "ja"));
-        // ドラッグ移動（保存は shared 側）
-        /* !!!!
-        (function enableDragging(){
-          const grip = box.querySelector('#cgpt-drag');
-          let dragging=false, offX=0, offY=0;
-          grip.addEventListener('pointerdown',e=>{
-            dragging=true; const r=box.getBoundingClientRect();
-            offX=e.clientX-r.left; offY=e.clientY-r.top;
-            try{ grip.setPointerCapture(e.pointerId); }catch{}
-          });
-          window.addEventListener('pointermove',e=>{
-            if(!dragging) return;
-            box.style.left=(e.clientX-offX)+'px';
-            box.style.top =(e.clientY-offY)+'px';
-          },{passive:true});
-          window.addEventListener('pointerup',e=>{
-            if(!dragging) return;
-            dragging=false;
-            try{ grip.releasePointerCapture(e.pointerId); }catch{}
-            clampPanelWithinViewport();
-            const r=box.getBoundingClientRect();
-            SH.saveSettingsPatch({ panel:{ x:r.left, y:r.top } });
-          });
-        })();
-    */
-        // ドラッグ移動（保存は shared 側）
-        (function enableDragging() {
-            const grip = box.querySelector("#cgpt-drag");
-            if (!grip)
-                return;
-            let dragging = false, offX = 0, offY = 0;
-            grip.addEventListener("pointerdown", (e) => {
-                dragging = true;
-                const r = box.getBoundingClientRect();
-                offX = e.clientX - r.left;
-                offY = e.clientY - r.top;
-                try {
-                    grip.setPointerCapture(e.pointerId);
-                }
-                catch { }
-            });
-            window.addEventListener("pointermove", (e) => {
-                if (!dragging)
-                    return;
-                box.style.left = e.clientX - offX + "px";
-                box.style.top = e.clientY - offY + "px";
-            }, { passive: true });
-            window.addEventListener("pointerup", (e) => {
-                if (!dragging)
-                    return;
-                dragging = false;
-                try {
-                    grip.releasePointerCapture(e.pointerId);
-                }
-                catch { }
-                clampPanelWithinViewport();
-                const r = box.getBoundingClientRect();
-                SH.saveSettingsPatch({ panel: { x: r.left, y: r.top } });
-            });
-        })();
-        // 初期表示：文言と保存状態
-        applyLang();
-        /* !!!!
+    document.body.appendChild(box);
+    // 言語リゾルバ（tooltipsの言語切替に使用）
+    window.CGTN_SHARED?.setLangResolver?.(
+      () =>
+        window.CGTN_UI?.getLang?.() ||
+        window.CGTN_SHARED?.getCFG?.()?.lang ||
+        (window.CGTN_SHARED?.getCFG?.()?.english ? "en" : "ja"),
+    );
+    // ドラッグ移動（保存は shared 側）
+    (function enableDragging() {
+      const grip = box.querySelector("#cgpt-drag");
+      if (!grip) return;
+      let dragging = false,
+        offX = 0,
+        offY = 0;
+      grip.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        const r = box.getBoundingClientRect();
+        offX = e.clientX - r.left;
+        offY = e.clientY - r.top;
         try {
-          box.querySelector("#cgpt-viz").checked = !!SH.getCFG().showViz;
+          grip.setPointerCapture(e.pointerId);
         } catch {}
-    
-        // === チェック群の初期反映とイベント ===
+      });
+      window.addEventListener(
+        "pointermove",
+        (e) => {
+          if (!dragging) return;
+          box.style.left = e.clientX - offX + "px";
+          box.style.top = e.clientY - offY + "px";
+        },
+        { passive: true },
+      );
+      window.addEventListener("pointerup", (e) => {
+        if (!dragging) return;
+        dragging = false;
         try {
-          const cfg = SH.getCFG() || {};
-          const listChk = box.querySelector("#cgpt-list-toggle");
-          listChk.checked = !!cfg.list?.enabled;
+          grip.releasePointerCapture(e.pointerId);
         } catch {}
-    
-        // 既定値反映（復唱：念のため）
-        try {
-          box.querySelector("#cgpt-viz").checked = !!SH.getCFG().showViz;
-          box.querySelector("#cgpt-list-toggle").checked =
-            !!SH.getCFG().list?.enabled;
-        } catch {}
-    */
-        const viz = box.querySelector("#cgpt-viz");
-        if (viz instanceof HTMLInputElement) {
-            viz.checked = !!SH.getCFG().showViz;
-        }
-        const listChk = box.querySelector("#cgpt-list-toggle");
-        if (listChk instanceof HTMLInputElement) {
-            const cfg = SH.getCFG() || {};
-            listChk.checked = !!cfg.list?.enabled;
-        }
-        // 既定値反映（復唱：念のため）
-        if (viz instanceof HTMLInputElement) {
-            viz.checked = !!SH.getCFG().showViz;
-        }
-        if (listChk instanceof HTMLInputElement) {
-            listChk.checked = !!SH.getCFG().list?.enabled;
-        }
-        window.CGTN_SHARED?.applyTooltips?.({
-            '#cgpt-nav [data-role="user"]      [data-act="top"]': "nav.top",
-            '#cgpt-nav [data-role="user"]      [data-act="bottom"]': "nav.bottom",
-            '#cgpt-nav [data-role="user"]      [data-act="prev"]': "nav.prev",
-            '#cgpt-nav [data-role="user"]      [data-act="next"]': "nav.next",
-            '#cgpt-nav [data-role="assistant"] [data-act="top"]': "nav.top",
-            '#cgpt-nav [data-role="assistant"] [data-act="bottom"]': "nav.bottom",
-            '#cgpt-nav [data-role="assistant"] [data-act="prev"]': "nav.prev",
-            '#cgpt-nav [data-role="assistant"] [data-act="next"]': "nav.next",
-            "#cgpt-drag": "nav.drag",
-            "#cgpt-nav .cgpt-lang-btn": "nav.lang",
-            "#cgpt-viz": "nav.viz",
-            "#cgpt-list-toggle": "nav.list",
-            "#cgpt-navi-refresh": "nav.refresh",
-            "#cgtn-open-settings": "nav.openSettings",
-        }, document);
-        // === 手動リフレッシュ（ナビパネル） ===
-        (function bindNaviRefresh() {
-            const btn = box.querySelector("#cgpt-navi-refresh");
-            if (!btn)
-                return;
-            btn.addEventListener("click", (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                try {
-                    // 内部状態を完全再構築
-                    LG.rebuild?.();
-                    // 一覧パネルが開いていれば再描画
-                    if (SH.isListOpen?.()) {
-                        LG.renderList?.(true);
-                    }
-                    console.debug("[CGTN] manual refresh (nav): rebuild + optional renderList");
-                }
-                catch (e) {
-                    console.warn("[CGTN] nav refresh failed", e);
-                }
-            });
-        })();
-        // === フォーカスが残らない最終防御（モダリティ + パーキング） ===
-        (function enforceNoFocusNav() {
-            const root = document.getElementById("cgpt-nav");
-            if (!root || root._cgtnFocusGuard)
-                return;
-            root._cgtnFocusGuard = true;
-            // 直近入力モダリティを覚える（キーボード:true / ポインタ:false）
-            let lastWasKeyboard = false;
-            window.addEventListener("keydown", () => {
-                lastWasKeyboard = true;
-            }, { capture: true });
-            window.addEventListener("pointerdown", () => {
-                lastWasKeyboard = false;
-            }, { capture: true });
-            // フォーカスの逃がし先（画面外・不可視）
-            /* !!!!
-            let park = document.getElementById("cgtn-focus-park");
-            if (!park) {
-              park = document.createElement("button");
-              park.id = "cgtn-focus-park";
-              park.type = "button";
-              park.tabIndex = -1;
-              park.style.cssText =
-                "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
-              document.body.appendChild(park);
-            }
-      */
-            let park = document.getElementById("cgtn-focus-park");
-            if (!park) {
-                park = document.createElement("button");
-                park.id = "cgtn-focus-park";
-                park.type = "button";
-                park.tabIndex = -1;
-                park.style.cssText =
-                    "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
-                document.body.appendChild(park);
-            }
-            const INTERACTIVE = "button, label, input[type=checkbox]";
-            // マウス系で root 内に focusin したら即座に追い出す
-            /* !!!!
-            root.addEventListener(
-              "focusin",
-              (e) => {
-                const el = e.target && e.target.closest(INTERACTIVE);
-                if (el && !lastWasKeyboard) {
-                  // クリック・ドラッグ等で入ったフォーカスは排除
-                  try {
-                    el.blur();
-                  } catch {}
-                  try {
-                    park.focus({ preventScroll: true });
-                  } catch {}
-                }
-              },
-              true
-            ); // ← capture
-      */
-            root.addEventListener("focusin", (e) => {
-                const t = e.target;
-                if (!(t instanceof Element))
-                    return;
-                const el = t.closest(INTERACTIVE);
-                if (el && !lastWasKeyboard) {
-                    // クリック・ドラッグ等で入ったフォーカスは排除
-                    try {
-                        el.blur();
-                    }
-                    catch { }
-                    try {
-                        park.focus({ preventScroll: true });
-                    }
-                    catch { }
-                }
-            }, true); // ← capture
-            // 念押し：マウスアップで常にパークへ
-            root.addEventListener("mouseup", () => {
-                try {
-                    // activeElement がまだ残ってたらパーキングに移す
-                    if (document.activeElement &&
-                        root.contains(document.activeElement)) {
-                        park.focus({ preventScroll: true });
-                    }
-                }
-                catch { }
-            }, { capture: true });
-        })();
+        clampPanelWithinViewport();
+        const r = box.getBoundingClientRect();
+        SH.saveSettingsPatch({ panel: { x: r.left, y: r.top } });
+      });
+    })();
+    // 初期表示：文言と保存状態
+    applyLang();
+    const viz = box.querySelector("#cgpt-viz");
+    if (viz instanceof HTMLInputElement) {
+      viz.checked = !!SH.getCFG().showViz;
     }
-    /* installUI ｺｺﾏﾃﾞ*/
-    function applyLang() {
-        const box = document.getElementById("cgpt-nav");
-        if (!box)
-            return;
-        const cur = (SH.getCFG?.() || {}).lang;
-        //console.log("applyLang cur:",cur);
-        // 共通翻訳関数を取得
-        const t = window.CGTN_I18N?.t || ((k) => k);
-        // data-i18n属性を持つ要素すべてに適用
-        /*
+    const listChk = box.querySelector("#cgpt-list-toggle");
+    if (listChk instanceof HTMLInputElement) {
+      const cfg = SH.getCFG() || {};
+      listChk.checked = !!cfg.list?.enabled;
+    }
+    // 既定値反映（復唱：念のため）
+    if (viz instanceof HTMLInputElement) {
+      viz.checked = !!SH.getCFG().showViz;
+    }
+    if (listChk instanceof HTMLInputElement) {
+      listChk.checked = !!SH.getCFG().list?.enabled;
+    }
+    window.CGTN_SHARED?.applyTooltips?.(
+      {
+        '#cgpt-nav [data-role="user"]      [data-act="top"]': "nav.top",
+        '#cgpt-nav [data-role="user"]      [data-act="bottom"]': "nav.bottom",
+        '#cgpt-nav [data-role="user"]      [data-act="prev"]': "nav.prev",
+        '#cgpt-nav [data-role="user"]      [data-act="next"]': "nav.next",
+        '#cgpt-nav [data-role="assistant"] [data-act="top"]': "nav.top",
+        '#cgpt-nav [data-role="assistant"] [data-act="bottom"]': "nav.bottom",
+        '#cgpt-nav [data-role="assistant"] [data-act="prev"]': "nav.prev",
+        '#cgpt-nav [data-role="assistant"] [data-act="next"]': "nav.next",
+        "#cgpt-drag": "nav.drag",
+        "#cgpt-nav .cgpt-lang-btn": "nav.lang",
+        "#cgpt-viz": "nav.viz",
+        "#cgpt-list-toggle": "nav.list",
+        "#cgpt-navi-refresh": "nav.refresh",
+        "#cgtn-open-settings": "nav.openSettings",
+      },
+      document,
+    );
+    // === 手動リフレッシュ（ナビパネル） ===
+    (function bindNaviRefresh() {
+      const btn = box.querySelector("#cgpt-navi-refresh");
+      if (!btn) return;
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        try {
+          // 内部状態を完全再構築
+          LG.rebuild?.();
+          // 一覧パネルが開いていれば再描画
+          if (SH.isListOpen?.()) {
+            LG.renderList?.(true);
+          }
+          console.debug(
+            "[CGTN] manual refresh (nav): rebuild + optional renderList",
+          );
+        } catch (e) {
+          console.warn("[CGTN] nav refresh failed", e);
+        }
+      });
+    })();
+    // === フォーカスが残らない最終防御（モダリティ + パーキング） ===
+    (function enforceNoFocusNav() {
+      const root = document.getElementById("cgpt-nav");
+      if (!root || root._cgtnFocusGuard) return;
+      root._cgtnFocusGuard = true;
+      // 直近入力モダリティを覚える（キーボード:true / ポインタ:false）
+      let lastWasKeyboard = false;
+      window.addEventListener(
+        "keydown",
+        () => {
+          lastWasKeyboard = true;
+        },
+        { capture: true },
+      );
+      window.addEventListener(
+        "pointerdown",
+        () => {
+          lastWasKeyboard = false;
+        },
+        { capture: true },
+      );
+      // フォーカスの逃がし先（画面外・不可視）
+      let park = document.getElementById("cgtn-focus-park");
+      if (!park) {
+        park = document.createElement("button");
+        park.id = "cgtn-focus-park";
+        park.type = "button";
+        park.tabIndex = -1;
+        park.style.cssText =
+          "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
+        document.body.appendChild(park);
+      }
+      const INTERACTIVE = "button, label, input[type=checkbox]";
+      // マウス系で root 内に focusin したら即座に追い出す
+      root.addEventListener(
+        "focusin",
+        (e) => {
+          const t = e.target;
+          if (!(t instanceof Element)) return;
+          const el = t.closest(INTERACTIVE);
+          if (el && !lastWasKeyboard) {
+            // クリック・ドラッグ等で入ったフォーカスは排除
+            try {
+              el.blur();
+            } catch {}
+            try {
+              park.focus({ preventScroll: true });
+            } catch {}
+          }
+        },
+        true,
+      ); // ← capture
+      // 念押し：マウスアップで常にパークへ
+      root.addEventListener(
+        "mouseup",
+        () => {
+          try {
+            // activeElement がまだ残ってたらパーキングに移す
+            if (
+              document.activeElement &&
+              root.contains(document.activeElement)
+            ) {
+              park.focus({ preventScroll: true });
+            }
+          } catch {}
+        },
+        { capture: true },
+      );
+    })();
+  }
+  /* installUI ｺｺﾏﾃﾞ*/
+  function applyLang() {
+    const box = document.getElementById("cgpt-nav");
+    if (!box) return;
+    const cur = (SH.getCFG?.() || {}).lang;
+    //console.log("applyLang cur:",cur);
+    // 共通翻訳関数を取得
+    const t = window.CGTN_I18N?.t || ((k) => k);
+    // data-i18n属性を持つ要素すべてに適用
+    /*
         box.querySelectorAll("[data-i18n]").forEach((el) => {
           const key = el.getAttribute("data-i18n");
           const txt = t(key);
@@ -1101,103 +1044,96 @@
           el.title = txt;
         });
     */
-        box.querySelectorAll("[data-i18n]").forEach((el) => {
-            if (!(el instanceof HTMLElement))
-                return;
-            const key = el.getAttribute("data-i18n");
-            const txt = t(key);
-            if (!key || !txt)
-                return;
-            // テキスト＆タイトルを同時更新
-            el.textContent = txt;
-            el.title = txt;
-        });
-        // 言語ボタン
-        /*
+    box.querySelectorAll("[data-i18n]").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const key = el.getAttribute("data-i18n");
+      const txt = t(key);
+      if (!key || !txt) return;
+      // テキスト＆タイトルを同時更新
+      el.textContent = txt;
+      el.title = txt;
+    });
+    // 言語ボタン
+    /*
         const langBtn = box.querySelector(".cgpt-lang-btn");
         if (langBtn) langBtn.textContent = T("langBtn");
         // ドラッグタイトル
         const drag = box.querySelector("#cgpt-drag");
         if (drag) drag.title = T("nav.drag");
     */
-        // 言語ボタン
-        const langBtn = box.querySelector(".cgpt-lang-btn");
-        if (langBtn instanceof HTMLElement) {
-            langBtn.textContent = T("langBtn");
-        }
-        // ドラッグタイトル
-        const drag = box.querySelector("#cgpt-drag");
-        if (drag instanceof HTMLElement) {
-            drag.title = T("nav.drag");
-        }
-        // プレビュータイトル
-        const h = document.querySelector("#cgtn-preview-title");
-        if (h)
-            h.textContent = T("preview");
-        // リストパネルのロールフィルタも言語を反映 '25.11.20
-        try {
-            window.CGTN_LOGIC?.applyListFilterLang?.();
-        }
-        catch { }
-        // リストパネルのフッターも言語を反映 '25.11.20
-        try {
-            window.CGTN_LOGIC?.updateListFooterInfo?.();
-        }
-        catch (_) { }
-        // リストパネルのタイトル
-        try {
-            window.CGTN_LOGIC?.updateListChatTitle?.();
-        }
-        catch (_) { }
+    // 言語ボタン
+    const langBtn = box.querySelector(".cgpt-lang-btn");
+    if (langBtn instanceof HTMLElement) {
+      langBtn.textContent = T("langBtn");
     }
-    function toggleLang() {
-        // 現在の言語を取得（設定がなければ ja をデフォルトに）
-        const cur = (SH.getCFG?.() || {}).lang || "ja";
-        const next = cur && String(cur).toLowerCase().startsWith("en") ? "ja" : "en";
-        // --- 言語設定の共有と即時反映 ---
-        try {
-            SH.saveSettingsPatch?.({ lang: next }); // ← LANG ではなく next
-            if (window.CGTN_I18N) {
-                window.CGTN_I18N._forceLang = next; // ← 即反映
-            }
-        }
-        catch (e) {
-            console.warn("toggleLang error", e);
-        }
-        // --- UI反映 ---
-        applyLang();
-        // --- ツールチップ再翻訳 ---
-        SH.updateTooltips?.();
-        // --- 必要な場合のみリスト再描画 ---
-        const isListVisible = window.CGTN_LOGIC?.isListVisible?.();
-        const isPinOnly = !!window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly;
-        //    window.CGTN_LOGIC?.updateListFooterInfo?.();
-        if (isListVisible || isPinOnly) {
-            window.CGTN_LOGIC.renderList(true);
-        }
+    // ドラッグタイトル
+    const drag = box.querySelector("#cgpt-drag");
+    if (drag instanceof HTMLElement) {
+      drag.title = T("nav.drag");
     }
-    function clampPanelWithinViewport() {
-        const box = document.getElementById("cgpt-nav");
-        if (!box)
-            return;
-        const margin = 8;
-        const vw = document.documentElement.clientWidth || window.innerWidth;
-        const vh = document.documentElement.clientHeight || window.innerHeight;
-        const r = box.getBoundingClientRect();
-        box.style.right = "auto";
-        box.style.bottom = "auto";
-        let x = Number.isFinite(r.left) ? r.left : vw - r.width - 12;
-        let y = Number.isFinite(r.top) ? r.top : vh - r.height - 140;
-        x = Math.min(vw - r.width - margin, Math.max(margin, x));
-        y = Math.min(vh - r.height - margin, Math.max(margin, y));
-        box.style.left = `${x}px`;
-        box.style.top = `${y}px`;
+    // プレビュータイトル
+    const h = document.querySelector("#cgtn-preview-title");
+    if (h) h.textContent = T("preview");
+    // リストパネルのロールフィルタも言語を反映 '25.11.20
+    try {
+      window.CGTN_LOGIC?.applyListFilterLang?.();
+    } catch {}
+    // リストパネルのフッターも言語を反映 '25.11.20
+    try {
+      window.CGTN_LOGIC?.updateListFooterInfo?.();
+    } catch (_) {}
+    // リストパネルのタイトル
+    try {
+      window.CGTN_LOGIC?.updateListChatTitle?.();
+    } catch (_) {}
+  }
+  function toggleLang() {
+    // 現在の言語を取得（設定がなければ ja をデフォルトに）
+    const cur = (SH.getCFG?.() || {}).lang || "ja";
+    const next =
+      cur && String(cur).toLowerCase().startsWith("en") ? "ja" : "en";
+    // --- 言語設定の共有と即時反映 ---
+    try {
+      SH.saveSettingsPatch?.({ lang: next }); // ← LANG ではなく next
+      if (window.CGTN_I18N) {
+        window.CGTN_I18N._forceLang = next; // ← 即反映
+      }
+    } catch (e) {
+      console.warn("toggleLang error", e);
     }
-    // 公開API
-    NS.installUI = installUI;
-    NS.clampPanelWithinViewport = clampPanelWithinViewport;
-    NS.applyLang = applyLang;
-    NS.toggleLang = toggleLang;
-    // 起動直後に一度だけ適用（navがまだ無ければ無害）
-    document.addEventListener("DOMContentLoaded", applyLang);
+    // --- UI反映 ---
+    applyLang();
+    // --- ツールチップ再翻訳 ---
+    SH.updateTooltips?.();
+    // --- 必要な場合のみリスト再描画 ---
+    const isListVisible = window.CGTN_LOGIC?.isListVisible?.();
+    const isPinOnly = !!window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly;
+    //    window.CGTN_LOGIC?.updateListFooterInfo?.();
+    if (isListVisible || isPinOnly) {
+      window.CGTN_LOGIC.renderList(true);
+    }
+  }
+  function clampPanelWithinViewport() {
+    const box = document.getElementById("cgpt-nav");
+    if (!box) return;
+    const margin = 8;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = document.documentElement.clientHeight || window.innerHeight;
+    const r = box.getBoundingClientRect();
+    box.style.right = "auto";
+    box.style.bottom = "auto";
+    let x = Number.isFinite(r.left) ? r.left : vw - r.width - 12;
+    let y = Number.isFinite(r.top) ? r.top : vh - r.height - 140;
+    x = Math.min(vw - r.width - margin, Math.max(margin, x));
+    y = Math.min(vh - r.height - margin, Math.max(margin, y));
+    box.style.left = `${x}px`;
+    box.style.top = `${y}px`;
+  }
+  // 公開API
+  NS.installUI = installUI;
+  NS.clampPanelWithinViewport = clampPanelWithinViewport;
+  NS.applyLang = applyLang;
+  NS.toggleLang = toggleLang;
+  // 起動直後に一度だけ適用（navがまだ無ければ無害）
+  document.addEventListener("DOMContentLoaded", applyLang);
 })();
