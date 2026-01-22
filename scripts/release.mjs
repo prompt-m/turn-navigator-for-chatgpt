@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "..");
 
 const pkg = JSON.parse(
-  fs.readFileSync(path.join(root, "package.json"), "utf8")
+  fs.readFileSync(path.join(root, "package.json"), "utf8"),
 );
 const version = pkg.version; // ここが唯一の正
 
@@ -31,10 +31,10 @@ manifest.version_name = `${version} (${dateTag})`;
 fs.writeFileSync(
   manifestPath,
   JSON.stringify(manifest, null, 2) + "\n",
-  "utf8"
+  "utf8",
 );
 console.log(
-  `✅ manifest.json updated: version=${manifest.version}, version_name=${manifest.version_name}`
+  `✅ manifest.json updated: version=${manifest.version}, version_name=${manifest.version_name}`,
 );
 
 // release/ を作り直し
@@ -75,9 +75,9 @@ execSync(
   `powershell -NoProfile -Command "if(Test-Path '${zipPath}') { Remove-Item -Force '${zipPath}' }; Compress-Archive -Path '${path.join(
     root,
     "release",
-    "*"
+    "*",
   )}' -DestinationPath '${zipPath}'"`,
-  { stdio: "inherit" }
+  { stdio: "inherit" },
 );
 
 console.log(`✅ Release ready: ${releaseDir}`);

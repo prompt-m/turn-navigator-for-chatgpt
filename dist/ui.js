@@ -71,10 +71,28 @@
    1) NAV (ナビパネル)
 ========================= */
 #cgpt-nav{
-  position:fixed; right:12px; bottom:140px;
-  display:flex; flex-direction:column; gap:12px;
+  position:fixed;
+  right:12px;
+  bottom:140px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
   z-index:2147483647
+  border:1px solid rgba(0,0,0,.12);
+  background:rgba(255,255,255,.88);
+  backdrop-filter: blur(10px);
+  border-radius: 18px;            /* お好み */
+  box-shadow: 0 12px 40px rgba(0,0,0,.18);  
 }
+
+@media (prefers-color-scheme: dark){
+  #cgpt-nav{
+    background:rgba(17,24,39,.55);
+    border-color:rgba(255,255,255,.14);
+  }
+  #cgpt-nav .cgtn-title, #cgpt-nav .cgtn-ver{ color:#fff; }
+}
+
 
 .cgpt-nav-group{
   width:92px; border-radius:14px; padding:10px;
@@ -220,15 +238,35 @@
 /* ヘッダー （常駐）*/
 #cgpt-nav .cgtn-head{
   display:flex;
+  flex-direction:column;
   align-items:flex-start;
   justify-content:space-between;
   gap:10px;
   padding:10px 12px 8px;
   border-bottom:1px solid rgba(0,0,0,.08);
 }
+/* 1段目：左にスイッチ、右に（必要なら）何か置ける */
+#cgpt-nav .cgtn-power{
+  display:flex;
+  justify-content:flex-start;
+}
 
+/* 製品名・バージョンは左寄せ */
+#cgpt-nav .cgtn-brand{
+  text-align:left;
+}
+
+/* つまみは下段にフル幅で置く */
+#cgpt-nav #cgpt-drag{
+  width:100%;
+  margin:0;
+}  
+#cgpt-nav #cgpt-drag{
+  margin-left:auto;
+}
+  
 #cgpt-nav .cgtn-brand{ display:flex; flex-direction:column; gap:2px; }
-#cgpt-nav .cgtn-title{ font:13px/1.2 system-ui,-apple-system,sans-serif; font-weight:700; }
+#cgpt-nav .cgtn-title{ font:9px/1.2 system-ui,-apple-system,sans-serif; font-weight:700; }
 #cgpt-nav .cgtn-ver{ font:11px/1.1 system-ui,-apple-system,sans-serif; opacity:.7; }
 
 #cgpt-nav .cgtn-power input{ display:none; }
@@ -814,18 +852,18 @@
         const box = document.createElement("div");
         box.id = "cgpt-nav";
         box.innerHTML = `
-      <div id="cgpt-drag" title=""></div>
-
       <div class="cgtn-head" data-cgtn-ui>
+        <label class="cgtn-power">
+          <input id="cgtn-power-toggle" type="checkbox">
+          <span class="cgtn-power-pill">Navigate</span>
+        </label>
+
         <div class="cgtn-brand">
           <div class="cgtn-title">Turn Navigator</div>
           <div class="cgtn-ver">v1.0.2</div>
         </div>
 
-        <label class="cgtn-power">
-          <input id="cgtn-power-toggle" type="checkbox">
-          <span class="cgtn-power-pill">Navigate</span>
-        </label>
+        <div id="cgpt-drag" title=""></div>
       </div>
 
     <div class="cgtn-body">
@@ -1182,10 +1220,11 @@
         box.classList.toggle("cgtn-idle", !!idle);
         const cb = box.querySelector("#cgtn-power-toggle");
         const pill = box.querySelector(".cgtn-power-pill");
+        const running = !idle;
         if (cb)
-            cb.checked = !idle;
+            cb.checked = running;
         if (pill)
-            pill.textContent = idle ? "Idle" : "Navigate";
+            pill.textContent = running ? "Navigate" : "Idle";
     }
     // 公開API
     NS.installUI = installUI;

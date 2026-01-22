@@ -26,6 +26,7 @@
     const RUN = {
         running: false,
         bag: makeBag(),
+        prevListEnabled: null,
         // タブ内Idle状態：デバッグ用途でリロードしても維持（sessionStorage優先）
         get idle() {
             try {
@@ -1460,7 +1461,6 @@
             return;
         RUN.running = true;
         RUN.idle = false;
-        // UIは先に確保（ヘッダー＝復帰手段）
         try {
             UI?.installUI?.();
             UI?.setIdleMode?.(false);
@@ -1468,6 +1468,17 @@
         catch { }
         try {
             await initialize();
+            // ★復帰時：Idle前の一覧状態があればそれ、なければ設定値
+            try {
+                const enabled = RUN.prevListEnabled !== null
+                    ? RUN.prevListEnabled
+                    : !!SH?.getCFG?.()?.list?.enabled;
+                LG?.setListEnabled?.(enabled);
+                const chk = document.getElementById("cgpt-list-toggle");
+                if (chk instanceof HTMLInputElement)
+                    chk.checked = enabled;
+            }
+            catch { }
             try {
                 LG?.updatePinOnlyBadge?.();
                 LG?.updateListChatTitle?.();
@@ -1481,7 +1492,14 @@
     function stopApp(reason = "stop") {
         RUN.running = false;
         RUN.idle = true;
-        // 1) UIまわりの“実体”を先に閉じる（表示と状態の不一致を防ぐ）
+        // ★ Idleに入る直前の一覧状態を「メモリ」に退避（storageは触らない）
+        try {
+            RUN.prevListEnabled = !!SH?.getCFG?.()?.list?.enabled;
+        }
+        catch {
+            RUN.prevListEnabled = null;
+        }
+        // ★ 実体を閉じる（表示と監視を止める）
         try {
             window.CGTN_PREVIEW?.hide?.("idle");
         }
@@ -1491,17 +1509,14 @@
             LG?.clearListPanelUI?.();
         }
         catch { }
-        try {
-            // 次回復帰で勝手に一覧が開かないように、状態もOFFへ寄せる
-            SH?.saveSettingsPatch?.({ list: { enabled: false } });
-        }
-        catch { }
+        // ★ UIのチェックも揃える（ズレ防止）
         try {
             const chk = document.getElementById("cgpt-list-toggle");
             if (chk instanceof HTMLInputElement)
                 chk.checked = false;
         }
         catch { }
+        // 監視停止など
         try {
             LG?.detachTurnObserver?.();
         }
@@ -1510,7 +1525,6 @@
             UI?.setIdleMode?.(true);
         }
         catch { }
-        // content 側で登録した解除を全部実行
         RUN.bag.flush();
     }
     window.CGTN_APP = {
