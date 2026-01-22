@@ -216,6 +216,38 @@
   }
 }
 
+/* 2026.1.22 */
+/* ヘッダー （常駐）*/
+#cgpt-nav .cgtn-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px 8px;
+  border-bottom:1px solid rgba(0,0,0,.08);
+}
+
+#cgpt-nav .cgtn-brand{ display:flex; flex-direction:column; gap:2px; }
+#cgpt-nav .cgtn-title{ font:13px/1.2 system-ui,-apple-system,sans-serif; font-weight:700; }
+#cgpt-nav .cgtn-ver{ font:11px/1.1 system-ui,-apple-system,sans-serif; opacity:.7; }
+
+#cgpt-nav .cgtn-power input{ display:none; }
+#cgpt-nav .cgtn-power-pill{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:22px; padding:0 10px; border-radius:999px;
+  border:1px solid rgba(0,0,0,.12);
+  background:#fff;
+  font:12px/1 system-ui,-apple-system,sans-serif;
+  cursor:pointer;
+  margin-top:2px;
+  white-space:nowrap;
+}
+
+/* ===== Idle時：ボディ非表示 ===== */
+#cgpt-nav.cgtn-idle .cgtn-body{ display:none; }
+#cgpt-nav.cgtn-idle{ width:190px; }
+
+
 `;
     const LIST_CSS = `
 /* =========================
@@ -784,6 +816,19 @@
         box.innerHTML = `
       <div id="cgpt-drag" title=""></div>
 
+      <div class="cgtn-head" data-cgtn-ui>
+        <div class="cgtn-brand">
+          <div class="cgtn-title">Turn Navigator</div>
+          <div class="cgtn-ver">v1.0.2</div>
+        </div>
+
+        <label class="cgtn-power">
+          <input id="cgtn-power-toggle" type="checkbox">
+          <span class="cgtn-power-pill">Navigate</span>
+        </label>
+      </div>
+
+    <div class="cgtn-body">
       <!-- === ユーザー === -->
       <div class="cgpt-nav-group" data-role="user">
         <div class="cgpt-nav-label" data-i18n="user"></div>
@@ -854,8 +899,38 @@
                 title="設定を開く">⚙</button>
       </div>
       </div>
-    `;
+    </div>
+
+      `;
         document.body.appendChild(box);
+        // 2026.1.22
+        // ヘッダー：製品名＆バージョン表示
+        try {
+            const mf = chrome.runtime.getManifest();
+            const t = box.querySelector(".cgtn-title");
+            const v = box.querySelector(".cgtn-ver");
+            if (t)
+                t.textContent = mf.name || "Turn Navigator";
+            if (v)
+                v.textContent = "v" + (mf.version || "");
+        }
+        catch { }
+        // power toggle
+        const cb = box.querySelector("#cgtn-power-toggle");
+        if (cb) {
+            // 初期状態（IdleならOFF）
+            const idle = window.CGTN_APP?.isIdle?.() ?? false;
+            cb.checked = !idle;
+            setIdleMode(!!idle);
+            cb.addEventListener("change", () => {
+                if (cb.checked) {
+                    window.CGTN_APP?.start?.("ui-power-on");
+                }
+                else {
+                    window.CGTN_APP?.stop?.("ui-power-off");
+                }
+            });
+        }
         // 言語リゾルバ（tooltipsの言語切替に使用）
         window.CGTN_SHARED?.setLangResolver?.(() => window.CGTN_UI?.getLang?.() ||
             window.CGTN_SHARED?.getCFG?.()?.lang ||
@@ -1099,11 +1174,25 @@
         box.style.left = `${x}px`;
         box.style.top = `${y}px`;
     }
+    // 2026.1.22
+    function setIdleMode(idle) {
+        const box = document.getElementById("cgpt-nav");
+        if (!box)
+            return;
+        box.classList.toggle("cgtn-idle", !!idle);
+        const cb = box.querySelector("#cgtn-power-toggle");
+        const pill = box.querySelector(".cgtn-power-pill");
+        if (cb)
+            cb.checked = !idle;
+        if (pill)
+            pill.textContent = idle ? "Idle" : "Navigate";
+    }
     // 公開API
     NS.installUI = installUI;
     NS.clampPanelWithinViewport = clampPanelWithinViewport;
     NS.applyLang = applyLang;
     NS.toggleLang = toggleLang;
+    NS.setIdleMode = setIdleMode; // 2026.1.22
     // 起動直後に一度だけ適用（navがまだ無ければ無害）
     document.addEventListener("DOMContentLoaded", applyLang);
 })();

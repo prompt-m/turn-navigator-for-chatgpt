@@ -7,6 +7,45 @@
     const UI = window.CGTN_UI;
     const EV = window.CGTN_EVENTS;
     const LG = window.CGTN_LOGIC;
+    function makeBag() {
+        const bag = [];
+        return {
+            add(fn) {
+                bag.push(fn);
+            },
+            flush() {
+                for (const fn of bag.splice(0)) {
+                    try {
+                        fn();
+                    }
+                    catch { }
+                }
+            },
+        };
+    }
+    const RUN = {
+        running: false,
+        bag: makeBag(),
+        // タブ内Idle状態：デバッグ用途でリロードしても維持（sessionStorage優先）
+        get idle() {
+            try {
+                if (sessionStorage.getItem("cgtnIdle") === "1")
+                    return true;
+            }
+            catch { }
+            return !!window.__CGTN_IDLE__;
+        },
+        set idle(v) {
+            window.__CGTN_IDLE__ = !!v;
+            try {
+                if (v)
+                    sessionStorage.setItem("cgtnIdle", "1");
+                else
+                    sessionStorage.removeItem("cgtnIdle");
+            }
+            catch { }
+        },
+    };
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -147,7 +186,8 @@
         let __debTo = 0; // デバウンス用タイマ
         let __gen = 0; // 世代トークン（逆戻り防止）
         let __pageInfo = { kind: "other", cid: "", hasTurns: false }; // 直近のページ情報
-        window.addEventListener("message", (ev) => {
+        // 2026.1.22
+        const onMessage = (ev) => {
             (async () => {
                 // ← async ラッパーで await が使えるように
                 const d = ev && ev.data;
@@ -222,7 +262,22 @@
                     }, 80); // 軽デバウンス
                 }
             })();
-        }, true);
+        };
+        // 2026.1.22
+        window.addEventListener("message", onMessage, true);
+        // stop() で解除できるようにdisposerへ（デバウンスも止める）
+        RUN.bag.add(() => {
+            try {
+                if (__debTo)
+                    window.clearTimeout(__debTo);
+            }
+            catch { }
+            try {
+                window.removeEventListener("message", onMessage, true);
+            }
+            catch { }
+            window.__CGTN_MSG_BOUND__ = false;
+        });
     })();
     // --- 自動同期フラグ（最小差分用） ---
     // リスト開状態なら「チャット切替時」に中身だけ差し替える
@@ -259,15 +314,58 @@
             "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
         document.body.appendChild(park);
     }
+    /*
+    function installFocusStealGuard() {
+      const nav = document.getElementById("cgpt-nav");
+      const list = document.getElementById("cgpt-list-panel");
+      const inUI = (el) =>
+        !!(el && ((nav && nav.contains(el)) || (list && list.contains(el))));
+      let fromUI = false;
+  
+      document.addEventListener(
+        "mousedown",
+        (e) => {
+          fromUI = inUI(e.target);
+        },
+        { capture: true },
+      );
+      document.addEventListener(
+        "mouseup",
+        () => {
+          if (!fromUI) return;
+          fromUI = false;
+          try {
+            const sel = getSelection();
+            sel && sel.removeAllRanges();
+          } catch {}
+          const park = document.getElementById("cgtn-focus-park");
+          if (!park) return;
+          setTimeout(() => {
+            try {
+              park.focus({ preventScroll: true });
+            } catch {}
+          }, 0);
+          requestAnimationFrame(() => {
+            try {
+              park.focus({ preventScroll: true });
+            } catch {}
+          });
+        },
+        { capture: true },
+      );
+    }
+  */
+    // 2026.1.22 解除できる形に置き換え
     function installFocusStealGuard() {
         const nav = document.getElementById("cgpt-nav");
         const list = document.getElementById("cgpt-list-panel");
         const inUI = (el) => !!(el && ((nav && nav.contains(el)) || (list && list.contains(el))));
         let fromUI = false;
-        document.addEventListener("mousedown", (e) => {
+        let to = 0;
+        const onDown = (e) => {
             fromUI = inUI(e.target);
-        }, { capture: true });
-        document.addEventListener("mouseup", () => {
+        };
+        const onUp = () => {
             if (!fromUI)
                 return;
             fromUI = false;
@@ -279,19 +377,37 @@
             const park = document.getElementById("cgtn-focus-park");
             if (!park)
                 return;
-            setTimeout(() => {
+            try {
+                if (to)
+                    window.clearTimeout(to);
+            }
+            catch { }
+            to = window.setTimeout(() => {
                 try {
                     park.focus({ preventScroll: true });
                 }
                 catch { }
             }, 0);
-            requestAnimationFrame(() => {
-                try {
-                    park.focus({ preventScroll: true });
-                }
-                catch { }
-            });
-        }, { capture: true });
+        };
+        document.addEventListener("mousedown", onDown, { capture: true });
+        document.addEventListener("mouseup", onUp, { capture: true });
+        RUN.bag.add(() => {
+            try {
+                document.removeEventListener("mousedown", onDown, {
+                    capture: true,
+                });
+            }
+            catch { }
+            try {
+                document.removeEventListener("mouseup", onUp, { capture: true });
+            }
+            catch { }
+            try {
+                if (to)
+                    window.clearTimeout(to);
+            }
+            catch { }
+        });
     }
     // ========= 2) プレビュードック =========
     function bindPreviewDockOnce() {
@@ -888,22 +1004,22 @@
         });
     }
     catch { }
+    // 2026.1.22
     function watchChatIdChange() {
         let prev = null;
-        setInterval(() => {
+        const id = window.setInterval(() => {
             const cur = SH.getChatId?.();
             if (cur && cur !== prev) {
                 prev = cur;
                 //チャットを切り替えたらリストを閉じる処理
-                // チャット切替時は一旦リストOFF（勝手に開かない）
                 SH.saveSettingsPatch({ list: { enabled: false } });
-                // チャット切替で強制OFFする旧挙動（残しつつフラグでガード）
                 if (!AUTO_SYNC_OPEN_LIST) {
                     SH.saveSettingsPatch({ list: { enabled: false } });
-                    // （既存のチェックボックス連動処理もこの if 内に残す）
                 }
             }
         }, 800);
+        // ★停止できるように disposer を登録
+        RUN.bag.add(() => window.clearInterval(id));
     }
     // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
     function injectUrlChangeHook() {
@@ -1302,14 +1418,105 @@
         window.addEventListener("orientationchange", () => UI.clampPanelWithinViewport());
     }
     // ========= 10) DOM Ready =========
+    /*
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initialize, { once: true });
+      document.addEventListener("DOMContentLoaded", initialize, { once: true });
+    } else {
+      initialize();
+      // 付箋バッジ
+      window.CGTN_LOGIC?.updatePinOnlyBadge?.();
+      // チャット名
+      window.CGTN_LOGIC.updateListChatTitle?.();
+    }
+  */
+    // 2026.1.22
+    const boot = () => {
+        // UI（ヘッダー）だけは常に出す：復帰手段
+        try {
+            UI?.installUI?.();
+        }
+        catch { }
+        if (RUN.idle) {
+            // 既にIdleなら軽量モードで待機
+            try {
+                UI?.setIdleMode?.(true);
+            }
+            catch { }
+            return;
+        }
+        // 通常起動
+        startApp("boot");
+    };
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot, { once: true });
     }
     else {
-        initialize();
-        // 付箋バッジ
-        window.CGTN_LOGIC?.updatePinOnlyBadge?.();
-        // チャット名
-        window.CGTN_LOGIC.updateListChatTitle?.();
+        boot();
     }
+    // 2026.1.22
+    // ========= App Control (Idle ⇄ Navigate) =========
+    async function startApp(reason = "start") {
+        if (RUN.running)
+            return;
+        RUN.running = true;
+        RUN.idle = false;
+        // UIは先に確保（ヘッダー＝復帰手段）
+        try {
+            UI?.installUI?.();
+            UI?.setIdleMode?.(false);
+        }
+        catch { }
+        try {
+            await initialize();
+            try {
+                LG?.updatePinOnlyBadge?.();
+                LG?.updateListChatTitle?.();
+            }
+            catch { }
+        }
+        catch (e) {
+            console.warn("[cgtn] start failed", reason, e);
+        }
+    }
+    function stopApp(reason = "stop") {
+        RUN.running = false;
+        RUN.idle = true;
+        // 1) UIまわりの“実体”を先に閉じる（表示と状態の不一致を防ぐ）
+        try {
+            window.CGTN_PREVIEW?.hide?.("idle");
+        }
+        catch { }
+        try {
+            LG?.setListEnabled?.(false);
+            LG?.clearListPanelUI?.();
+        }
+        catch { }
+        try {
+            // 次回復帰で勝手に一覧が開かないように、状態もOFFへ寄せる
+            SH?.saveSettingsPatch?.({ list: { enabled: false } });
+        }
+        catch { }
+        try {
+            const chk = document.getElementById("cgpt-list-toggle");
+            if (chk instanceof HTMLInputElement)
+                chk.checked = false;
+        }
+        catch { }
+        try {
+            LG?.detachTurnObserver?.();
+        }
+        catch { }
+        try {
+            UI?.setIdleMode?.(true);
+        }
+        catch { }
+        // content 側で登録した解除を全部実行
+        RUN.bag.flush();
+    }
+    window.CGTN_APP = {
+        start: startApp,
+        stop: stopApp,
+        isRunning: () => RUN.running,
+        isIdle: () => RUN.idle,
+    };
 })();

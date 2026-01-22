@@ -8,6 +8,46 @@
   const EV = window.CGTN_EVENTS;
   const LG = window.CGTN_LOGIC;
 
+  // 2026.1.22
+  // ===== Runtime (Idle ⇄ Navigate) =====
+  // ===== Runtime (Idle ⇄ Navigate) =====
+  type Disposer = () => void;
+
+  function makeBag() {
+    const bag: Disposer[] = [];
+    return {
+      add(fn: Disposer) {
+        bag.push(fn);
+      },
+      flush() {
+        for (const fn of bag.splice(0)) {
+          try {
+            fn();
+          } catch {}
+        }
+      },
+    };
+  }
+
+  const RUN = {
+    running: false,
+    bag: makeBag(),
+    // タブ内Idle状態：デバッグ用途でリロードしても維持（sessionStorage優先）
+    get idle() {
+      try {
+        if (sessionStorage.getItem("cgtnIdle") === "1") return true;
+      } catch {}
+      return !!(window as any).__CGTN_IDLE__;
+    },
+    set idle(v: boolean) {
+      (window as any).__CGTN_IDLE__ = !!v;
+      try {
+        if (v) sessionStorage.setItem("cgtnIdle", "1");
+        else sessionStorage.removeItem("cgtnIdle");
+      } catch {}
+    },
+  };
+
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -16,7 +56,7 @@
   // 補助：現在のターン数とスクロール情報
   function _cgtnCountTurns() {
     return document.querySelectorAll(
-      'article,[data-testid^="conversation-turn"]'
+      'article,[data-testid^="conversation-turn"]',
     ).length;
   }
 
@@ -33,7 +73,7 @@
   // === wait helpers (lightweight) ==========================
   function cgtnCountTurns() {
     return document.querySelectorAll(
-      'article,[data-testid^="conversation-turn"]'
+      'article,[data-testid^="conversation-turn"]',
     ).length;
   }
   function cgtnRoot() {
@@ -173,94 +213,104 @@
     let __gen = 0; // 世代トークン（逆戻り防止）
     let __pageInfo = { kind: "other", cid: "", hasTurns: false }; // 直近のページ情報
 
-    window.addEventListener(
-      "message",
-      (ev) => {
-        (async () => {
-          // ← async ラッパーで await が使えるように
-          const d = ev && ev.data;
-          if (!d || d.source !== "cgtn") return;
+    // 2026.1.22
+    const onMessage = (ev: MessageEvent) => {
+      (async () => {
+        // ← async ラッパーで await が使えるように
+        const d = ev && ev.data;
+        if (!d || d.source !== "cgtn") return;
 
-          const SH = window.CGTN_SHARED,
-            LG = window.CGTN_LOGIC;
-          const kind = d.kind || "other";
-          const cidNow = d.cid || SH?.getChatId?.();
-          const fKind = d.fromKind || "other";
-          const fCid = d.fromCid || "";
+        const SH = window.CGTN_SHARED,
+          LG = window.CGTN_LOGIC;
+        const kind = d.kind || "other";
+        const cidNow = d.cid || SH?.getChatId?.();
+        const fKind = d.fromKind || "other";
+        const fCid = d.fromCid || "";
 
-          __pageInfo = { kind, cid: cidNow || "", hasTurns: !!d.hasTurns };
+        __pageInfo = { kind, cid: cidNow || "", hasTurns: !!d.hasTurns };
+        try {
+          SH.setPageInfo?.(__pageInfo);
+        } catch {}
+
+        // ログ（どこから→どこへ）
+        //        try {
+        //          console.debug('[cgtn] nav', `${fKind}:${fCid || '-'}`, '→', `${kind}:${cidNow || '-'}`, 'hasTurns=', !!d.hasTurns);
+        //        } catch {}
+
+        // --- 非チャット系：クリアのみ（ONならメッセージA）
+        if (
+          kind === "home" ||
+          kind === "project" ||
+          kind === "other" ||
+          kind === "new"
+        ) {
+          LG?.clearListPanelUI?.();
           try {
-            SH.setPageInfo?.(__pageInfo);
+            if (SH.getCFG?.()?.list?.enabled) {
+              window.CGTN_UI?.toast?.(
+                "ここにはチャットがありません（リストは表示できません）",
+              ); // メッセージA
+            }
+          } catch {}
+          __lastCid = null;
+          __gen++;
+          return;
+        }
+
+        // ---- 既存チャット（/c/...）でイベントが来た場合 ----
+        if (d.type === "url-change" || d.type === "turn-added") {
+          const prev = __lastCid;
+          __lastCid = cidNow;
+          const changed = prev !== null && cidNow !== prev;
+          const myGen = ++__gen;
+
+          // 先にプレビューは畳む
+          try {
+            if (d.type === "url-change")
+              window.CGTN_PREVIEW?.hide?.("url-change");
           } catch {}
 
-          // ログ（どこから→どこへ）
-          //        try {
-          //          console.debug('[cgtn] nav', `${fKind}:${fCid || '-'}`, '→', `${kind}:${cidNow || '-'}`, 'hasTurns=', !!d.hasTurns);
-          //        } catch {}
+          // マスクをすばやくON（視覚フィードバック）
+          try {
+            setUiBusy?.(true);
+          } catch {}
 
-          // --- 非チャット系：クリアのみ（ONならメッセージA）
-          if (
-            kind === "home" ||
-            kind === "project" ||
-            kind === "other" ||
-            kind === "new"
-          ) {
-            LG?.clearListPanelUI?.();
-            try {
-              if (SH.getCFG?.()?.list?.enabled) {
-                window.CGTN_UI?.toast?.(
-                  "ここにはチャットがありません（リストは表示できません）"
-                ); // メッセージA
-              }
-            } catch {}
-            __lastCid = null;
-            __gen++;
-            return;
-          }
+          clearTimeout(__debTo);
+          __debTo = setTimeout(() => {
+            requestAnimationFrame(() => {
+              (async () => {
+                if (myGen !== __gen) return; // 競合キャンセル
+                // 一括待機＋rebuild＋必要ならrenderList（一覧OFFなら内部でスキップ）
+                await rebuildAndRenderSafely({
+                  /* forceList:false */
+                });
+              })()
+                .catch((err) =>
+                  console.warn("[cgtn] rebuildAndRenderSafely error:", err),
+                )
+                .finally(() => {
+                  try {
+                    setUiBusy?.(false);
+                  } catch {}
+                });
+            });
+          }, 80); // 軽デバウンス
+        }
+      })();
+    };
+    // 2026.1.22
+    window.addEventListener("message", onMessage, true);
 
-          // ---- 既存チャット（/c/...）でイベントが来た場合 ----
-          if (d.type === "url-change" || d.type === "turn-added") {
-            const prev = __lastCid;
-            __lastCid = cidNow;
-            const changed = prev !== null && cidNow !== prev;
-            const myGen = ++__gen;
-
-            // 先にプレビューは畳む
-            try {
-              if (d.type === "url-change")
-                window.CGTN_PREVIEW?.hide?.("url-change");
-            } catch {}
-
-            // マスクをすばやくON（視覚フィードバック）
-            try {
-              setUiBusy?.(true);
-            } catch {}
-
-            clearTimeout(__debTo);
-            __debTo = setTimeout(() => {
-              requestAnimationFrame(() => {
-                (async () => {
-                  if (myGen !== __gen) return; // 競合キャンセル
-                  // 一括待機＋rebuild＋必要ならrenderList（一覧OFFなら内部でスキップ）
-                  await rebuildAndRenderSafely({
-                    /* forceList:false */
-                  });
-                })()
-                  .catch((err) =>
-                    console.warn("[cgtn] rebuildAndRenderSafely error:", err)
-                  )
-                  .finally(() => {
-                    try {
-                      setUiBusy?.(false);
-                    } catch {}
-                  });
-              });
-            }, 80); // 軽デバウンス
-          }
-        })();
-      },
-      true
-    );
+    // stop() で解除できるようにdisposerへ（デバウンスも止める）
+    RUN.bag.add(() => {
+      try {
+        if (__debTo) window.clearTimeout(__debTo);
+      } catch {}
+      try {
+        window.removeEventListener("message", onMessage, true);
+      } catch {}
+      window.__CGTN_MSG_BOUND__ = false;
+    });
   })();
 
   // --- 自動同期フラグ（最小差分用） ---
@@ -301,6 +351,7 @@
       "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
     document.body.appendChild(park);
   }
+  /*
   function installFocusStealGuard() {
     const nav = document.getElementById("cgpt-nav");
     const list = document.getElementById("cgpt-list-panel");
@@ -313,7 +364,7 @@
       (e) => {
         fromUI = inUI(e.target);
       },
-      { capture: true }
+      { capture: true },
     );
     document.addEventListener(
       "mouseup",
@@ -337,8 +388,62 @@
           } catch {}
         });
       },
-      { capture: true }
+      { capture: true },
     );
+  }
+*/
+  // 2026.1.22 解除できる形に置き換え
+  function installFocusStealGuard() {
+    const nav = document.getElementById("cgpt-nav");
+    const list = document.getElementById("cgpt-list-panel");
+    const inUI = (el: any) =>
+      !!(el && ((nav && nav.contains(el)) || (list && list.contains(el))));
+
+    let fromUI = false;
+    let to = 0;
+
+    const onDown = (e: MouseEvent) => {
+      fromUI = inUI((e as any).target);
+    };
+
+    const onUp = () => {
+      if (!fromUI) return;
+      fromUI = false;
+
+      try {
+        const sel = getSelection();
+        sel && sel.removeAllRanges();
+      } catch {}
+
+      const park = document.getElementById("cgtn-focus-park") as any;
+      if (!park) return;
+
+      try {
+        if (to) window.clearTimeout(to);
+      } catch {}
+      to = window.setTimeout(() => {
+        try {
+          park.focus({ preventScroll: true });
+        } catch {}
+      }, 0);
+    };
+
+    document.addEventListener("mousedown", onDown, { capture: true });
+    document.addEventListener("mouseup", onUp, { capture: true });
+
+    RUN.bag.add(() => {
+      try {
+        document.removeEventListener("mousedown", onDown, {
+          capture: true,
+        } as any);
+      } catch {}
+      try {
+        document.removeEventListener("mouseup", onUp, { capture: true } as any);
+      } catch {}
+      try {
+        if (to) window.clearTimeout(to);
+      } catch {}
+    });
   }
 
   // ========= 2) プレビュードック =========
@@ -454,7 +559,7 @@
           dock.style.left = left + "px";
           dock.style.top = top + "px";
         },
-        { passive: true }
+        { passive: true },
       );
 
       window.addEventListener("mouseup", () => {
@@ -487,7 +592,7 @@
           dock.style.width = w + "px";
           dock.style.height = h + "px";
         },
-        { passive: true }
+        { passive: true },
       );
 
       // === 言語切り替え対応：タイトルを再翻訳 ===
@@ -701,7 +806,7 @@
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => updateDock(btn));
       },
-      true
+      true,
     );
 
     // B) クリック：表示/非表示トグル（固定ON/OFF）
@@ -744,7 +849,7 @@
           box.setAttribute("data-pinned", "1");
         }
       },
-      true
+      true,
     );
 
     // ★Escだけは残して、外側クリックでのクローズは無効化
@@ -794,7 +899,7 @@
             ro.disconnect();
           } catch {}
         },
-        { once: true }
+        { once: true },
       );
     } catch {}
     // 初回も一度呼ぶ（初期描画）
@@ -960,13 +1065,13 @@
           rows.forEach((article: Element) => {
             if (
               article.querySelector(
-                '[data-testid*="attachment"], .text-token-file, [data-filename]'
+                '[data-testid*="attachment"], .text-token-file, [data-filename]',
               )
             )
               uploads++;
             if (
               article.querySelector(
-                'a[download], button[aria-label*="Download"], [data-testid*="download"]'
+                'a[download], button[aria-label*="Download"], [data-testid*="download"]',
               )
             )
               downloads++;
@@ -990,7 +1095,7 @@
         const on = !!msg.on;
         SH.toggleViz?.(on);
         const cb = document.querySelector(
-          "#cgpt-viz"
+          "#cgpt-viz",
         ) as HTMLInputElement | null;
         if (cb) cb.checked = on;
         SH.saveSettingsPatch?.({ showViz: on });
@@ -998,23 +1103,25 @@
     });
   } catch {}
 
+  // 2026.1.22
   function watchChatIdChange() {
     let prev = null;
-    setInterval(() => {
+
+    const id = window.setInterval(() => {
       const cur = SH.getChatId?.();
       if (cur && cur !== prev) {
         prev = cur;
         //チャットを切り替えたらリストを閉じる処理
-        // チャット切替時は一旦リストOFF（勝手に開かない）
         SH.saveSettingsPatch({ list: { enabled: false } });
 
-        // チャット切替で強制OFFする旧挙動（残しつつフラグでガード）
         if (!AUTO_SYNC_OPEN_LIST) {
           SH.saveSettingsPatch({ list: { enabled: false } });
-          // （既存のチェックボックス連動処理もこの if 内に残す）
         }
       }
     }, 800);
+
+    // ★停止できるように disposer を登録
+    RUN.bag.add(() => window.clearInterval(id));
   }
 
   // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
@@ -1041,7 +1148,7 @@
       s.onerror = (e) => console.warn("[cgtn] inject_url_hook failed:", e);
 
       (document.documentElement || document.head || document.body).appendChild(
-        s
+        s,
       );
     } catch (e) {
       console.warn("injectUrlChangeHook failed", e);
@@ -1098,7 +1205,7 @@
   function waitForChatMain(
     onReady: () => void,
     onIdle?: () => void,
-    timeout = 4000
+    timeout = 4000,
   ) {
     const started = performance.now();
     const ok = () => {
@@ -1329,7 +1436,7 @@
 
       // 半透明マスク（見た目も分かりやすく）
       let mask = host.querySelector(
-        ":scope > .cgtn-mask"
+        ":scope > .cgtn-mask",
       ) as HTMLElement | null;
 
       if (busy) {
@@ -1448,7 +1555,7 @@
     //   かつ ChatGPT 本体の初期化とも競合しないよう 1.2 秒遅らせて実行 '25.12.6
     setTimeout(() => {
       rebuildAndRenderSafely({ forceList: true }).catch((e) =>
-        console.warn("[init-delayed] rebuildAndRenderSafely failed", e)
+        console.warn("[init-delayed] rebuildAndRenderSafely failed", e),
       );
     }, 1200);
 
@@ -1457,11 +1564,12 @@
       passive: true,
     });
     window.addEventListener("orientationchange", () =>
-      UI.clampPanelWithinViewport()
+      UI.clampPanelWithinViewport(),
     );
   }
 
   // ========= 10) DOM Ready =========
+  /*
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {
@@ -1471,4 +1579,91 @@
     // チャット名
     window.CGTN_LOGIC.updateListChatTitle?.();
   }
+*/
+  // 2026.1.22
+  const boot = () => {
+    // UI（ヘッダー）だけは常に出す：復帰手段
+    try {
+      UI?.installUI?.();
+    } catch {}
+
+    if (RUN.idle) {
+      // 既にIdleなら軽量モードで待機
+      try {
+        UI?.setIdleMode?.(true);
+      } catch {}
+      return;
+    }
+    // 通常起動
+    startApp("boot");
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else {
+    boot();
+  }
+
+  // 2026.1.22
+  // ========= App Control (Idle ⇄ Navigate) =========
+  async function startApp(reason: string = "start") {
+    if (RUN.running) return;
+    RUN.running = true;
+    RUN.idle = false;
+
+    // UIは先に確保（ヘッダー＝復帰手段）
+    try {
+      UI?.installUI?.();
+      UI?.setIdleMode?.(false);
+    } catch {}
+
+    try {
+      await initialize();
+      try {
+        LG?.updatePinOnlyBadge?.();
+        LG?.updateListChatTitle?.();
+      } catch {}
+    } catch (e) {
+      console.warn("[cgtn] start failed", reason, e);
+    }
+  }
+
+  function stopApp(reason: string = "stop") {
+    RUN.running = false;
+    RUN.idle = true;
+
+    // 1) UIまわりの“実体”を先に閉じる（表示と状態の不一致を防ぐ）
+    try {
+      window.CGTN_PREVIEW?.hide?.("idle");
+    } catch {}
+    try {
+      LG?.setListEnabled?.(false);
+      LG?.clearListPanelUI?.();
+    } catch {}
+    try {
+      // 次回復帰で勝手に一覧が開かないように、状態もOFFへ寄せる
+      SH?.saveSettingsPatch?.({ list: { enabled: false } });
+    } catch {}
+    try {
+      const chk = document.getElementById("cgpt-list-toggle");
+      if (chk instanceof HTMLInputElement) chk.checked = false;
+    } catch {}
+
+    try {
+      LG?.detachTurnObserver?.();
+    } catch {}
+    try {
+      UI?.setIdleMode?.(true);
+    } catch {}
+
+    // content 側で登録した解除を全部実行
+    RUN.bag.flush();
+  }
+
+  (window as any).CGTN_APP = {
+    start: startApp,
+    stop: stopApp,
+    isRunning: () => RUN.running,
+    isIdle: () => RUN.idle,
+  };
 })();

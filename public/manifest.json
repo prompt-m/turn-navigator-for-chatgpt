@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Turn Navigator for ChatGPT",
   "version": "1.0.2",
-  "version_name": "1.0.2 (2026-01-07)",
+  "version_name": "1.0.2 (2026-01-22)",
   "description": "Jump to the turn you need-instantly. Navigate ChatGPT conversations turn by turn, preview messages, and pin what matters.",
   "icons": {
     "16": "icon16.png",
