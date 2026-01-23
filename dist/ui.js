@@ -76,13 +76,14 @@
   bottom:140px;
   display:flex;
   flex-direction:column;
-  gap:12px;
-  z-index:2147483647
+/*  gap:12px;*/
+  z-index:2147483647;
   border:1px solid rgba(0,0,0,.12);
   background:rgba(255,255,255,.88);
   backdrop-filter: blur(10px);
   border-radius: 18px;            /* お好み */
   box-shadow: 0 12px 40px rgba(0,0,0,.18);  
+  width: 100px;
 }
 
 @media (prefers-color-scheme: dark){
@@ -95,30 +96,17 @@
 
 
 .cgpt-nav-group{
-  width:92px; border-radius:14px; padding:10px;
+  width:90px; border-radius:14px; padding:2px 10px 10px 10px;
   border:1px solid rgba(0,0,0,.12);
   background:rgba(255,255,255,.95);
   box-shadow:0 6px 24px rgba(0,0,0,.18);
-  display:flex; flex-direction:column; gap:6px
+  display:flex; flex-direction:column; gap:6px;margin-bottom:6px;
 }
 .cgpt-nav-label{
   text-align:center; font-weight:600; opacity:.9;
-  margin-bottom:2px; font-size:12px; color:#000
+  margin-bottom:2px; font-size:12px; color:#000;
 }
-/*
-#cgpt-nav button{
-  all:unset;
-  height:34px;
-  border-radius:10px;
-  display:grid;
-  place-items:center;
-  cursor:pointer;
-  background:#f2f2f7;
-  color:#111;
-  border:1px solid rgba(0,0,0,.08)
-}
-#cgpt-nav button:hover{ background:#fff }
-*/
+
 .cgpt-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0px }
 #cgpt-nav .cgpt-lang-btn{ height:22px; margin-top:16px; color:#000 }
 #cgpt-nav input[type=checkbox] { cursor: pointer; }
@@ -177,23 +165,6 @@
   box-shadow:0 3px 10px rgba(0,0,0,.25);
 }
 
-/*
-.cgpt-viz-toggle,
-.cgpt-list-toggle{
-  margin-top:6px;
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:flex-start;
-  font-size:12px;
-  cursor:pointer
-}
-.cgpt-viz-toggle:hover,
-.cgpt-list-toggle:hover{
-  cursor:pointer;
-  opacity:.9 
-}
-*/
 /* --- 設定ボタン（ナビ内：枠なし・中央寄せ） --- */
 #cgtn-open-settings.cgtn-open-settings{
   all: unset;                              /* ブラウザ標準のボタン装飾を全部消す */
@@ -239,11 +210,7 @@
 #cgpt-nav .cgtn-head{
   display:flex;
   flex-direction:column;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
-  padding:10px 12px 8px;
-  border-bottom:1px solid rgba(0,0,0,.08);
+  padding:12px 8px 2px 12px;
 }
 /* 1段目：左にスイッチ、右に（必要なら）何か置ける */
 #cgpt-nav .cgtn-power{
@@ -251,39 +218,60 @@
   justify-content:flex-start;
 }
 
-/* 製品名・バージョンは左寄せ */
+/* 製品名・バージョンは中央寄せ*/
 #cgpt-nav .cgtn-brand{
-  text-align:left;
+  text-align:center;
 }
 
-/* つまみは下段にフル幅で置く */
-#cgpt-nav #cgpt-drag{
-  width:100%;
-  margin:0;
-}  
-#cgpt-nav #cgpt-drag{
-  margin-left:auto;
-}
-  
-#cgpt-nav .cgtn-brand{ display:flex; flex-direction:column; gap:2px; }
-#cgpt-nav .cgtn-title{ font:9px/1.2 system-ui,-apple-system,sans-serif; font-weight:700; }
+#cgpt-nav .cgtn-brand{ font:10px/1.1 system-ui,-apple-system,sans-serif; opacity:.7; padding:5px;}
 #cgpt-nav .cgtn-ver{ font:11px/1.1 system-ui,-apple-system,sans-serif; opacity:.7; }
 
-#cgpt-nav .cgtn-power input{ display:none; }
-#cgpt-nav .cgtn-power-pill{
-  display:inline-flex; align-items:center; justify-content:center;
-  height:22px; padding:0 10px; border-radius:999px;
-  border:1px solid rgba(0,0,0,.12);
-  background:#fff;
-  font:12px/1 system-ui,-apple-system,sans-serif;
-  cursor:pointer;
-  margin-top:2px;
-  white-space:nowrap;
+.cgtn-power-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 10px 0 0;
+  border-radius: 999px;
+  background: grey  ;
+  font: 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+  border: 1px solid rgba(0,0,0,.12);
+  transition: all 0.2s ease;
+  width:30px
+}
+.cgtn-power-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  background: #green  ;
+}
+.cgtn-power-toggle input:checked + .cgtn-switch-label {
+  padding: 0 10px 0 0;
+  background: #green;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+.cgtn-switch-label {
+  background: #d0d0d0;
+  padding: 5px 5px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+#cgpt-nav .cgtn-body{
+  padding:1px 8px;
+}
+
+#cgpt-nav .cgtn-footer{
+  padding:0px 8px 8px;
+  text-align:center;
+  margin-top:-10px;
 }
 
 /* ===== Idle時：ボディ非表示 ===== */
 #cgpt-nav.cgtn-idle .cgtn-body{ display:none; }
-#cgpt-nav.cgtn-idle{ width:190px; }
+#cgpt-nav.cgtn-idle{ width:100px; }
 
 
 `;
@@ -330,10 +318,10 @@
 #cgpt-list-grip.dragging .drag-handle { cursor: grabbing; }
 
 #cgpt-drag{
-  width:92px; height:12px; border-radius:10px;
+  width:auto; height:12px; border-radius:10px;
   background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%);
-  opacity:.55; cursor:grab; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)
-}
+  opacity:.55; cursor:grab; box-shadow:inset 0 0 0 1px; rgba(0,0,0,.08)
+  }
 #cgpt-drag.dragging .drag-handle { cursor: grabbing; }
 
 #cgpt-list-foot{
@@ -853,17 +841,14 @@
         box.id = "cgpt-nav";
         box.innerHTML = `
       <div class="cgtn-head" data-cgtn-ui>
-        <label class="cgtn-power">
-          <input id="cgtn-power-toggle" type="checkbox">
-          <span class="cgtn-power-pill">Navigate</span>
-        </label>
-
+        <div id="cgpt-drag" title=""></div>
         <div class="cgtn-brand">
-          <div class="cgtn-title">Turn Navigator</div>
+          <div class="cgtn-title">
+            Turn Navigator<br>
+            <span class="cgtn-sub">for ChatGPT</span>
+          </div>
           <div class="cgtn-ver">v1.0.2</div>
         </div>
-
-        <div id="cgpt-drag" title=""></div>
       </div>
 
     <div class="cgtn-body">
@@ -938,6 +923,12 @@
       </div>
       </div>
     </div>
+    <div class="cgtn-footer">
+      <label class="cgtn-power-toggle">
+        <input id="cgtn-power-toggle" type="checkbox">
+        <span class="cgtn-switch-label"></span>
+      </label>
+    </div>
 
       `;
         document.body.appendChild(box);
@@ -945,10 +936,9 @@
         // ヘッダー：製品名＆バージョン表示
         try {
             const mf = chrome.runtime.getManifest();
-            const t = box.querySelector(".cgtn-title");
+            /*      const t = box.querySelector<HTMLElement>(".cgtn-title");*/
             const v = box.querySelector(".cgtn-ver");
-            if (t)
-                t.textContent = mf.name || "Turn Navigator";
+            /*      if (t) t.textContent = mf.name || "Turn Navigator";*/
             if (v)
                 v.textContent = "v" + (mf.version || "");
         }
@@ -1223,8 +1213,7 @@
         const running = !idle;
         if (cb)
             cb.checked = running;
-        if (pill)
-            pill.textContent = running ? "Navigate" : "Idle";
+        //    if (pill) pill.textContent = running ? "Navigate" : "Idle";
     }
     // 公開API
     NS.installUI = installUI;

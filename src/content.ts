@@ -1510,7 +1510,6 @@
   }
 
   // ========= 9) 初期セットアップ ========= '25.12.6 改
-
   async function initialize() {
     // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
     await new Promise((resolve) => setTimeout(resolve, 1500));
