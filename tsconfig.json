@@ -8,6 +8,6 @@
     "noEmitOnError": true,
     "types": ["chrome"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.css"],
   "exclude": ["node_modules", "dist"]
 }

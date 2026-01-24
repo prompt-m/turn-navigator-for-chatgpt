@@ -64,6 +64,29 @@ copyDir(path.join(root, "public"), releaseDir);
 // dist の JS を release へ上書き（TSビルド成果物が正）
 copyDir(path.join(root, "dist"), releaseDir);
 
+// ==========================================
+// ★追加: CSSファイルの救出コピー
+// ==========================================
+console.log("🎨 Copying CSS files...");
+const findAndCopyCss = (searchDir) => {
+  const entries = fs.readdirSync(searchDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(searchDir, entry.name);
+    if (entry.isDirectory()) {
+      // 再帰的に探す
+      findAndCopyCss(srcPath);
+    } else if (entry.name.endsWith(".css")) {
+      // .cssを見つけたら release 直下にコピー
+      const destPath = path.join(releaseDir, entry.name);
+      fs.copyFileSync(srcPath, destPath);
+      console.log(`   Derived CSS: ${entry.name} -> release/`);
+    }
+  }
+};
+// srcフォルダ以下を捜索してコピー
+findAndCopyCss(path.join(root, "src"));
+// ==========================================
+
 // ZIP 名固定：release/TurnNavigator-<version>.zip（出力先も固定）
 const zipName = `TurnNavigator-${version}.zip`;
 const zipPath = path.join(root, "release", zipName);
