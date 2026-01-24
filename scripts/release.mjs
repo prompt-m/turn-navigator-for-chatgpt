@@ -87,9 +87,11 @@ const findAndCopyCss = (searchDir) => {
 findAndCopyCss(path.join(root, "src"));
 // ==========================================
 
+/*
 // ZIP 名固定：release/TurnNavigator-<version>.zip（出力先も固定）
 const zipName = `TurnNavigator-${version}.zip`;
 const zipPath = path.join(root, "release", zipName);
+
 
 // PowerShell の Compress-Archive を使う（Windows想定）
 const cwd = root.replace(/\\/g, "/");
@@ -102,6 +104,21 @@ execSync(
   )}' -DestinationPath '${zipPath}'"`,
   { stdio: "inherit" },
 );
+
+console.log(`✅ Release ready: ${releaseDir}`);
+console.log(`✅ Zip created : ${zipPath}`);
+*/
+
+import AdmZip from "adm-zip";
+
+// ZIP 名固定：release/TurnNavigator-<version>.zip
+const zipName = `TurnNavigator-${version}.zip`;
+const zipPath = path.join(root, "release", zipName);
+
+// ZIP 作成
+const zip = new AdmZip();
+zip.addLocalFolder(releaseDir);
+zip.writeZip(zipPath);
 
 console.log(`✅ Release ready: ${releaseDir}`);
 console.log(`✅ Zip created : ${zipPath}`);

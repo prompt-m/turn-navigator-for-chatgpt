@@ -23,7 +23,7 @@
 
   // ★CSS注入ロジック（injectCssManyなど）は削除し、import "./ui.css" に任せます
   /* ==========================================================================
-     2) installUI (新・統一ヘッダー構造)
+     installUI (新・統一ヘッダー構造)
      ========================================================================== */
   function installUI() {
     if (document.getElementById("cgpt-nav")) return;
@@ -129,7 +129,6 @@
     const viz = box.querySelector("#cgpt-viz");
     if (viz instanceof HTMLInputElement) viz.checked = !!SH.getCFG().showViz;
 
-    // リストトグルの連動
     const listChk = box.querySelector("#cgpt-list-toggle");
     const listBtn = box.querySelector("#cgpt-list-btn");
 
@@ -205,17 +204,14 @@
     const next =
       cur && String(cur).toLowerCase().startsWith("en") ? "ja" : "en";
 
-    // 設定保存
     try {
       SH.saveSettingsPatch?.({ lang: next });
       if (window.CGTN_I18N) window.CGTN_I18N._forceLang = next;
     } catch (e) {}
 
-    // UI更新
     applyLang();
     SH.updateTooltips?.();
 
-    // リスト再描画
     if (
       window.CGTN_LOGIC?.isListVisible?.() ||
       !!window.CGTN_SHARED?.getCFG?.()?.list?.pinOnly
@@ -229,27 +225,21 @@
     if (!box) return;
     const t = window.CGTN_I18N?.t || ((k) => k);
 
-    // data-i18n 属性を持つ要素を一括更新
     box.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
       const txt = t(key);
       if (key && txt) {
         el.textContent = txt;
-        // ★修正: Element型にはtitleがないため、HTMLElementか確認してから代入
         if (el instanceof HTMLElement) {
           el.title = txt;
         }
       }
     });
 
-    // 個別ボタンの更新
     const langBtn = box.querySelector("#cgpt-lang-btn");
     if (langBtn) langBtn.textContent = T("langBtn") || "EN/JP";
   }
 
-  /* ==========================================================================
-     updateStatusDisplay (外部API)
-     ========================================================================== */
   NS.updateStatusDisplay = (text, subLabel = "READY") => {
     const screen = document.getElementById("cgtn-status-monitor");
     if (!screen) return;
@@ -264,9 +254,6 @@
     `;
   };
 
-  /* ==========================================================================
-     setIdleMode (OFF表示)
-     ========================================================================== */
   function setIdleMode(idle) {
     const box = document.getElementById("cgpt-nav");
     if (!box) return;
@@ -290,7 +277,6 @@
     }
   }
 
-  // ドラッグ機能
   function setupDrag(box) {
     const grip = box.querySelector("#cgpt-drag");
     if (!grip) return;
@@ -298,7 +284,12 @@
       offX = 0,
       offY = 0;
 
-    grip.addEventListener("pointerdown", (e: PointerEvent) => {
+    grip.addEventListener("pointerdown", (e) => {
+      // ★トグルスイッチ上でのクリックならドラッグしない
+      if ((e.target as HTMLElement).closest(".cgtn-power-wrapper")) {
+        return;
+      }
+
       dragging = true;
       const r = box.getBoundingClientRect();
       offX = e.clientX - r.left;
