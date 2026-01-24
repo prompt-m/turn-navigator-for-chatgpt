@@ -1,5 +1,4 @@
 // ui.ts — パネルUI生成 / 言語 / 位置クランプ
-import "./ui.css"; // ★CSSファイルをインポート
 
 (() => {
   "use strict";
@@ -23,9 +22,8 @@ import "./ui.css"; // ★CSSファイルをインポート
   const prvCurURL = chrome.runtime.getURL("assets/prev16.png");
 
   // ★CSS注入ロジック（injectCssManyなど）は削除し、import "./ui.css" に任せます
-
   /* ==========================================================================
-     installUI (新レイアウト)
+     2) installUI (新・統一ヘッダー構造)
      ========================================================================== */
   function installUI() {
     if (document.getElementById("cgpt-nav")) return;
@@ -34,21 +32,22 @@ import "./ui.css"; // ★CSSファイルをインポート
     box.id = "cgpt-nav";
 
     box.innerHTML = `
-      <div class="cgtn-head" id="cgpt-drag">
-        <div class="cgtn-brand">
-          <div class="cgtn-title-main">Turn</div>
-          <div class="cgtn-title-sub">Navigator</div>
+      <div class="cgtn-unified-header" id="cgpt-drag">
+        <div class="cgtn-header-top">
+          <div class="cgtn-brand-group">
+            <div class="cgtn-title-main">Turn</div>
+            <div class="cgtn-title-sub">Navigator</div>
+          </div>
           <div class="cgtn-ver">v...</div>
         </div>
-      </div>
-
-      <div class="status-cockpit">
-        <label class="cgtn-power-wrapper">
-          <input id="cgtn-power-toggle" type="checkbox">
-          <span class="slider"></span>
-        </label>
-        <div class="digital-screen" id="cgtn-status-monitor">
-          <span class="off-text">OFF</span>
+        <div class="cgtn-header-bottom">
+          <label class="cgtn-power-wrapper">
+             <input id="cgtn-power-toggle" type="checkbox">
+             <span class="slider"></span>
+          </label>
+          <div class="digital-screen" id="cgtn-status-monitor">
+            <span class="off-text">OFF</span>
+          </div>
         </div>
       </div>
 
@@ -84,7 +83,7 @@ import "./ui.css"; // ★CSSファイルをインポート
           <button id="cgpt-list-btn" class="cgtn-pill-btn" data-i18n="list" style="margin-top:4px;">List</button>
 
           <div class="cgtn-mini-row">
-             <button id="cgpt-lang-btn" class="cgtn-pill-btn" style="width:auto; padding:0 8px;">EN</button>
+             <button id="cgpt-lang-btn" class="cgtn-pill-btn">EN</button>
              <button id="cgtn-open-settings" class="cgtn-mini-btn" title="Settings">⚙</button>
              <button id="cgpt-navi-refresh" class="cgtn-mini-btn" title="Refresh">↻</button>
           </div>
@@ -97,7 +96,7 @@ import "./ui.css"; // ★CSSファイルをインポート
 
     document.body.appendChild(box);
 
-    // バージョン取得 & 表示
+    // バージョン取得
     try {
       const mf = chrome.runtime.getManifest();
       const v = box.querySelector(".cgtn-ver");
@@ -120,14 +119,6 @@ import "./ui.css"; // ★CSSファイルをインポート
       });
     }
 
-    // 言語リゾルバ
-    window.CGTN_SHARED?.setLangResolver?.(
-      () =>
-        window.CGTN_UI?.getLang?.() ||
-        window.CGTN_SHARED?.getCFG?.()?.lang ||
-        (window.CGTN_SHARED?.getCFG?.()?.english ? "en" : "ja"),
-    );
-
     // ドラッグ機能初期化
     setupDrag(box);
 
@@ -138,7 +129,7 @@ import "./ui.css"; // ★CSSファイルをインポート
     const viz = box.querySelector("#cgpt-viz");
     if (viz instanceof HTMLInputElement) viz.checked = !!SH.getCFG().showViz;
 
-    // リストトグルの連動 (ボタンの状態も初期化)
+    // リストトグルの連動
     const listChk = box.querySelector("#cgpt-list-toggle");
     const listBtn = box.querySelector("#cgpt-list-btn");
 
@@ -147,19 +138,15 @@ import "./ui.css"; // ★CSSファイルをインポート
       if (listBtn && listChk.checked) listBtn.classList.add("active");
     }
 
-    // --- イベントリスナー登録 ---
-
-    // 1. 一覧ボタン (List)
+    // --- イベントリスナー ---
     if (listBtn && listChk instanceof HTMLInputElement) {
       listBtn.addEventListener("click", () => {
         listChk.checked = !listChk.checked;
         listBtn.classList.toggle("active", listChk.checked);
-        // changeイベントを発火させて既存ロジック(shared/content.js等)に検知させる
         listChk.dispatchEvent(new Event("change", { bubbles: true }));
       });
     }
 
-    // 2. 言語切り替え (English)
     const langBtn = box.querySelector("#cgpt-lang-btn");
     if (langBtn) {
       langBtn.addEventListener("click", (e) => {
@@ -169,7 +156,6 @@ import "./ui.css"; // ★CSSファイルをインポート
       });
     }
 
-    // 3. 設定ボタン
     const settingsBtn = box.querySelector("#cgtn-open-settings");
     if (settingsBtn) {
       settingsBtn.addEventListener("click", (ev) => {
@@ -178,7 +164,6 @@ import "./ui.css"; // ★CSSファイルをインポート
       });
     }
 
-    // 4. リフレッシュ
     const refreshBtn = box.querySelector("#cgpt-navi-refresh");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", (ev) => {
@@ -193,7 +178,7 @@ import "./ui.css"; // ★CSSファイルをインポート
       });
     }
 
-    // ツールチップ適用
+    // ツールチップ
     window.CGTN_SHARED?.applyTooltips?.(
       {
         '#cgpt-nav [data-role="user"] [data-act="top"]': "nav.top",
@@ -205,8 +190,8 @@ import "./ui.css"; // ★CSSファイルをインポート
         '#cgpt-nav [data-role="assistant"] [data-act="prev"]': "nav.prev",
         '#cgpt-nav [data-role="assistant"] [data-act="next"]': "nav.next",
         "#cgpt-drag": "nav.drag",
-        "#cgpt-lang-btn": "nav.lang", // ← 追加
-        "#cgpt-list-btn": "nav.list", // ← 追加
+        "#cgpt-lang-btn": "nav.lang",
+        "#cgpt-list-btn": "nav.list",
         "#cgpt-navi-refresh": "nav.refresh",
         "#cgtn-open-settings": "nav.openSettings",
       },
@@ -215,7 +200,6 @@ import "./ui.css"; // ★CSSファイルをインポート
   }
 
   // --- ヘルパー関数群 ---
-
   function toggleLang() {
     const cur = (SH.getCFG?.() || {}).lang || "ja";
     const next =
