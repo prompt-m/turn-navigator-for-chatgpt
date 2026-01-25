@@ -15,17 +15,321 @@
     SH.setLangResolver?.(SH.getLang);
     const pinCurURL = chrome.runtime.getURL("assets/pin16.png");
     const prvCurURL = chrome.runtime.getURL("assets/prev16.png");
-    // ★CSS注入ロジック（injectCssManyなど）は削除し、import "./ui.css" に任せます
     /* ==========================================================================
-       installUI (新・統一ヘッダー構造)
+       CSS 定義
+       ========================================================================== */
+    const ALL_CSS = `
+/* === ベースパネル === */
+#cgpt-nav {
+  position: fixed;
+  right: 12px;
+  bottom: 80px;
+  display: flex;
+  flex-direction: column;
+  z-index: 2147483647;
+  background: #fcfcfc;
+  border: 1px solid rgba(0,0,0,.15);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  width: 90px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  transition: opacity 0.2s;
+  font-size: 11px;
+}
+
+/* ダークモード */
+@media (prefers-color-scheme: dark){
+  #cgpt-nav{
+    border-color: rgba(255,255,255,.15);
+    background: #1a1a1a;
+  }
+}
+
+/* === 統一ヘッダー (黒い塊) === */
+.cgtn-unified-header {
+  background: #000;
+  color: #fff;
+  padding: 16px 8px 14px 8px; 
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.cgtn-unified-header:active { cursor: grabbing; }
+
+/* ヘッダー上段 */
+.cgtn-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none; /* 文字選択などを防ぎドラッグしやすく */
+}
+.cgtn-brand-group {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.cgtn-title-main {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.cgtn-title-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #bbb;
+  margin-top: 3px;
+}
+.cgtn-ver {
+  font-size: 9px;
+  color: #888;
+  font-family: monospace;
+  margin-top: 1px;
+}
+
+/* ヘッダー下段 */
+.cgtn-header-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* トグルスイッチ */
+.cgtn-power-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 25px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+  pointer-events: auto; /* 明示的に操作可能に */
+  z-index: 10; /* ★ドラッグ層より手前に配置 */
+}
+.cgtn-power-wrapper input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #555;
+  transition: .3s;
+  border-radius: 18px;
+  border: 1px solid #666;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px; width: 14px;
+  left: 0px; bottom: 1px;
+  background-color: #ddd;
+  transition: .3s;
+  border-radius: 50%;
+}
+input:checked + .slider { background-color: #A40000; border-color: #A40000; }
+input:checked + .slider:before {
+  background-color: #fff;
+  transform: translateX(14px);
+  left: -5px;
+}
+
+/* デジタルスクリーン */
+.digital-screen {
+  text-align: right;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none; /* 文字選択防止 */
+}
+.digital-screen .screen-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'Consolas', monospace;
+  white-space: nowrap;
+}
+.digital-screen .off-text { 
+  color: #aaa; font-size: 12px; font-weight: 600; 
+}
+
+/* === ボディ === */
+.cgtn-body {
+  padding: 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  background: #9EB992;
+}
+.cgtn-body::-webkit-scrollbar { width: 0; height: 0; }
+
+/* グループ枠 */
+.cgpt-nav-group {
+  border-radius: 10px;
+  padding: 8px 4px;
+  background: #fff;
+  border: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+.cgpt-nav-group[data-role="user"] { background: #f0f8ff; border-color: #e0f2fe; }
+.cgpt-nav-group[data-role="assistant"] { background: #f0fdf4; border-color: #dcfce7; }
+.cgpt-nav-group[data-role="all"]{ background: #FFF; border-color: #DEDEDE; }
+.cgpt-nav-group[data-role="tools"]{ background: #EAEAEA; border-color: #DEDEDE; }
+.cgpt-nav-group[data-role="others"] { background: #CBCBCB; border-color: #CECECE; }
+
+@media (prefers-color-scheme: dark){
+  .cgpt-nav-group { background: #222; border-color: #333; }
+  .cgpt-nav-group[data-role="user"] { background: #1e293b; border-color: #334155; }
+  .cgpt-nav-group[data-role="assistant"] { background: #14532d; border-color: #166534; }
+}
+
+.cgpt-nav-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0.6;
+  color: #000 ;
+}
+@media (prefers-color-scheme: dark){ .cgpt-nav-label { color: #ccc; } }
+
+/* ピル型ボタン */
+.cgtn-pill-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 4px;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+  cursor: pointer;
+  color: #333;
+  height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.1s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  white-space: nowrap;
+}
+.cgtn-pill-btn:hover { 
+  background: #f9fafb; 
+  border-color: rgba(0,0,0,0.15);
+  transform: translateY(-1px);
+}
+.cgtn-pill-btn:active { 
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+}
+@media (prefers-color-scheme: dark){
+  .cgtn-pill-btn { background: #333; color: #eee; border-color: #555; }
+  .cgtn-pill-btn:hover { background: #444; }
+}
+
+/* 2列グリッド */
+.cgpt-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+/* 一覧ボタン */
+#cgpt-list-btn {
+  font-weight: 600;
+  color: #555;
+}
+#cgpt-list-btn.active {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+
+/* Idle モード */
+#cgpt-nav.cgtn-idle .cgtn-body {
+  display: none;
+}
+
+/* フォーカスリング消し */
+#cgpt-nav :where(button,label,input[type=checkbox]):focus:not(:focus-visible),
+#cgpt-list-panel :where(button,label,input[type=checkbox]):focus:not(:focus-visible){
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* === 以下、既存CSS (LIST等) === */
+#cgpt-list-panel{position:fixed; right:120px; bottom:140px; display:none; flex-direction:column; z-index:2147483646; width:360px; max-width:min(92vw,420px); max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12); border-radius:16px; background:rgba(255,255,255,.98); box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden; resize: horizontal; overflow: auto; min-width: 260px; max-width: 720px;}
+#cgpt-list-panel.no-anim * {transition: none !important;}
+#cgpt-list-head{display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px; position:sticky; top:0; background:rgba(255,255,255,.98);}
+#cgpt-list-close{all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:6px 8px;}
+#cgpt-list-grip{height:12px; border-radius:10px; background:linear-gradient(90deg,#aaa 18%,#d0d0d0 50%,#aaa 82%); opacity:.6; cursor:grab; flex:1;}
+#cgpt-list-grip.dragging .drag-handle {cursor: grabbing;}
+#cgpt-list-body{flex:1; overflow:auto; padding:6px 8px;}
+#cgpt-list-body .row {display:flex; align-items:stretch; gap:6px; line-height:1.7;}
+#cgpt-list-body .row::before{content: ""; display:inline-block; min-width:2.0em; margin-right:8px; text-align:right; opacity:0; font-size:11px; line-height:inherit; vertical-align:middle;}
+#cgpt-list-body .ops{display:flex; flex-direction: row; align-items: center; justify-content: flex-end; gap:4px; align-self: center;}
+#cgpt-list-body .turn-idx-anchor::before{content: attr(data-idx); opacity:.75; color:#333; vertical-align:middle;}
+#cgpt-list-body .txt{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; cursor: pointer;}
+#cgpt-list-body .txt:hover {background: skyblue;}
+#cgpt-list-foot{display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; padding:6px 8px; border-top:1px solid rgba(0,0,0,.08); color:#000;}
+#cgpt-list-panel.collapsed {max-height: 38px;}
+#cgpt-list-panel.collapsed #cgpt-list-body, #cgpt-list-panel.collapsed #cgpt-list-foot {display:none;}
+#cgpt-list-collapse{all:unset; border:1px solid rgba(0,0,0,.12); border-radius:8px; padding:4px 8px; color:#000; display:inline-grid; place-items:center;}
+#cgpt-list-panel .row .clip-dummy {visibility:hidden; pointer-events:none;}
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="false"] {color:#979797;}
+#cgpt-list-panel .row .cgtn-clip-pin[aria-pressed="true"] {color:#e60033;}
+#cgpt-list-panel.pinonly .row:not([data-pin="1"]) {display: none !important;}
+#cgpt-list-panel .row .attach {margin-left: .5em; opacity: .75; font-size: 0.92em; white-space: nowrap;}
+#cgpt-list-panel .row.user-turn {background: #F2F5F8;}
+#cgpt-list-panel .row.asst-turn {background: #F2FFF9;}
+#cgpt-list-panel .row.user-turn:hover {background: #D9E2EB;}
+#cgpt-list-panel .row.asst-turn:hover {background: #DDFFF0;}
+#cgpt-chat-title {max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; font-weight:600; font-size:13px; opacity:.9; padding:1px 6px 0; line-height:1.2;}
+.cgtn-preview-popup {position: absolute; background: #fff; border: 1px solid rgba(0,0,0,.15); border-radius: 6px; padding: 8px 10px; max-width: 320px; max-height: 240px; overflow: auto; box-shadow: 0 6px 24px rgba(0,0,0,.18); font-size: 12px; z-index: 2147483647; white-space: normal;}
+.cgtn-preview-btn, .cgtn-clip-pin {all: unset; font-size: 12px; padding: 3px 5px;}
+.cgtn-preview-btn:hover, .cgtn-clip-pin:hover {color: White; background: lightgray;}
+.cgtn-popover {position: fixed; z-index: 2147483647 !important; max-width: 520px; max-height: 320px; padding: 10px 12px; border-radius: 10px; background: rgba(20,20,20,.96); color: #fff; box-shadow: 0 10px 28px rgba(0,0,0,.35); overflow: auto; display: none; font-size: 12px; line-height: 1.5; transform: translate(10px, 14px); white-space: pre-wrap; will-change: left, top, transform; pointer-events: none;}
+.cgtn-popover[data-show="1"] {display: block;}
+.cgtn-dock {position: absolute; z-index: 2147483647; width: 460px; max-width: 80vw; height: 300px; max-height: 80vh; background: #eceff3; color: #0b0d12; border: 1px solid #cfd6de; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); display: none; overflow: hidden; user-select: none;}
+.cgtn-dock[data-show="1"] {display: block;}
+.cgtn-dock-head {display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #dfe5ec; border-bottom: 1px solid #cfd6de; cursor: move; font-weight: 600; color: #0b0d12;}
+.cgtn-dock-title {font-weight: 600; font-size: 12px; opacity: .9;}
+.cgtn-dock-close {margin-left: auto; border: none; background: transparent; color: #2c313a; cursor: pointer; font-size: 14px; opacity: .9;}
+.cgtn-dock-body {height: calc(100% - 40px); overflow: auto; padding: 10px 12px; white-space: pre-wrap; user-select: text; line-height: 1.6; max-height: 60vh;}
+.cgtn-dock-resize {position: absolute; right: 6px; bottom: 6px; width: 14px; height: 14px; cursor: nwse-resize; opacity: .7; color: #2c313a;}
+#cgpt-list-filter {display:flex; gap:8px; padding:6px 8px; position:sticky; top:34px; z-index:1; background:rgba(255,255,255,.85); backdrop-filter:blur(4px); justify-content: center; align-items: center;}
+#cgpt-list-filter label {user-select: none; cursor: pointer;}
+#cgpt-list-filter label:has(input:checked) .cgtn-pill-btn {background:#222; color:#fff; border-color:#222;}
+#cgpt-list-filter label:hover .cgtn-pill-btn {background: rgba(0,0,0,.06);}
+#cgpt-list-filter input[type="radio"] {position:absolute; opacity:0; pointer-events:none; margin:0;}
+.cgtn-badge {position: absolute; top: -4px; right: -4px; min-width: 14px; height: 14px; padding: 0 4px; border-radius: 999px; background: #e11; color: #fff; font-size: 10px; font-weight: 700; text-align: center; box-shadow: 0 0 0 2px #fff; display: flex; align-items: center; justify-content: center; line-height: 1;}
+.cgtn-dock-body::-webkit-scrollbar, #cgpt-list-body::-webkit-scrollbar{width: 10px;}
+.cgtn-dock-body::-webkit-scrollbar-track, #cgpt-list-body::-webkit-scrollbar-track{background: rgba(0,0,0,.05); border-radius: 10px;}
+.cgtn-dock-body::-webkit-scrollbar-thumb, #cgpt-list-body::-webkit-scrollbar-thumb{background: rgba(0,0,0,.28); border-radius: 10px; border: 1px solid transparent; background-clip: padding-box;}
+.cgtn-dock-body::-webkit-scrollbar-thumb:hover, #cgpt-list-body::-webkit-scrollbar-thumb:hover{background: rgba(0,0,0,.45);}
+#cgpt-list-panel .cgtn-iconbtn {display: inline-flex; align-items: center; justify-content: center; padding: 0;}
+#cgpt-list-body .cgtn-clip-pin svg.cgtn-pin-svg {width:16px; height:16px; display:block; stroke:currentColor; fill:none;}
+#cgpt-list-body .cgtn-clip-pin.on svg.cgtn-pin-svg {fill:currentColor;}
+  `;
+    const injectCss = (css) => {
+        const s = document.createElement("style");
+        s.textContent = css;
+        document.head.appendChild(s);
+    };
+    injectCss(ALL_CSS);
+    /* ==========================================================================
+       installUI
        ========================================================================== */
     function installUI() {
         if (document.getElementById("cgpt-nav"))
             return;
         const box = document.createElement("div");
         box.id = "cgpt-nav";
+        // ★修正: ヘッダーに title (Drag to move) を入れつつ、スイッチには別のtitleを入れる
         box.innerHTML = `
-      <div class="cgtn-unified-header" id="cgpt-drag">
+      <div class="cgtn-unified-header" id="cgpt-drag" title="${T("headerDrag")}">
         <div class="cgtn-header-top">
           <div class="cgtn-brand-group">
             <div class="cgtn-title-main">Turn</div>
@@ -72,18 +376,22 @@
             <button class="cgtn-pill-btn" data-act="top">▲</button>
             <button class="cgtn-pill-btn" data-act="bottom">▼</button>
           </div>
-          
-          <button id="cgpt-list-btn" class="cgtn-pill-btn" data-i18n="list" style="margin-top:4px;">List</button>
-
-          <div class="cgtn-mini-row">
-             <button id="cgpt-lang-btn" class="cgtn-pill-btn">EN</button>
-             <button id="cgtn-open-settings" class="cgtn-mini-btn" title="Settings">⚙</button>
-             <button id="cgpt-navi-refresh" class="cgtn-mini-btn" title="Refresh">↻</button>
-          </div>
-
-          <input id="cgpt-viz" type="checkbox" style="display:none">
-          <input id="cgpt-list-toggle" type="checkbox" style="display:none">
         </div>
+
+        <div class="cgpt-nav-group" data-role="tools">
+          <div class="cgpt-nav-label" data-i18n="tools">Tool</div>
+          <button id="cgpt-list-btn" class="cgtn-pill-btn" data-i18n="list">List</button>
+        </div>
+
+        <div class="cgpt-nav-group" data-role="others">
+          <div class="cgpt-nav-label" data-i18n="others">Other</div>
+          <button id="cgpt-navi-refresh" class="cgtn-pill-btn" data-i18n="refresh">Refresh</button>
+          <button id="cgtn-open-settings" class="cgtn-pill-btn" data-i18n="settings">Settings</button>
+          <button id="cgpt-lang-btn" class="cgtn-pill-btn" data-i18n="langBtn">EN/JP</button>
+        </div>
+
+        <input id="cgpt-viz" type="checkbox" style="display:none">
+        <input id="cgpt-list-toggle" type="checkbox" style="display:none">
 
       </div>`;
         document.body.appendChild(box);
@@ -110,7 +418,7 @@
                 }
             });
         }
-        // ドラッグ機能初期化
+        // ドラッグ機能
         setupDrag(box);
         // 言語設定反映
         applyLang();
@@ -173,7 +481,6 @@
             '#cgpt-nav [data-role="assistant"] [data-act="bottom"]': "nav.bottom",
             '#cgpt-nav [data-role="assistant"] [data-act="prev"]': "nav.prev",
             '#cgpt-nav [data-role="assistant"] [data-act="next"]': "nav.next",
-            "#cgpt-drag": "nav.drag",
             "#cgpt-lang-btn": "nav.lang",
             "#cgpt-list-btn": "nav.list",
             "#cgpt-navi-refresh": "nav.refresh",
@@ -201,10 +508,9 @@
         const box = document.getElementById("cgpt-nav");
         if (!box)
             return;
-        const t = window.CGTN_I18N?.t || ((k) => k);
         box.querySelectorAll("[data-i18n]").forEach((el) => {
             const key = el.getAttribute("data-i18n");
-            const txt = t(key);
+            const txt = T(key);
             if (key && txt) {
                 el.textContent = txt;
                 if (el instanceof HTMLElement) {
@@ -212,9 +518,24 @@
                 }
             }
         });
-        const langBtn = box.querySelector("#cgpt-lang-btn");
-        if (langBtn)
-            langBtn.textContent = T("langBtn") || "EN/JP";
+        // ヘッダーとスイッチの文言更新
+        const dragHeader = box.querySelector("#cgpt-drag");
+        if (dragHeader instanceof HTMLElement)
+            dragHeader.title = T("headerDrag");
+        // 現在のスイッチ状態に合わせて更新
+        const cb = box.querySelector("#cgtn-power-toggle");
+        if (cb instanceof HTMLInputElement)
+            updateSwitchTooltip(cb);
+    }
+    // ★スイッチ用ツールチップ更新関数
+    function updateSwitchTooltip(cb) {
+        if (!cb)
+            return;
+        const label = cb.parentElement;
+        if (label) {
+            // ONなら「OFFで停止」、OFFなら「ONで開始」を表示
+            label.title = cb.checked ? T("tipOff") : T("tipOn");
+        }
     }
     NS.updateStatusDisplay = (text, subLabel = "READY") => {
         const screen = document.getElementById("cgtn-status-monitor");
@@ -234,8 +555,10 @@
             return;
         box.classList.toggle("cgtn-idle", !!idle);
         const cb = box.querySelector("#cgtn-power-toggle");
-        if (cb)
+        if (cb) {
             cb.checked = !idle;
+            updateSwitchTooltip(cb); // ★状態変化時にツールチップ更新
+        }
         const screen = document.getElementById("cgtn-status-monitor");
         if (screen) {
             if (idle) {
@@ -243,7 +566,6 @@
             }
             else {
                 screen.innerHTML = `
-          <div class="screen-label">STATUS</div>
           <div class="screen-value" style="color:#aaa">READY</div>
         `;
             }
@@ -255,7 +577,7 @@
             return;
         let dragging = false, offX = 0, offY = 0;
         grip.addEventListener("pointerdown", (e) => {
-            // ★トグルスイッチ上でのクリックならドラッグしない
+            // スイッチ上のクリックならドラッグしない
             if (e.target.closest(".cgtn-power-wrapper")) {
                 return;
             }
