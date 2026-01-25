@@ -80,7 +80,7 @@
 .cgtn-title-main {
   font-size: 14px;
   font-weight: 800;
-  color: #fff;
+  color: #EBFFF5;
   letter-spacing: 0.5px;
 }
 .cgtn-title-sub {
@@ -91,7 +91,7 @@
 }
 .cgtn-ver {
   font-size: 9px;
-  color: #888;
+  color: #bbb;
   font-family: monospace;
   margin-top: 1px;
 }
@@ -99,7 +99,8 @@
 /* ヘッダー下段 */
 .cgtn-header-bottom {
   display: flex;
-  justify-content: space-between;
+/*  justify-content: space-between;*/
+  column-gap: 5px;
   align-items: center;
 }
 
@@ -133,7 +134,7 @@
   transition: .3s;
   border-radius: 50%;
 }
-input:checked + .slider { background-color: #A40000; border-color: #A40000; }
+input:checked + .slider { background-color: #AC0000; border-color: #AC0000; }
 input:checked + .slider:before {
   background-color: #fff;
   transform: translateX(14px);
@@ -168,7 +169,7 @@ input:checked + .slider:before {
   gap: 8px;
   max-height: calc(100vh - 160px);
   overflow-y: auto;
-  background: #9EB992;
+  background: #444;
 }
 .cgtn-body::-webkit-scrollbar { width: 0; height: 0; }
 
@@ -183,11 +184,11 @@ input:checked + .slider:before {
   gap: 5px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.03);
 }
-.cgpt-nav-group[data-role="user"] { background: #f0f8ff; border-color: #e0f2fe; }
-.cgpt-nav-group[data-role="assistant"] { background: #f0fdf4; border-color: #dcfce7; }
-.cgpt-nav-group[data-role="all"]{ background: #FFF; border-color: #DEDEDE; }
-.cgpt-nav-group[data-role="tools"]{ background: #EAEAEA; border-color: #DEDEDE; }
-.cgpt-nav-group[data-role="others"] { background: #EEE; border-color: #CECECE; }
+.cgpt-nav-group[data-role="user"] { color:#555;background: #2A2A2A; border-color: #2A2A2A; }
+.cgpt-nav-group[data-role="assistant"] { background: #2A2A2A; border-color: #2A2A2A; }
+.cgpt-nav-group[data-role="all"]{ background: #2A2A2A; border-color: #2A2A2A; }
+.cgpt-nav-group[data-role="tools"]{ background: #2A2A2A; border-color: #2A2A2A; }
+.cgpt-nav-group[data-role="others"] { background: #2A2A2A; border-color: #2A2A2A; }
 
 @media (prefers-color-scheme: dark){
   .cgpt-nav-group { background: #222; border-color: #333; }
@@ -200,21 +201,32 @@ input:checked + .slider:before {
   font-weight: 700;
   text-align: center;
   opacity: 0.6;
-  color: #000 ;
 }
 @media (prefers-color-scheme: dark){ .cgpt-nav-label { color: #ccc; } }
 
+.cgpt-nav-group[data-role="user"] {.cgpt-nav-label{color:#fff;}} 
+.cgpt-nav-group[data-role="assistant"] {.cgpt-nav-label{color:#fff;}} 
+.cgpt-nav-group[data-role="all"] {.cgpt-nav-label{color:#fff;}} 
+.cgpt-nav-group[data-role="tools"] {.cgpt-nav-label{color:#fff;}} 
+.cgpt-nav-group[data-role="others"] {.cgpt-nav-label{color:#fff;}} 
+
+.cgpt-nav-group[data-role="user"] {.cgtn-pill-btn:hover{background:#4E95D9;}} 
+.cgpt-nav-group[data-role="assistant"] {.cgtn-pill-btn:hover{background:#F59599;}} 
+.cgpt-nav-group[data-role="all"] {.cgtn-pill-btn:hover{background:#FF4343;}} 
+.cgpt-nav-group[data-role="tools"] {#cgpt-list-btn:hover{background:#EDEDED;color:#000;}} 
+.cgpt-nav-group[data-role="others"] {.cgtn-pill-btn:hover{background:#EDEDED;color:#000;}} 
+
 /* ピル型ボタン */
 .cgtn-pill-btn {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   padding: 0 4px;
   width: 100%;
   border-radius: 6px;
   border: 1px solid rgba(0,0,0,0.08);
-  background: #fff;
+  background: #444;
   cursor: pointer;
-  color: #333;
+  color: #fff;
   height: 24px;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.1s;
@@ -243,16 +255,17 @@ input:checked + .slider:before {
 }
 
 /* 一覧ボタン */
+/*
 #cgpt-list-btn {
   font-weight: 600;
-  color: #555;
+  color: #fff;
 }
 #cgpt-list-btn.active {
   background: #333;
   color: #fff;
   border-color: #333;
 }
-
+*/
 /* Idle モード */
 #cgpt-nav.cgtn-idle .cgtn-body {
   display: none;
