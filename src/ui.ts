@@ -6,6 +6,7 @@
   const NS = (window.CGTN_UI = window.CGTN_UI || {});
   const SH = window.CGTN_SHARED || {};
   const LG = window.CGTN_LOGIC || {};
+
   const T = (k) => window.CGTN_I18N?.t?.(k) || k;
 
   // 初期言語設定
@@ -22,7 +23,7 @@
   const prvCurURL = chrome.runtime.getURL("assets/prev16.png");
 
   /* ==========================================================================
-     CSS 定義
+     CSS 定義 (幅100px & 12pxフォント対応)
      ========================================================================== */
   const ALL_CSS = `
 /* === ベースパネル === */
@@ -37,14 +38,14 @@
   border: 1px solid rgba(0,0,0,.15);
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0,0,0,.25);
-  width: 90px;
+  /* ★修正: 90px -> 100px にして余裕を持たせる */
+  width: 100px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
   transition: opacity 0.2s;
   font-size: 11px;
 }
 
-/* ダークモード */
 @media (prefers-color-scheme: dark){
   #cgpt-nav{
     border-color: rgba(255,255,255,.15);
@@ -52,7 +53,7 @@
   }
 }
 
-/* === 統一ヘッダー (黒い塊) === */
+/* === 統一ヘッダー === */
 .cgtn-unified-header {
   background: #000;
   color: #fff;
@@ -70,7 +71,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  pointer-events: none; /* 文字選択などを防ぎドラッグしやすく */
+  pointer-events: none;
 }
 .cgtn-brand-group {
   display: flex;
@@ -99,8 +100,7 @@
 /* ヘッダー下段 */
 .cgtn-header-bottom {
   display: flex;
-/*  justify-content: space-between;*/
-  column-gap: 5px;
+  justify-content: space-between;
   align-items: center;
 }
 
@@ -108,12 +108,12 @@
 .cgtn-power-wrapper {
   position: relative;
   display: inline-block;
-  width: 25px;
+  width: 28px;
   height: 18px;
   flex-shrink: 0;
   cursor: pointer;
-  pointer-events: auto; /* 明示的に操作可能に */
-  z-index: 10; /* ★ドラッグ層より手前に配置 */
+  pointer-events: auto;
+  z-index: 10;
 }
 .cgtn-power-wrapper input { opacity: 0; width: 0; height: 0; }
 .slider {
@@ -129,7 +129,7 @@
   position: absolute;
   content: "";
   height: 14px; width: 14px;
-  left: 0px; bottom: 1px;
+  left: 1px; bottom: 1px;
   background-color: #ddd;
   transition: .3s;
   border-radius: 50%;
@@ -137,26 +137,30 @@
 input:checked + .slider { background-color: #AC0000; border-color: #AC0000; }
 input:checked + .slider:before {
   background-color: #fff;
-  transform: translateX(14px);
-  left: -5px;
+  transform: translateX(10px);
 }
 
-/* デジタルスクリーン */
+/* デジタルスクリーン (数値・状態表示) */
 .digital-screen {
   text-align: right;
   height: 18px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  pointer-events: none; /* 文字選択防止 */
+  pointer-events: none;
+  flex: 1; /* 残りのスペースを埋める */
+  overflow: hidden;
 }
 .digital-screen .screen-value {
-  font-size: 13px;
+  /* ★修正: 12pxで見やすく。桁が多くても収まるように */
+  font-size: 12px; 
   font-weight: 700;
   color: #fff;
-  font-family: 'Consolas', monospace;
   white-space: nowrap;
 }
+/* ローディング中は少し小さくしても良いかも */
+.digital-screen .screen-value.loading { font-size: 10px; opacity: 0.8; }
+
 .digital-screen .off-text { 
   color: #aaa; font-size: 12px; font-weight: 600; 
 }
@@ -184,7 +188,7 @@ input:checked + .slider:before {
   gap: 5px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.03);
 }
-.cgpt-nav-group[data-role="user"] { color:#555;background: #2A2A2A; border-color: #2A2A2A; }
+.cgpt-nav-group[data-role="user"] { color:#555; background: #2A2A2A; border-color: #2A2A2A; }
 .cgpt-nav-group[data-role="assistant"] { background: #2A2A2A; border-color: #2A2A2A; }
 .cgpt-nav-group[data-role="all"]{ background: #2A2A2A; border-color: #2A2A2A; }
 .cgpt-nav-group[data-role="tools"]{ background: #2A2A2A; border-color: #2A2A2A; }
@@ -218,7 +222,8 @@ input:checked + .slider:before {
 
 /* ピル型ボタン */
 .cgtn-pill-btn {
-  font-size: 11px;
+  /* ★修正: 幅を100pxにしたので、文字サイズを12pxに上げても大丈夫 */
+  font-size: 12px;
   font-weight: 500;
   padding: 0 4px;
   width: 100%;
@@ -233,18 +238,16 @@ input:checked + .slider:before {
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   white-space: nowrap;
 }
-.cgtn-pill-btn:hover { 
-  background: #f9fafb; 
-  border-color: rgba(0,0,0,0.15);
-  transform: translateY(-1px);
-}
 .cgtn-pill-btn:active { 
   transform: translateY(0);
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
 }
-@media (prefers-color-scheme: dark){
-  .cgtn-pill-btn { background: #333; color: #eee; border-color: #555; }
-  .cgtn-pill-btn:hover { background: #444; }
+
+#cgpt-list-btn.active {
+  background: #fff;
+  color: #222;
+  font-weight: 700;
+  border-color: #fff;
 }
 
 /* 2列グリッド */
@@ -254,18 +257,6 @@ input:checked + .slider:before {
   gap: 5px;
 }
 
-/* 一覧ボタン */
-/*
-#cgpt-list-btn {
-  font-weight: 600;
-  color: #fff;
-}
-#cgpt-list-btn.active {
-  background: #333;
-  color: #fff;
-  border-color: #333;
-}
-*/
 /* Idle モード */
 #cgpt-nav.cgtn-idle .cgtn-body {
   display: none;
@@ -278,7 +269,7 @@ input:checked + .slider:before {
   box-shadow: none !important;
 }
 
-/* === 以下、既存CSS (LIST等) === */
+/* === 既存CSS (LIST等) === */
 #cgpt-list-panel{position:fixed; right:120px; bottom:140px; display:none; flex-direction:column; z-index:2147483646; width:360px; max-width:min(92vw,420px); max-height:min(62vh,680px); border:1px solid rgba(0,0,0,.12); border-radius:16px; background:rgba(255,255,255,.98); box-shadow:0 18px 56px rgba(0,0,0,.25); overflow:hidden; resize: horizontal; overflow: auto; min-width: 260px; max-width: 720px;}
 #cgpt-list-panel.no-anim * {transition: none !important;}
 #cgpt-list-head{display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(0,0,0,.1); padding:6px 10px; position:sticky; top:0; background:rgba(255,255,255,.98);}
@@ -349,7 +340,6 @@ input:checked + .slider:before {
     const box = document.createElement("div");
     box.id = "cgpt-nav";
 
-    // ★修正: ヘッダーに title (Drag to move) を入れつつ、スイッチには別のtitleを入れる
     box.innerHTML = `
       <div class="cgtn-unified-header" id="cgpt-drag" title="${T("headerDrag")}">
         <div class="cgtn-header-top">
@@ -557,26 +547,23 @@ input:checked + .slider:before {
       }
     });
 
-    // ヘッダーとスイッチの文言更新
     const dragHeader = box.querySelector("#cgpt-drag");
     if (dragHeader instanceof HTMLElement) dragHeader.title = T("headerDrag");
 
-    // 現在のスイッチ状態に合わせて更新
     const cb = box.querySelector("#cgtn-power-toggle");
     if (cb instanceof HTMLInputElement) updateSwitchTooltip(cb);
   }
 
-  // ★スイッチ用ツールチップ更新関数
   function updateSwitchTooltip(cb) {
     if (!cb) return;
     const label = cb.parentElement;
     if (label) {
-      // ONなら「OFFで停止」、OFFなら「ONで開始」を表示
       label.title = cb.checked ? T("tipOff") : T("tipOn");
     }
   }
 
-  NS.updateStatusDisplay = (text, subLabel = "READY") => {
+  // ★修正: テキストをそのまま表示 (Loading.. や 999/999 対応)
+  NS.updateStatusDisplay = (text, subLabel) => {
     const screen = document.getElementById("cgtn-status-monitor");
     if (!screen) return;
     const cb = document.getElementById(
@@ -584,10 +571,10 @@ input:checked + .slider:before {
     ) as HTMLInputElement | null;
     if (cb && !cb.checked) return;
 
-    screen.innerHTML = `
-      <div class="screen-label">${subLabel}</div>
-      <div class="screen-value">${text}</div>
-    `;
+    // Loading... の場合はクラスを付けて少し小さくするなどの調整も可能
+    const isLong = text.length > 8;
+    const cls = isLong ? "screen-value loading" : "screen-value";
+    screen.innerHTML = `<div class="${cls}">${text}</div>`;
   };
 
   function setIdleMode(idle) {
@@ -600,7 +587,7 @@ input:checked + .slider:before {
     ) as HTMLInputElement | null;
     if (cb) {
       cb.checked = !idle;
-      updateSwitchTooltip(cb); // ★状態変化時にツールチップ更新
+      updateSwitchTooltip(cb);
     }
 
     const screen = document.getElementById("cgtn-status-monitor");
@@ -608,9 +595,7 @@ input:checked + .slider:before {
       if (idle) {
         screen.innerHTML = `<span class="off-text">OFF</span>`;
       } else {
-        screen.innerHTML = `
-          <div class="screen-value" style="color:#aaa">READY</div>
-        `;
+        screen.innerHTML = `<div class="screen-value" style="color:#aaa">READY</div>`;
       }
     }
   }
@@ -623,7 +608,6 @@ input:checked + .slider:before {
       offY = 0;
 
     grip.addEventListener("pointerdown", (e) => {
-      // スイッチ上のクリックならドラッグしない
       if ((e.target as HTMLElement).closest(".cgtn-power-wrapper")) {
         return;
       }

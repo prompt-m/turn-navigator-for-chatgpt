@@ -27,8 +27,17 @@
 
   const T = (k) => window.CGTN_I18N?.t?.(k) ?? k;
 
-  function _L() {
-    return (SH?.getLang?.() || "").toLowerCase().startsWith("en") ? "en" : "ja";
+  // --- ヘルパー: 自作UI内かどうかの判定 (AutoSyncで使用) ---
+  function inOwnUI(node) {
+    if (!node || node.nodeType !== 1) return false;
+    // data-cgtn-ui 属性、または主要ID内かどうか
+    if (node.closest?.("[data-cgtn-ui]")) return true;
+    const nav = document.getElementById("cgpt-nav");
+    const list = document.getElementById("cgpt-list-panel");
+    return (
+      (nav && (node === nav || nav.contains(node))) ||
+      (list && (node === list || list.contains(node)))
+    );
   }
 
   // ★チャット別ピン・キャッシュ
@@ -50,66 +59,6 @@
   }
   NS.isPinnedByKey = isPinnedByKey;
 
-  // 追加: ピン配列を chatId ごとに保存する非同期関数
-  /* 未使用
-  async function persistPinsOrRollback(chatId, pinsArr, rollback) {
-    // pins を稠密配列で保持
-    const patch = { pinsByChat: { [chatId]: { pins: pinsArr, updatedAt: Date.now() } } };
-    const result = await SH.saveSettingsPatch(patch);
-    if (result?.ok) return true;
-    // 失敗 → UI ロールバック + 通知
-    try { rollback && rollback(); } catch {}
-    const t = window.CGTN_I18N?.t || (s=>s);
-    const title = t('storage.saveFailed.title') || '保存に失敗しました';
-    const body  = t('storage.saveFailed.body')  || 'ストレージ上限に達しています。設定 → 付箋データ管理で不要な付箋を削除してください。';
-    alert(`${title}\n\n${body}`);
-    return false;
-  }
-  */
-
-  /* 未使用
-  function togglePin(artOrKey){
-    const k = (typeof artOrKey==='string') ? artOrKey : getTurnKey(artOrKey);
-    const ks = String(k);
-    const chatId = SH.getChatId?.();
-    if (!chatId) return false;
-
-    // 現在の集合 → 次状態を楽観反映
-    const s = new Set(PINS);
-    const next = !s.has(ks);
-    if (next) s.add(ks); else s.delete(ks);
-
-    // UI 反映（楽観）
-    _applyPinsToUI(s);   // ← 既存の描画同期があればそれを呼ぶ（例: rows のクラス付け等）
-//    updateListFooterInfo?.();
-    updatePinOnlyBadge?.();
-
-    // 永続化：'turn:n' を 0/1 配列へ（密配列）
-    const arr = [];
-    for (const key of s) {
-      const n = Number(String(key).replace('turn:',''));
-      if (Number.isFinite(n) && n > 0) arr[n-1] = 1;
-    }
-
-    // 失敗時は、ここで即ロールバック
-    const rollback = () => {
-      const r = new Set(PINS); // 直前の正しい状態（PINS は失敗時まで書き換えない設計ならここで保持）
-      if (next) r.delete(ks); else r.add(ks);
-      _applyPinsToUI(r);
-//      updateListFooterInfo?.();
-      updatePinOnlyBadge?.();
-    };
-
-    // メモ: PINS に確定反映するタイミングは成功後
-    return persistPinsOrRollback(chatId, arr, rollback).then(ok => {
-      if (ok){
-        // 成功で PINS を確定同期
-        PINS = Array.from(s);
-      }
-      return ok ? next : !next; // 呼出し互換（次状態 or 元の状態）
-    });
-  }
-*/
   // 互換：従来の _savePinsSet 等を使っていた呼び出しを内部移譲
   NS.isPinned = function (art) {
     return isPinnedByKey(NS.getTurnKey?.(art));
@@ -122,69 +71,6 @@
     if (s.display === "none" || s.visibility === "hidden") return false;
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
-  }
-
-  // === 追加：ナビ専用デバッグ・ユーティリティ ===
-  const NAV_DEBUG = true;
-  function _navLog(...a) {
-    if (NAV_DEBUG) console.debug("[nav]", ...a);
-  }
-
-  // いまのアンカー・位置・候補を数値で可視化
-  function logScrollSpy(roleLabel = "all") {
-    try {
-      const sc = getTrueScroller();
-      const yTop = sc.scrollTop;
-      const anchor = currentAnchorY();
-      const yStar = yTop + anchor; // 判定ライン
-      const eps = Number(SH.getCFG().eps) || 0;
-
-      const L =
-        roleLabel === "user"
-          ? ST.user
-          : roleLabel === "assistant"
-          ? ST.assistant
-          : ST.all;
-
-      const rows = (L || []).map((a, i) => {
-        const y = articleTop(sc, a);
-        return { i: i + 1, y, d: yStar - y }; // d>0 なら上にある
-      });
-
-      const prev = [...rows].reverse().find((r) => r.y < yStar - eps);
-      const next = rows.find((r) => r.y > yStar + eps);
-
-      _navLog("spy", {
-        role: roleLabel,
-        turns: rows.length,
-        eps,
-        anchor,
-        yTop,
-        yStar,
-        prev: prev ? `#${prev.i}@${Math.round(prev.y)}` : null,
-        next: next ? `#${next.i}@${Math.round(next.y)}` : null,
-      });
-
-      // 直近±2件も出す（目視でズレが分かる）
-      if (prev) {
-        const k = prev.i - 1;
-        const pick = rows.slice(
-          Math.max(0, k - 2),
-          Math.min(rows.length, k + 3)
-        );
-        _navLog("around-prev", pick);
-      }
-      if (next) {
-        const k = next.i - 1;
-        const pick = rows.slice(
-          Math.max(0, k - 2),
-          Math.min(rows.length, k + 3)
-        );
-        _navLog("around-next", pick);
-      }
-    } catch (e) {
-      _navLog("spy-failed", e);
-    }
   }
 
   function getTrueScroller() {
@@ -233,7 +119,6 @@
         pick(article, "div.markdown") ||
         article
       );
-      //      return pick(article, ':scope > div, :scope > article') || pick(article, 'div.text-base') || pick(article, 'div.markdown') || article;
     }
     if (isUser) {
       const wrap =
@@ -259,17 +144,8 @@
       return;
     }
 
-    /* !!!!
-    const row = sc.querySelector(`.row[data-turn="${CSS.escape(turnKey)}"]`);
-    if (!row) return;
-
-    // 行をパネル中央付近に出す
-    const top = row.offsetTop - (sc.clientHeight / 2 - row.clientHeight / 2);
-
-    sc.scrollTo({ top: Math.max(0, top), behavior: "instant" });
-    */
     const row = sc.querySelector(
-      `.row[data-turn="${CSS.escape(turnKey)}"]`
+      `.row[data-turn="${CSS.escape(turnKey)}"]`,
     ) as HTMLElement | null;
     if (!row) return;
 
@@ -299,7 +175,7 @@
     return article;
   }
 
-  // ここ変えたよ：共通トランケータ
+  // 共通トランケータ
   function truncate(s, max) {
     if (!max || !s) return s || "";
     return s.length > max ? s.slice(0, max) + "" : s;
@@ -391,7 +267,7 @@
     return !!el.querySelector(
       'a[download], a[href^="blob:"], ' +
         ".border.rounded-xl .truncate.font-semibold, " +
-        'img, picture img, video, source[type^="video/"]'
+        'img, picture img, video, source[type^="video/"]',
     );
   }
 
@@ -400,7 +276,7 @@
     try {
       // 1) 画像キャプションを表す要素を探す
       const captionEl = el.querySelector(
-        ".text-token-text-secondary, .text-sm.text-token-text-secondary, figcaption"
+        ".text-token-text-secondary, .text-sm.text-token-text-secondary, figcaption",
       );
       if (captionEl) {
         const text = captionEl.innerText.trim();
@@ -439,38 +315,28 @@
   function collectAttachmentNames(root) {
     const el = root || document;
     const names = new Set();
-
-    // a[download] と a[href] のテキスト/末尾名
     el.querySelectorAll("a[download], a[href]").forEach((a) => {
       const dn = (a.getAttribute("download") || "").trim();
       const href = a.getAttribute("href") || "";
       const tail = href.split("/").pop()?.split("?")[0] || "";
-
-      // ChatGPT の「ファイルカード」対策：
-      // a の内側に .text-token-link 等があれば、まずそれをファイル名候補にする
       let txt = "";
       const chip =
         a.querySelector(".text-token-link") ||
         a.querySelector(".truncate.font-semibold");
-
       if (chip) {
         txt = (chip.textContent || "").trim();
       } else {
         txt = (a.textContent || "").trim();
       }
-
       const picked = dn || (txt && /\S/.test(txt) ? txt : tail);
       if (picked) names.add(picked);
     });
-
-    // “古いタイプのファイルチップ”内の表示名（href が無いケース）
     el.querySelectorAll(".border.rounded-xl .truncate.font-semibold").forEach(
       (n) => {
         const tx = (n.textContent || "").trim();
         if (tx) names.add(tx);
-      }
+      },
     );
-
     return [...names];
   }
 
@@ -489,7 +355,7 @@
 
     // 1) 既存抽出でファイル名を取得
     const names = Array.from(new Set(collectAttachmentNames(el))).filter(
-      Boolean
+      Boolean,
     );
     if (names.length) {
       // ローカル小ヘルパ：PDF抽出
@@ -504,7 +370,7 @@
       const extractAssistantFileLabel = () => {
         // 1) よくある data-testid / class 名称を総当りで捜索
         const candidates = el.querySelectorAll(
-          '[data-testid*="file"],[data-testid*="attachment"],[class*="file"],[class*="attachment"]'
+          '[data-testid*="file"],[data-testid*="attachment"],[class*="file"],[class*="attachment"]',
         );
         for (const c of candidates) {
           const t = (c.textContent || "").trim();
@@ -593,7 +459,7 @@
           "picture",
           "video",
           "source",
-        ].join(",")
+        ].join(","),
       )
       .forEach((n) => n.remove());
 
@@ -613,7 +479,7 @@
 
   const currentAnchorY = () => SH.computeAnchor(SH.getCFG()).y;
 
-  // ここ変えたよ：ターンキー安定化。DOMに無ければ連番を割り当てて保持。
+  // ターンキー安定化。DOMに無ければ連番を割り当てて保持。
   const _turnKeyMap = new WeakMap();
 
   // [追記] 本文からプレビュー用テキストを抽出（改行・空白を整理、長すぎるときはカット）
@@ -688,15 +554,6 @@
     PINS = _pinsSetFromCFG(SH.getCFG() || {});
     _pinsInited = true;
   }
-  /*
-  function initPinsCache() {
-    PINS = _pinsSetFromCFG(SH.getCFG() || {});
-  }
-  function getPins() {
-    return Array.from(PINS);
-  }
-*/
-
   function isPinned(artOrKey) {
     const k = typeof artOrKey === "string" ? artOrKey : getTurnKey(artOrKey);
     return PINS.has(String(k));
@@ -719,7 +576,7 @@
     const body = qListBody();
     if (!body) return [];
     return Array.from(
-      body.querySelectorAll(`.row[data-turn="${CSS.escape(turnKey)}"]`)
+      body.querySelectorAll(`.row[data-turn="${CSS.escape(turnKey)}"]`),
     );
   }
 
@@ -743,10 +600,6 @@
   function bindDelegatedClipPinHandler() {
     const body = document.getElementById("cgpt-list-body");
     if (!body) return;
-    /* !!!!
-    if (body._cgtnClipDelegated) return; // 二重バインド防止
-    body._cgtnClipDelegated = true;
-    */
     // 二重バインド防止（WeakSet）
     if (_delegatedClipBound.has(body)) return;
     _delegatedClipBound.add(body);
@@ -754,11 +607,6 @@
     body.addEventListener(
       "click",
       async (ev) => {
-        /* !!!!
-        const clipEl = ev.target?.closest?.(".cgtn-clip-pin");
-        if (!clipEl) return; // 付箋ボタン以外は無視
-        */
-
         // EventTarget は Element とは限らないので、まず型を絞る
         const t = ev.target;
         if (!(t instanceof Element)) return;
@@ -820,14 +668,14 @@
           const pinsCount = Array.isArray(pinsArr)
             ? pinsArr.filter(Boolean).length
             : pinsArr
-            ? Object.values(pinsArr).filter(Boolean).length
-            : 0;
+              ? Object.values(pinsArr).filter(Boolean).length
+              : 0;
           NS.pinsCount = pinsCount;
           NS.updateListFooterInfo?.();
           NS.updatePinOnlyBadge?.();
         } catch {}
       },
-      { passive: false }
+      { passive: false },
     );
   }
 
@@ -882,13 +730,13 @@
           const pinsCount = Array.isArray(pinsArr)
             ? pinsArr.filter(Boolean).length
             : pinsArr
-            ? Object.values(pinsArr).filter(Boolean).length
-            : 0;
+              ? Object.values(pinsArr).filter(Boolean).length
+              : 0;
           NS.pinsCount = pinsCount;
           NS.updateListFooterInfo?.();
         } catch {}
       },
-      { passive: false }
+      { passive: false },
     );
   }
 
@@ -1094,7 +942,7 @@
         const anchor2 = currentAnchorY();
         const want = Math.min(
           maxScr,
-          Math.max(0, articleTop(sc, article) - anchor2)
+          Math.max(0, articleTop(sc, article) - anchor2),
         );
         const err = Math.abs((sc.scrollTop || 0) - want);
         if (err <= NAV_SNAP.epsPx) break;
@@ -1153,13 +1001,13 @@
 
     // まずは TURN_SEL を素直に拾う（<article> 前提）
     let list: HTMLElement[] = Array.from(
-      document.querySelectorAll<HTMLElement>(TURN_SEL)
+      document.querySelectorAll<HTMLElement>(TURN_SEL),
     );
 
     // フォールバック：roleノードから article を辿る
     if (!list.length) {
       const nodes = Array.from(
-        document.querySelectorAll<HTMLElement>("[data-message-author-role]")
+        document.querySelectorAll<HTMLElement>("[data-message-author-role]"),
       );
 
       list = nodes
@@ -1203,13 +1051,13 @@
     if (hint === "user" || hint === "assistant") return hint;
     if (
       el.matches?.(
-        '[data-message-author-role="user"], div [data-message-author-role="user"]'
+        '[data-message-author-role="user"], div [data-message-author-role="user"]',
       )
     )
       return "user";
     if (
       el.matches?.(
-        '[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'
+        '[data-message-author-role="assistant"], div [data-message-author-role="assistant"]',
       )
     )
       return "assistant";
@@ -1246,7 +1094,7 @@
     const hasMedia = !!article.querySelector(
       "img,video,canvas,figure," +
         '[data-testid*="download"],[data-testid*="attachment"],[data-testid*="file"],' +
-        'a[download],a[href^="blob:"]'
+        'a[download],a[href^="blob:"]',
     );
     const busy = head.getAttribute?.("aria-busy") === "true";
 
@@ -1310,68 +1158,6 @@
   //
   //   これらの改修により、チャット切替・リロード・ON/OFF操作の並行タイミングでも
   //   一貫して「最新チャットの確定データだけが ST に反映」されるようになった。
-  /* !!!!
-  const ST = { all: [], user: [], assistant: [], page: 1 };
-
-  let _rebuildTicket = 0,
-    _rebuildCid = null;
-  function rebuild(cidFromMsg) {
-    const my = ++_rebuildTicket;
-
-    // この実行の “対象チャットID” を確定（以降はこれで評価）
-    const startCid = cidFromMsg || SH.getChatId?.();
-    _rebuildCid = startCid || _rebuildCid;
-
-    NS._scroller = getTrueScroller();
-
-    // ===== 材料スナップショットを nextST に作る =====
-    const nextST = { all: [], user: [], assistant: [], page: 1 };
-
-    const t0 = performance.now();
-    const allRaw = pickAllTurns().filter(isRealTurn);
-    nextST.all = sortByY(allRaw);
-
-    // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
-    if (nextST.all.length === 0) {
-      NS.clearListPanelUI?.(); // !!!!
-      // ↓ この後の確定ブロックで my/cid の照合を通す
-    } else {
-      const isRole = (el, role) => {
-        const dt = el?.dataset?.turn;
-        if (dt) return dt === role;
-        return el.matches?.(
-          `[data-message-author-role="${role}"], div [data-message-author-role="${role}"]`
-        );
-      };
-      const roleOf = (a) => getTurnRole(a); // 既存ヘルパに委譲
-
-      nextST.user = nextST.all.filter((a) => roleOf(a) === "user");
-      nextST.assistant = nextST.all.filter((a) => roleOf(a) === "assistant");
-
-      // 可能なら Set も用意（描画側が速くなる）
-      nextST._userSet = new Set(nextST.user);
-      nextST._asstSet = new Set(nextST.assistant);
-    }
-
-    // ===== ここが“最後の3行”の意味：確定直前ガード & コミット =====
-    // 1) 自分の実行が最新か（古い並走は破棄）
-    if (my !== _rebuildTicket) return;
-
-    // 2) チャットIDが途中で変わっていないか（別チャットに切り替わっていたら破棄）
-    const curCid = SH.getChatId?.();
-    if (startCid && curCid && startCid !== curCid) return;
-
-    // 3) ここで初めて ST に反映（再代入ではなく各フィールドを上書き）
-    ST.all = nextST.all;
-    ST.user = nextST.user;
-    ST.assistant = nextST.assistant;
-    ST._userSet = nextST._userSet || new Set(ST.user);
-    ST._asstSet = nextST._asstSet || new Set(ST.assistant);
-
-    // デバッグ公開
-    NS.ST = ST;
-  }
-*/
   // ===== ST の型を先に定義（_userSet/_asstSet を optional で持たせる）=====
   type TurnEl = HTMLElement;
 
@@ -1447,8 +1233,8 @@
         (el.matches?.('[data-message-author-role="assistant"]')
           ? "assistant"
           : el.matches?.('[data-message-author-role="user"]')
-          ? "user"
-          : "unknown");
+            ? "user"
+            : "unknown");
 
       // headNodeOf() で主要ノードを取得し、そのテキストをtrimして本文扱いとする。
       const head = headNodeOf(el);
@@ -1607,8 +1393,8 @@
         <!-- ★ 付箋 全ON -->
         <button id="cgpt-pin-all-on" class="cgtn-mini-btn" type="button"
                 title="${T("list.pinAllOn")}" aria-label="${T(
-      "list.pinAllOn"
-    )}">
+                  "list.pinAllOn",
+                )}">
           <svg class="cgtn-all-pin-on" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
             <g transform="translate(0,3)">
             <!-- ALL の文字：真ん中寄せ、太め -->
@@ -1632,8 +1418,8 @@
         <!-- ★ 付箋 全OFF -->
         <button id="cgpt-pin-all-off" class="cgtn-mini-btn" type="button"
                 title="${T("list.pinAllOff")}" aria-label="${T(
-      "list.pinAllOff"
-    )}">
+                  "list.pinAllOff",
+                )}">
           <svg class="cgtn-all-pin-off" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
             <g transform="translate(0,3)">
             <text x="16" y="11"
@@ -1680,7 +1466,7 @@
           "#lv-lab-asst": "listFilter.asst",
           "#lv-lab-pin": "listFilter.pin",
         },
-        listBox
+        listBox,
       );
       listBox._tipsBound = true; // ★重複登録防止
     }
@@ -1777,14 +1563,14 @@
         () => {
           lastWasKeyboard = true;
         },
-        { capture: true }
+        { capture: true },
       );
       window.addEventListener(
         "pointerdown",
         () => {
           lastWasKeyboard = false;
         },
-        { capture: true }
+        { capture: true },
       );
 
       let park = document.getElementById("cgtn-focus-park");
@@ -1816,7 +1602,7 @@
             } catch {}
           }
         },
-        true
+        true,
       );
 
       panel.addEventListener(
@@ -1831,7 +1617,7 @@
             }
           } catch {}
         },
-        { capture: true }
+        { capture: true },
       );
     })(listBox);
     // enforceNoFocusList ここまで
@@ -1850,7 +1636,7 @@
             e.target && e.target.closest("button, label, input[type=checkbox]");
           if (el) e.preventDefault();
         },
-        { passive: false }
+        { passive: false },
       );
 
       // クリック後は念のため blur（キーボード操作には影響なし）
@@ -1861,7 +1647,7 @@
             e.target && e.target.closest("button, label, input[type=checkbox]");
           if (el && el.blur) el.blur();
         },
-        { passive: true }
+        { passive: true },
       );
 
       // マウスアップ捕捉で“今フォーカス中”も外す（より強固に）
@@ -1875,7 +1661,7 @@
             }
           } catch {}
         },
-        { capture: true }
+        { capture: true },
       );
     })();
     // suppressMouseFocusInList ここまで
@@ -1891,7 +1677,7 @@
           const el = e.target.closest("button, label, input[type=checkbox]");
           if (el) e.preventDefault();
         },
-        { passive: false }
+        { passive: false },
       );
 
       panel.addEventListener(
@@ -1900,7 +1686,7 @@
           const el = e.target.closest("button, label, input[type=checkbox]");
           if (el && el.blur) el.blur();
         },
-        { passive: true }
+        { passive: true },
       );
     })(listBox);
     // suppressMouseFocusInList ここまで
@@ -1930,7 +1716,7 @@
           listBox.style.left = e.clientX - offX + "px";
           listBox.style.top = e.clientY - offY + "px";
         },
-        { passive: true }
+        { passive: true },
       );
       window.addEventListener("pointerup", (e) => {
         if (!dragging) return;
@@ -2096,7 +1882,7 @@
   };
   NS.renderList = async function renderList(
     forceOn = false,
-    opts: RenderListOptions = {}
+    opts: RenderListOptions = {},
   ) {
     const SH = window.CGTN_SHARED,
       LG = window.CGTN_LOGIC;
@@ -2178,7 +1964,7 @@
     const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
     const fontPx = (cfg.list?.fontSize || 12) + "px";
 
-    (uploads = 0), (downloads = 0); // ダウンロードターン数・アップロードターン数
+    ((uploads = 0), (downloads = 0)); // ダウンロードターン数・アップロードターン数
 
     // === 行生成 ===
     for (const art of turns) {
@@ -2198,7 +1984,7 @@
       //   - body優先、無ければattachを採用
       const PREVIEW_MAX = Math.max(
         600,
-        Math.min(2000, SH?.getCFG?.()?.list?.previewMax || 1200)
+        Math.min(2000, SH?.getCFG?.()?.list?.previewMax || 1200),
       );
       const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || "";
       let bodyPreview = extractBodySnippet(head, PREVIEW_MAX) || "";
@@ -2221,13 +2007,13 @@
       const isUser = roleHint
         ? roleHint === "user"
         : art.matches(
-            '[data-message-author-role="user"], div [data-message-author-role="user"]'
+            '[data-message-author-role="user"], div [data-message-author-role="user"]',
           );
 
       const isAsst = roleHint
         ? roleHint === "assistant"
         : art.matches(
-            '[data-message-author-role="assistant"], div [data-message-author-role="assistant"]'
+            '[data-message-author-role="assistant"], div [data-message-author-role="assistant"]',
           );
 
       let anchored = false;
@@ -2404,7 +2190,7 @@
       empty.style.cssText = "padding:16px;opacity:.85;font-size:13px;";
       empty.innerHTML = `
         <div class="msg" style="margin-bottom:6px;" data-kind="msg">${T(
-          "list.noPins"
+          "list.noPins",
         )}</div>
         <button class="show-all" type="button">${T("list.showAll")}</button>
       `;
@@ -2514,7 +2300,7 @@
               console.warn("[setListEnabled/on] rebuild+render failed", e);
             }
           }, 180);
-        })
+        }),
       );
     } else {
       // --- OFF 時：enabled:false / pinOnly:false にして保存 ---
@@ -2866,7 +2652,7 @@
       maxW = 680;
     const width = Math.max(
       minW,
-      Math.min(maxW, Math.round(charsPerLine * charW + padding))
+      Math.min(maxW, Math.round(charsPerLine * charW + padding)),
     );
     panel.style.width = width + "px";
   };
@@ -2953,6 +2739,81 @@
       }
     }
   }
+
+  // === ★追加: 自動更新ロジックの移植 ===
+  let _turnObs = null;
+  let _observedRoot = null;
+
+  NS.detachTurnObserver = function () {
+    try {
+      _turnObs?.disconnect();
+    } catch {}
+    _turnObs = null;
+    _observedRoot = null;
+  };
+
+  NS.installAutoSyncForTurns = function installAutoSyncForTurns() {
+    const root = document.querySelector("main") || document.body;
+    if (_observedRoot === root && _turnObs) return;
+
+    NS.detachTurnObserver();
+
+    let to = 0;
+    const kick = () => {
+      // SH.isListOpen チェック (なければCFG直接)
+      const open =
+        typeof SH.isListOpen === "function"
+          ? SH.isListOpen()
+          : !!SH.getCFG?.()?.list?.enabled;
+      if (!open) return;
+
+      clearTimeout(to);
+      to = window.setTimeout(() => {
+        try {
+          NS.rebuild?.();
+          NS.renderList?.(true);
+        } catch (e) {}
+      }, 300);
+    };
+
+    _turnObs = new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (inOwnUI(m.target)) continue;
+        const sel = "article,[data-message-author-role]";
+
+        if (m.type === "childList") {
+          const arr = [...m.addedNodes, ...m.removedNodes];
+          const hit = arr.some((n) => {
+            if (!(n instanceof Element)) return false;
+            return n.matches(sel) || !!n.querySelector(sel);
+          });
+          if (hit) {
+            kick();
+            break;
+          }
+        } else if (m.type === "characterData" || m.type === "attributes") {
+          const host =
+            m.target.nodeType === 3 ? m.target.parentElement : m.target;
+          if (host instanceof Element && host.closest(sel)) {
+            kick();
+            break;
+          }
+        }
+      }
+    });
+
+    try {
+      _turnObs.observe(root, {
+        childList: true,
+        subtree: true,
+        characterData: false,
+        attributes: false,
+      });
+      _observedRoot = root;
+    } catch (e) {
+      console.warn("[auto-sync] observe failed", e);
+    }
+  };
 
   // --- expose ---
   NS.ensureTurnsReady = ensureTurnsReady;

@@ -47,212 +47,180 @@
             catch { }
         },
     };
-    function sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
+    // 画面操作を一時的にブロック
+    function setUiBusy(busy = true) {
+        const ids = ["cgpt-nav", "cgpt-list-panel"]; // 必要なら増やす
+        for (const id of ids) {
+            const host = document.getElementById(id);
+            if (!host)
+                continue;
+            // CSS-only 無効化
+            host.classList.toggle("loading", busy);
+            // 半透明マスク（見た目も分かりやすく）
+            let mask = host.querySelector(":scope > .cgtn-mask");
+            if (busy) {
+                if (!mask) {
+                    mask = document.createElement("div");
+                    mask.className = "cgtn-mask";
+                    Object.assign(mask.style, {
+                        position: "absolute",
+                        inset: "0",
+                        background: "rgba(255,255,255,0.55)",
+                        backdropFilter: "blur(2px)",
+                        cursor: "wait",
+                        zIndex: "9999",
+                        pointerEvents: "auto",
+                    });
+                    // relative が無いと被せられない
+                    if (getComputedStyle(host).position === "static") {
+                        host.style.position = "relative";
+                    }
+                    host.appendChild(mask);
+                }
+            }
+            else {
+                mask?.remove();
+            }
+        }
+        // ★ ステータス表示の更新 2026.01.26
+        if (busy) {
+            UI?.updateStatusDisplay?.("Loading..");
+        }
+        else {
+            // アプリ停止中(OFF)ならREADYに戻さずOFFのままにする
+            if (RUN.idle)
+                return;
+            // 完了時は "READY" (または 999/999 等に変更可能)
+            UI?.updateStatusDisplay?.("READY");
+        }
     }
-    // 既存の waitForChatSettled を開いて中を少しだけ強化（ログと0↔N検出）
-    // 補助：現在のターン数とスクロール情報
-    function _cgtnCountTurns() {
-        return document.querySelectorAll('article,[data-testid^="conversation-turn"]').length;
-    }
-    function cgtnScrollStats() {
-        const el = document.scrollingElement || document.documentElement || document.body;
-        return {
-            h: el?.scrollHeight | 0,
-            y: el?.scrollTop | 0,
-            vh: window.innerHeight | 0,
-        };
-    }
-    // === wait helpers (lightweight) ==========================
+    // CSS（ローディング用スタイル）
+    (function ensureBusyStyle() {
+        if (document.getElementById("cgtn-busy-style"))
+            return;
+        const st = document.createElement("style");
+        st.id = "cgtn-busy-style";
+        /*
+        st.textContent = `
+          #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none; opacity: .6; cursor: not-allowed; }
+        `;
+    */
+        // 2026.01.26
+        st.textContent = `
+      #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none; opacity: 0.9; }
+    `;
+        document.head.appendChild(st);
+    })();
+    // === wait helpers ===
     function cgtnCountTurns() {
         return document.querySelectorAll('article,[data-testid^="conversation-turn"]').length;
     }
     function cgtnRoot() {
         return document.querySelector("main") || document.body;
     }
-    async function waitForChatSettled({ cid, expectZeroFirst = false, idleMs = 350, tickMs = 120, maxMs = 12000, } = {}) {
-        const SH = window.CGTN_SHARED;
-        const start = performance.now();
-        const root = cgtnRoot();
-        if (!root)
-            return false;
-        // 監視対象（childList + attributes で十分に軽い）
-        let lastCnt = cgtnCountTurns();
-        let lastH = cgtnScrollStats().h;
-        let lastAt = performance.now();
-        let sawZero = lastCnt === 0; // すでに 0 の場合もある
-        let sawPos = lastCnt > 0;
-        let printed0toN = false; // 転換ログの多重出力防止
-        let printedNto0 = false;
-        const turnsQ = 'article,[data-testid^="conversation-turn"]';
-        const isTurnNode = (n) => n?.nodeType === 1 &&
-            (n.matches?.('article,[data-testid^="conversation-turn"]') ||
-                n.querySelector?.(turnsQ));
-        const mo = new MutationObserver((muts) => {
-            for (const m of muts) {
-                if (m.type === "childList") {
-                    // turnノードの増減があれば即チェック
-                    if ([...m.addedNodes, ...m.removedNodes].some(isTurnNode)) {
-                        const cnt = cgtnCountTurns();
-                        const h = cgtnScrollStats().h;
-                        if (cnt !== lastCnt || h !== lastH) {
-                            if (!printed0toN && lastCnt === 0 && cnt > 0) {
-                                printed0toN = true;
-                            }
-                            if (!printedNto0 && lastCnt > 0 && cnt === 0) {
-                                printedNto0 = true;
-                            }
-                            lastCnt = cnt;
-                            lastH = h;
-                            lastAt = performance.now();
-                            if (cnt === 0)
-                                sawZero = true;
-                            if (cnt > 0)
-                                sawPos = true;
-                        }
-                    }
+    // 1) 最初の turn-added を待つ Promise
+    function waitForFirstTurnAdded(timeout = 15000) {
+        return new Promise((resolve) => {
+            const to = setTimeout(() => {
+                window.removeEventListener("message", onMsg, true);
+                resolve("timeout");
+            }, timeout);
+            const onMsg = (ev) => {
+                const d = ev?.data;
+                if (d && d.source === "cgtn" && d.type === "turn-added") {
+                    window.removeEventListener("message", onMsg, true);
+                    clearTimeout(to);
+                    resolve("turn-added");
                 }
-                else if (m.type === "attributes") {
-                    // スクロール高さの変化も idle 判定に効かせる
-                    const h = cgtnScrollStats().h;
-                    if (h !== lastH) {
-                        lastH = h;
-                        lastAt = performance.now();
-                    }
-                }
-            }
+            };
+            window.addEventListener("message", onMsg, true);
         });
-        mo.observe(root, { subtree: true, childList: true, attributes: true });
-        if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) {
-            return false; // 逆戻り/別タブ割込み
-        }
-        const now = performance.now();
+    }
+    let __buildGen = 0;
+    async function rebuildAndRenderSafely({ forceList = false } = {}) {
+        const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
+        const myGen = ++__buildGen;
+        setUiBusy(true); // ★ Loading.. 開始
         try {
-            // フェーズA：URL切替直後は「0 → 正」の連鎖を優先
-            //   - expectZeroFirst のときは 0 を一度見るまで A を継続
-            //   - 低ターンの小チャットでは 0 を見ずに >0 へ行くこともあるので許容
-            while (performance.now() - start < maxMs) {
-                if (cid && SH?.getChatId?.() && SH.getChatId() !== cid)
-                    return false; // 逆戻り/別タブ割込み
-                const now = performance.now();
-                if (expectZeroFirst) {
-                    // 「0 を一度見る」→ その後「>0 を見る」を狙う
-                    if (!sawZero) {
-                        // 0 を待つ間も timeout は進む
-                    }
-                    else if (sawPos) {
-                        // フェーズBへ
-                        break;
-                    }
-                }
-                else {
-                    // 0 を見ていなくても、すでに可視化（>0）されていれば B へ
-                    if (sawPos)
-                        break;
-                }
-                while (performance.now() - start < maxMs) {
-                    if (cid && SH?.getChatId?.() && SH.getChatId() !== cid) {
-                        return false;
-                    }
-                    const h = cgtnScrollStats().h;
-                    const cnt = cgtnCountTurns();
-                    if (cnt !== lastCnt || h !== lastH) {
-                        lastCnt = cnt;
-                        lastH = h;
-                        lastAt = performance.now();
-                    }
-                    if (performance.now() - lastAt >= idleMs) {
-                        return true; // 静穏
-                    }
-                    await new Promise((r) => setTimeout(r, tickMs));
-                }
-                // フェーズB：変化が idleMs 止まるのを待つ（安定化）
-                await new Promise((r) => setTimeout(r, tickMs));
+            // どちらか早い方（turn-added or ensureTurnsReady）
+            await Promise.race([
+                waitForFirstTurnAdded(15000),
+                LG.ensureTurnsReady?.(),
+            ]);
+            // もう一度だけ安定待ち
+            await LG.ensureTurnsReady?.();
+            // 競合キャンセル
+            if (myGen !== __buildGen)
+                return;
+            LG.rebuild?.();
+            if (myGen !== __buildGen)
+                return;
+            const kind = SH.getPageInfo?.()?.kind || "other";
+            const on = forceList || !!SH.getCFG?.()?.list?.enabled;
+            if (kind === "chat" && on) {
+                await LG.renderList?.(forceList);
             }
-            return false; // タイムアウト
         }
         finally {
-            try {
-                mo.disconnect();
-            }
-            catch { }
+            // ★ 処理完了（READYに戻る）
+            if (myGen === __buildGen)
+                setUiBusy(false);
         }
     }
-    // --- cgtnメッセージ受信（url-change / turn-added を一本化）---
+    // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
     (function bindCgtnMessageOnce() {
         if (window.__CGTN_MSG_BOUND__)
             return;
         window.__CGTN_MSG_BOUND__ = true;
-        let __lastCid = null; // 直近のchatId
-        let __debTo = 0; // デバウンス用タイマ
-        let __gen = 0; // 世代トークン（逆戻り防止）
-        let __pageInfo = { kind: "other", cid: "", hasTurns: false }; // 直近のページ情報
-        // 2026.1.22
+        let __lastCid = null;
+        let __debTo = 0;
+        let __gen = 0;
+        let __pageInfo = { kind: "other", cid: "", hasTurns: false };
         const onMessage = (ev) => {
             (async () => {
-                // ← async ラッパーで await が使えるように
                 const d = ev && ev.data;
                 if (!d || d.source !== "cgtn")
                     return;
                 const SH = window.CGTN_SHARED, LG = window.CGTN_LOGIC;
                 const kind = d.kind || "other";
                 const cidNow = d.cid || SH?.getChatId?.();
-                const fKind = d.fromKind || "other";
-                const fCid = d.fromCid || "";
                 __pageInfo = { kind, cid: cidNow || "", hasTurns: !!d.hasTurns };
                 try {
                     SH.setPageInfo?.(__pageInfo);
                 }
                 catch { }
-                // ログ（どこから→どこへ）
-                //        try {
-                //          console.debug('[cgtn] nav', `${fKind}:${fCid || '-'}`, '→', `${kind}:${cidNow || '-'}`, 'hasTurns=', !!d.hasTurns);
-                //        } catch {}
-                // --- 非チャット系：クリアのみ（ONならメッセージA）
                 if (kind === "home" ||
                     kind === "project" ||
                     kind === "other" ||
                     kind === "new") {
                     LG?.clearListPanelUI?.();
-                    try {
-                        if (SH.getCFG?.()?.list?.enabled) {
-                            window.CGTN_UI?.toast?.("ここにはチャットがありません（リストは表示できません）"); // メッセージA
-                        }
-                    }
-                    catch { }
+                    UI?.updateStatusDisplay?.("READY");
                     __lastCid = null;
                     __gen++;
                     return;
                 }
-                // ---- 既存チャット（/c/...）でイベントが来た場合 ----
                 if (d.type === "url-change" || d.type === "turn-added") {
                     const prev = __lastCid;
                     __lastCid = cidNow;
-                    const changed = prev !== null && cidNow !== prev;
                     const myGen = ++__gen;
-                    // 先にプレビューは畳む
                     try {
                         if (d.type === "url-change")
                             window.CGTN_PREVIEW?.hide?.("url-change");
                     }
                     catch { }
-                    // マスクをすばやくON（視覚フィードバック）
                     try {
                         setUiBusy?.(true);
                     }
                     catch { }
                     clearTimeout(__debTo);
-                    __debTo = setTimeout(() => {
+                    __debTo = window.setTimeout(() => {
                         requestAnimationFrame(() => {
                             (async () => {
                                 if (myGen !== __gen)
-                                    return; // 競合キャンセル
-                                // 一括待機＋rebuild＋必要ならrenderList（一覧OFFなら内部でスキップ）
-                                await rebuildAndRenderSafely({
-                                /* forceList:false */
-                                });
+                                    return;
+                                await rebuildAndRenderSafely({});
                             })()
-                                .catch((err) => console.warn("[cgtn] rebuildAndRenderSafely error:", err))
+                                .catch((err) => console.warn("[cgtn] rebuild error:", err))
                                 .finally(() => {
                                 try {
                                     setUiBusy?.(false);
@@ -260,13 +228,11 @@
                                 catch { }
                             });
                         });
-                    }, 80); // 軽デバウンス
+                    }, 80);
                 }
             })();
         };
-        // 2026.1.22
         window.addEventListener("message", onMessage, true);
-        // stop() で解除できるようにdisposerへ（デバウンスも止める）
         RUN.bag.add(() => {
             try {
                 if (__debTo)
@@ -280,33 +246,12 @@
             window.__CGTN_MSG_BOUND__ = false;
         });
     })();
-    // --- 自動同期フラグ（最小差分用） ---
-    // リスト開状態なら「チャット切替時」に中身だけ差し替える
-    const AUTO_SYNC_OPEN_LIST = true;
-    // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
     const USE_INJECT_URL_HOOK = true;
-    const URL_HOOK_EVENT = "cgtn:url-change";
-    // ========= 小さなユーティリティ =========
-    function inOwnUI(node) {
-        if (node?.closest?.("[data-cgtn-ui]"))
-            return true;
-        const nav = document.getElementById("cgpt-nav");
-        const list = document.getElementById("cgpt-list-panel");
-        return ((nav && (node === nav || nav.contains(node))) ||
-            (list && (node === list || list.contains(node))));
-    }
-    function _L() {
-        return (SH?.getLang?.() || "").toLowerCase().startsWith("en") ? "en" : "ja";
-    }
     // ========= 1) フォーカス系 =========
     function ensureFocusPark() {
-        // !!!!
         const el = document.getElementById("cgtn-focus-park");
         if (el instanceof HTMLButtonElement)
             return;
-        // let park = document.getElementById("cgtn-focus-park");!!!!
-        // if (park) return; !!!!
-        // park = document.createElement("button");
         const park = document.createElement("button");
         park.id = "cgtn-focus-park";
         park.type = "button";
@@ -315,47 +260,6 @@
             "position:fixed;left:-9999px;top:-9999px;width:0;height:0;opacity:0;pointer-events:none;";
         document.body.appendChild(park);
     }
-    /*
-    function installFocusStealGuard() {
-      const nav = document.getElementById("cgpt-nav");
-      const list = document.getElementById("cgpt-list-panel");
-      const inUI = (el) =>
-        !!(el && ((nav && nav.contains(el)) || (list && list.contains(el))));
-      let fromUI = false;
-  
-      document.addEventListener(
-        "mousedown",
-        (e) => {
-          fromUI = inUI(e.target);
-        },
-        { capture: true },
-      );
-      document.addEventListener(
-        "mouseup",
-        () => {
-          if (!fromUI) return;
-          fromUI = false;
-          try {
-            const sel = getSelection();
-            sel && sel.removeAllRanges();
-          } catch {}
-          const park = document.getElementById("cgtn-focus-park");
-          if (!park) return;
-          setTimeout(() => {
-            try {
-              park.focus({ preventScroll: true });
-            } catch {}
-          }, 0);
-          requestAnimationFrame(() => {
-            try {
-              park.focus({ preventScroll: true });
-            } catch {}
-          });
-        },
-        { capture: true },
-      );
-    }
-  */
     // 2026.1.22 解除できる形に置き換え
     function installFocusStealGuard() {
         const nav = document.getElementById("cgpt-nav");
@@ -722,10 +626,9 @@
         //    → プレビューボタンクラスに当たったときだけ更新
         let raf = 0;
         document.addEventListener("mousemove", (e) => {
-            const t = e.target; // !!!!
+            const t = e.target;
             if (!(t instanceof Element))
-                return; // !!!!
-            //const btn = e.target.closest?.(BTN_SEL); !!!!
+                return;
             const btn = t.closest?.(BTN_SEL);
             if (!btn)
                 return;
@@ -734,10 +637,9 @@
         }, true);
         // B) クリック：表示/非表示トグル（固定ON/OFF）
         document.addEventListener("click", (e) => {
-            const t = e.target; // !!!!
+            const t = e.target;
             if (!(t instanceof Element))
-                return; // !!!!
-            //const btn = e.target.closest?.(BTN_SEL); !!!!
+                return;
             const btn = t.closest?.(BTN_SEL);
             if (!btn)
                 return;
@@ -822,135 +724,8 @@
         // 初回も一度呼ぶ（初期描画）
         requestAnimationFrame(redraw); // 初期描画
     }
-    // ========= 5) URL変化でのクローズ・再描画 =========
-    function closeDockOnUrlChange() {
-        if (!USE_INJECT_URL_HOOK) {
-            // ここに既存の popstate/hashchange/setInterval(check, …) などを有効のまま
-            // インジェクト方式を使う場合は発火源が二重になるのでバイパス
-            let last = location.pathname + location.search;
-            // リスト開状態なら自動で中身を新チャットへ差し替える
-            const AUTO_SYNC_OPEN_LIST = true; // ← ここでON/OFFできる
-            const check = () => {
-                const cur = location.pathname + location.search;
-                if (cur === last)
-                    return;
-                last = cur;
-                window.CGTN_PREVIEW?.hide?.("url-change");
-                // ★ 開いている時だけ自動更新（閉じているなら何もしない）
-                if (AUTO_SYNC_OPEN_LIST && SH.isListOpen?.()) {
-                    try {
-                        const cid = SH.getChatId?.();
-                        // pins → 新チャットへ切替（引数省略版でもOK）
-                        if (cid)
-                            LG?.hydratePinsCache?.(cid);
-                        else
-                            LG?.hydratePinsCache?.();
-                        LG?.rebuild?.("auto:chat-switch");
-                        LG?.renderList?.(true);
-                    }
-                    catch (e) {
-                        console.debug("[auto-sync] chat switch update failed:", e);
-                    }
-                }
-                // ※ 閉じている時は描画しない＝無駄コストをかけない
-            };
-            window.addEventListener("popstate", check);
-            window.addEventListener("hashchange", check);
-            // SPA用: pushState / replaceState をフック
-            const _push = history.pushState;
-            history.pushState = function (...args) {
-                const ret = _push.apply(this, args);
-                try {
-                    check();
-                }
-                catch { }
-                return ret;
-            };
-            const _repl = history.replaceState;
-            history.replaceState = function (...args) {
-                const ret = _repl.apply(this, args);
-                try {
-                    check();
-                }
-                catch { }
-                return ret;
-            };
-        }
-    }
     // 基準線の表示ON/OFF 設定画面より受信
     // === options.html からの即時反映メッセージを受ける ===
-    /* !!!!
-    try {
-      chrome.runtime.onMessage.addListener((msg) => {
-        if (!msg || !msg.type) return;
-  
-        // ここから追加：② タイトル問い合わせに応答（取得できなければ空文字）
-        if (msg.type === "cgtn:get-chat-meta") {
-          try {
-            const chatId = SH.getChatId?.() || "";
-            const title = SH.getChatTitle?.() || ""; // document.title ベース
-            sendResponse({ ok: true, chatId, title });
-          } catch (e) {
-            sendResponse({ ok: false, error: String(e) });
-          }
-          return true; // async-friendly
-        }
-  
-        // ここから追加：② 現在チャットの集計：ターン数／アップありターン数／DLありターン数
-        // ここは使っていない筈
-        if (msg.type === "cgtn:get-chat-stats") {
-          try {
-            const ST = window.ST || {};
-            const rows = Array.isArray(ST.all) ? ST.all : [];
-            const chatId = SH.getChatId?.() || "";
-            const turns = rows.length;
-            let uploads = 0,
-              downloads = 0;
-            rows.forEach((article) => {
-              const up = article.querySelector(
-                '[data-testid*="attachment"], .text-token-file, [data-filename]'
-              )
-                ? 1
-                : 0;
-              const dl = article.querySelector(
-                'a[download], button[aria-label*="Download"], [data-testid*="download"]'
-              )
-                ? 1
-                : 0;
-              uploads += up;
-              downloads += dl;
-            });
-            sendResponse({ ok: true, chatId, turns, uploads, downloads });
-          } catch (e) {
-            sendResponse({ ok: false, error: String(e) });
-          }
-          return true;
-        }
-  
-        if (msg.type === "cgtn:pins-deleted") {
-          // 表示中のチャットなら一覧をリフレッシュ
-          const cid = SH.getChatId?.();
-          if (!cid || (msg.chatId && msg.chatId !== cid)) return;
-          LG.hydratePinsCache?.(cid);
-          //const wasOpen = !!window.CGTN_SHARED?.getCFG?.()?.list?.enabled;
-          //if (wasOpen) window.CGTN_LOGIC?.renderList?.(false);
-          // isListOpen === true のときだけ描画（閉じていれば何もしない）
-          //　設定画面で付箋データが削除されたとき、リストを更新する処理
-          if (SH.isListOpen?.()) window.CGTN_LOGIC?.renderList?.(false);
-        }
-        if (msg.type === "cgtn:viz-toggle") {
-          const on = !!msg.on;
-          SH.toggleViz?.(on); // 基準線の実表示を切替
-          const cb = document.querySelector(
-            "#cgpt-viz"
-          ) as HTMLInputElement | null;
-  
-          if (cb) cb.checked = on; // ナビパネルのチェックを同期
-          SH.saveSettingsPatch?.({ showViz: on }); // 状態も保存
-        }
-      });
-    } catch {}
-  */
     try {
         chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             if (!msg || !msg.type)
@@ -1005,23 +780,6 @@
         });
     }
     catch { }
-    // 2026.1.22
-    function watchChatIdChange() {
-        let prev = null;
-        const id = window.setInterval(() => {
-            const cur = SH.getChatId?.();
-            if (cur && cur !== prev) {
-                prev = cur;
-                //チャットを切り替えたらリストを閉じる処理
-                SH.saveSettingsPatch({ list: { enabled: false } });
-                if (!AUTO_SYNC_OPEN_LIST) {
-                    SH.saveSettingsPatch({ list: { enabled: false } });
-                }
-            }
-        }, 800);
-        // ★停止できるように disposer を登録
-        RUN.bag.add(() => window.clearInterval(id));
-    }
     // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
     function injectUrlChangeHook() {
         try {
@@ -1038,10 +796,13 @@
             s.id = "cgtn-url-hook";
             s.src = url;
             s.async = false; // 実行順の安定化
+            // 2026.01.26
+            /*
             s.onload = () => {
-                // 読み込み完了後に掃除したい場合はここで remove する（実行済みだからOK）
-                // s.remove();
+              // 読み込み完了後に掃除したい場合はここで remove する（実行済みだからOK）
+              // s.remove();
             };
+      */
             s.onerror = (e) => console.warn("[cgtn] inject_url_hook failed:", e);
             (document.documentElement || document.head || document.body).appendChild(s);
         }
@@ -1049,329 +810,9 @@
             console.warn("injectUrlChangeHook failed", e);
         }
     }
-    let _lastUrlSig = "";
-    let _navSeq = 0; // 遷移の世代カウンタ
-    function handleUrlChangeMessage() {
-        const cur = location.pathname + location.search;
-        if (cur === _lastUrlSig) {
-            return;
-        }
-        _lastUrlSig = cur;
-        const mySeq = ++_navSeq;
-        try {
-            const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
-            window.CGTN_PREVIEW?.hide?.("url-change");
-            // 1) まず確実に閉じて残像を消す
-            LG?.setListEnabled?.(false);
-            LG?.clearListPanelUI?.();
-            // 2) 旧mainを監視していたObserverは切る（後述③のensureが再アタッチ）
-            LG?.detachTurnObserver?.();
-            // 3) すぐ再アタッチしてもOK（idempotent：後述③）
-            LG?.installAutoSyncForTurns?.();
-            // 4) バッジとタイトルは空に
-            LG?.updatePinOnlyBadge?.();
-            LG?.updateListChatTitle?.();
-            // （任意の追加）“一覧チェックはONのまま”なら、描画準備完了後に自動再オープン★★★★
-            // ※ 自動再構築はここではせず、setListEnabled(true) に任せる
-            const wantReopen = !!SH.getCFG?.().list?.enabled;
-            if (wantReopen) {
-                waitForChatMain(() => {
-                    if (mySeq === _navSeq)
-                        LG?.setListEnabled?.(true);
-                });
-            }
-        }
-        catch (e) {
-            console.warn("[cgtn:url] close-on-nav failed", e);
-        }
-    }
-    // 成功したら onReady、タイムアウトしたら onIdle を呼ぶ
-    /* UNUSED */
-    //function waitForChatMain(onReady, onIdle, timeout = 4000) { !!!!
-    function waitForChatMain(onReady, onIdle, timeout = 4000) {
-        const started = performance.now();
-        const ok = () => {
-            onReady?.();
-        };
-        const idle = () => {
-            onIdle?.();
-        };
-        const check = () => {
-            const main = document.querySelector("main");
-            if (main && main.querySelector('[data-testid*="conversation"], article'))
-                return ok();
-            if (performance.now() - started < timeout)
-                return setTimeout(check, 200);
-            idle();
-        };
-        check();
-    }
-    /* UNUSED */
-    // <article>が出てきた瞬間に一度だけ実行
-    function watchFirstArticleOnce(cb) {
-        const main = document.querySelector("main");
-        if (!main)
-            return;
-        const mo = new MutationObserver(() => {
-            if (main.querySelector('[data-testid*="conversation"], article')) {
-                mo.disconnect();
-                cb?.();
-            }
-        });
-        mo.observe(main, { childList: true, subtree: true });
-    }
-    //  let _turnObs = null;
-    //  let _observedRoot = null;
-    //  CGTN_LOGIC.detachTurnObserver = function(){
-    let _turnObs = null;
-    let _observedRoot = null;
-    LG.detachTurnObserver = function () {
-        try {
-            _turnObs?.disconnect();
-        }
-        catch { }
-        _turnObs = null;
-        _observedRoot = null;
-    };
-    // ========= リスト表示中の「ターン追加」自動更新（MOは1本のみ） =========
-    //  function installAutoSyncForTurns(){
-    window.CGTN_LOGIC.installAutoSyncForTurns =
-        function installAutoSyncForTurns() {
-            const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
-            // 自作UI除外（無限ループ防止）
-            const inOwnUI = (node) => {
-                if (!node || node.nodeType !== 1)
-                    return false;
-                return (node.closest?.("[data-cgtn-ui]") ||
-                    document.getElementById("cgpt-nav")?.contains(node) ||
-                    document.getElementById("cgpt-list-panel")?.contains(node));
-            };
-            const root = document.querySelector("main") || document.body;
-            if (_observedRoot === root && _turnObs)
-                return; // 既に最新を監視中
-            // 旧rootを解除 → 新rootに張替え
-            window.CGTN_LOGIC.detachTurnObserver();
-            let to = 0;
-            const kick = () => {
-                if (!SH.isListOpen?.())
-                    return; // 閉じている間は完全ノーオペ
-                clearTimeout(to);
-                to = setTimeout(() => {
-                    try {
-                        LG.rebuild?.();
-                        LG.renderList?.(true);
-                    }
-                    catch (e) { }
-                }, 300); // 300msデバウンス
-            };
-            /* !!!!
-          _turnObs = new MutationObserver((muts) => {
-            // リストが閉じていてもナビの ST 更新が必要なので常に監視する '25.11.20
-            //if (!SH.isListOpen?.()) return;
-            for (const m of muts) {
-              if (inOwnUI(m.target)) continue;
-      
-              // childList 追加・削除で article / role を検知
-              if (m.type === "childList") {
-                const arr = [...m.addedNodes, ...m.removedNodes];
-                const hit = arr.some(
-                  (n) =>
-                    n?.nodeType === 1 &&
-                    (n.matches?.("article,[data-message-author-role]") ||
-                      n.querySelector?.("article,[data-message-author-role]"))
-                );
-                if (hit) {
-                  kick();
-                  break;
-                }
-              } else if (m.type === "characterData" || m.type === "attributes") {
-                // ストリーミングの文字更新や属性変更でも近傍が会話ならトリガ
-                const host =
-                  m.target?.nodeType === 3 ? m.target.parentElement : m.target;
-                if (host?.closest?.("article,[data-message-author-role]")) {
-                  kick();
-                  break;
-                }
-              }
-            }
-          });
-      */
-            _turnObs = new MutationObserver((muts) => {
-                for (const m of muts) {
-                    if (inOwnUI(m.target))
-                        continue;
-                    const sel = "article,[data-message-author-role]";
-                    // childList 追加・削除で article / role を検知
-                    if (m.type === "childList") {
-                        const arr = [...m.addedNodes, ...m.removedNodes];
-                        const hit = arr.some((n) => {
-                            if (!(n instanceof Element))
-                                return false; // ★ここが肝
-                            return n.matches(sel) || !!n.querySelector(sel);
-                        });
-                        if (hit) {
-                            kick();
-                            break;
-                        }
-                    }
-                    else if (m.type === "characterData" || m.type === "attributes") {
-                        // ストリーミングの文字更新や属性変更でも近傍が会話ならトリガ
-                        const host = m.target.nodeType === 3 ? m.target.parentElement : m.target;
-                        if (host instanceof Element && host.closest(sel)) {
-                            // ★ここ
-                            kick();
-                            break;
-                        }
-                    }
-                }
-            });
-            try {
-                _turnObs.observe(root, {
-                    childList: true,
-                    subtree: true,
-                    characterData: false,
-                    attributes: false,
-                });
-                _observedRoot = root;
-            }
-            catch (e) {
-                console.warn("[auto-sync] observe failed", e);
-            }
-        };
-    // 1) 最初の turn-added を待つ Promise
-    function waitForFirstTurnAdded(timeout = 15000) {
-        return new Promise((resolve) => {
-            const to = setTimeout(() => {
-                window.removeEventListener("message", onMsg, true);
-                resolve("timeout");
-            }, timeout);
-            const onMsg = (ev) => {
-                const d = ev?.data;
-                if (d && d.source === "cgtn" && d.type === "turn-added") {
-                    window.removeEventListener("message", onMsg, true);
-                    clearTimeout(to);
-                    resolve("turn-added");
-                }
-            };
-            window.addEventListener("message", onMsg, true);
-        });
-    }
-    // 画面操作を一時的にブロック
-    /* !!!!
-    function setUiBusy(busy = true) {
-      const ids = ["cgpt-nav", "cgpt-list-panel"]; // 必要なら増やす
-      for (const id of ids) {
-        const host = document.getElementById(id);
-        if (!host) continue;
-  
-        // CSS-only 無効化
-        host.classList.toggle("loading", busy);
-  
-        // 半透明マスク（見た目も分かりやすく）
-        let mask = host.querySelector(":scope > .cgtn-mask");
-        if (busy) {
-          if (!mask) {
-            mask = document.createElement("div");
-            mask.className = "cgtn-mask";
-            Object.assign(mask.style, {
-              position: "absolute",
-              inset: 0,
-              background: "rgba(255,255,255,0.55)",
-              backdropFilter: "blur(2px)",
-              cursor: "wait",
-              zIndex: 9999,
-              pointerEvents: "auto",
-            });
-            // relative が無いと被せられない
-            if (getComputedStyle(host).position === "static")
-              host.style.position = "relative";
-            host.appendChild(mask);
-          }
-        } else {
-          mask?.remove();
-        }
-      }
-    }
-  */
-    // 画面操作を一時的にブロック
-    function setUiBusy(busy = true) {
-        const ids = ["cgpt-nav", "cgpt-list-panel"]; // 必要なら増やす
-        for (const id of ids) {
-            const host = document.getElementById(id);
-            if (!host)
-                continue;
-            // CSS-only 無効化
-            host.classList.toggle("loading", busy);
-            // 半透明マスク（見た目も分かりやすく）
-            let mask = host.querySelector(":scope > .cgtn-mask");
-            if (busy) {
-                if (!mask) {
-                    mask = document.createElement("div");
-                    mask.className = "cgtn-mask";
-                    Object.assign(mask.style, {
-                        position: "absolute",
-                        inset: "0",
-                        background: "rgba(255,255,255,0.55)",
-                        backdropFilter: "blur(2px)",
-                        cursor: "wait",
-                        zIndex: "9999",
-                        pointerEvents: "auto",
-                    });
-                    // relative が無いと被せられない
-                    if (getComputedStyle(host).position === "static") {
-                        host.style.position = "relative";
-                    }
-                    host.appendChild(mask);
-                }
-            }
-            else {
-                mask?.remove();
-            }
-        }
-    }
-    // CSS（どこかで1回注入）
-    (function ensureBusyStyle() {
-        if (document.getElementById("cgtn-busy-style"))
-            return;
-        const st = document.createElement("style");
-        st.id = "cgtn-busy-style";
-        st.textContent = `
-      #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none; opacity: .6; cursor: not-allowed; }
-    `;
-        document.head.appendChild(st);
-    })();
-    let __buildGen = 0;
-    async function rebuildAndRenderSafely({ forceList = false } = {}) {
-        const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
-        const myGen = ++__buildGen;
-        setUiBusy(true);
-        try {
-            // どちらか早い方（turn-added or ensureTurnsReady）
-            await Promise.race([
-                waitForFirstTurnAdded(15000),
-                LG.ensureTurnsReady?.(),
-            ]);
-            // もう一度だけ安定待ち
-            await LG.ensureTurnsReady?.();
-            // 競合キャンセル
-            if (myGen !== __buildGen)
-                return;
-            LG.rebuild?.();
-            if (myGen !== __buildGen)
-                return;
-            const kind = SH.getPageInfo?.()?.kind || "other";
-            const on = forceList || !!SH.getCFG?.()?.list?.enabled;
-            if (kind === "chat" && on) {
-                await LG.renderList?.(forceList);
-            }
-        }
-        finally {
-            if (myGen === __buildGen)
-                setUiBusy(false);
-        }
-    }
     // ========= 9) 初期セットアップ ========= '25.12.6 改
     async function initialize() {
+        console.log("initialize");
         // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
         await new Promise((resolve) => setTimeout(resolve, 1500));
         // 設定ロード & v2 ストレージ移行
@@ -1410,6 +851,9 @@
         // ★ 初回 rebuild は「UI とイベントが一通り整ったあと」で、
         //   かつ ChatGPT 本体の初期化とも競合しないよう 1.2 秒遅らせて実行 '25.12.6
         setTimeout(() => {
+            // ★ 修正：勝手にリストが開くのを防止
+            //   forceList: true を false に変更しました
+            //    rebuildAndRenderSafely({ forceList: true }).catch((e) =>
             rebuildAndRenderSafely({ forceList: true }).catch((e) => console.warn("[init-delayed] rebuildAndRenderSafely failed", e));
         }, 1200);
         // viewport 変化でナビ位置クランプ
@@ -1418,18 +862,6 @@
         });
         window.addEventListener("orientationchange", () => UI.clampPanelWithinViewport());
     }
-    // ========= 10) DOM Ready =========
-    /*
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", initialize, { once: true });
-    } else {
-      initialize();
-      // 付箋バッジ
-      window.CGTN_LOGIC?.updatePinOnlyBadge?.();
-      // チャット名
-      window.CGTN_LOGIC.updateListChatTitle?.();
-    }
-  */
     // 2026.1.22
     const boot = () => {
         // UI（ヘッダー）だけは常に出す：復帰手段
@@ -1532,5 +964,15 @@
         stop: stopApp,
         isRunning: () => RUN.running,
         isIdle: () => RUN.idle,
+    };
+    let _turnObs = null;
+    let _observedRoot = null;
+    LG.detachTurnObserver = function () {
+        try {
+            _turnObs?.disconnect();
+        }
+        catch { }
+        _turnObs = null;
+        _observedRoot = null;
     };
 })();
