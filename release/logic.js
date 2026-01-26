@@ -1997,6 +1997,7 @@
         const curList = cfg.list || {};
         const panel = document.getElementById("cgpt-list-panel");
         if (on) {
+            console.log("setListEnabled on");
             // --- ON 時：必ず enabled:true / pinOnly:false にして保存 ---
             const nextList = {
                 ...curList,
@@ -2035,6 +2036,7 @@
             }));
         }
         else {
+            console.log("setListEnabled off");
             // --- OFF 時：enabled:false / pinOnly:false にして保存 ---
             const nextList = {
                 ...curList,

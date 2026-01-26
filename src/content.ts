@@ -895,6 +895,26 @@
     }
   }
 
+  // ★追加：ページ情報を能動的に初期化するヘルパー 2026.01.26
+  // ロード時OFF→ONの場合、onMessageによる通知がまだ来ていない（または逃した）可能性があるため
+  function manualInitPageInfo() {
+    try {
+      const p = location.pathname || "/";
+      let kind = "other";
+      if (/^\/c\/[^/]+$/.test(p)) kind = "chat";
+      else if (p === "/" || p === "/new") kind = "new"; // or home
+
+      let cid = "";
+      const m = p.match(/\/c\/([^/?#]+)/);
+      if (m) cid = m[1];
+
+      // SHにセット（onMessageが来るまでの仮の値として機能する）
+      SH.setPageInfo?.({ kind, cid, hasTurns: true });
+    } catch (e) {
+      console.warn("[cgtn] manualInitPageInfo failed", e);
+    }
+  }
+
   // ========= 9) 初期セットアップ ========= '25.12.6 改
   async function initialize() {
     console.log("initialize");
@@ -933,6 +953,9 @@
       injectUrlChangeHook();
     }
 
+    // ★ここで手動初期化を追加（ロード時OFF対策） 2026.01.26
+    manualInitPageInfo();
+
     // ゴミになったゼロ件レコードの掃除
     try {
       SH.cleanupZeroPinRecords?.();
@@ -944,7 +967,7 @@
       // ★ 修正：勝手にリストが開くのを防止
       //   forceList: true を false に変更しました
       //    rebuildAndRenderSafely({ forceList: true }).catch((e) =>
-      rebuildAndRenderSafely({ forceList: true }).catch((e) =>
+      rebuildAndRenderSafely({ forceList: false }).catch((e) =>
         console.warn("[init-delayed] rebuildAndRenderSafely failed", e),
       );
     }, 1200);
