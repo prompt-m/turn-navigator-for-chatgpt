@@ -213,6 +213,8 @@ input:checked + .slider:before {
 .cgpt-nav-group[data-role="tools"] {#cgpt-list-btn:hover{background:#EDEDED;color:#000;}} 
 .cgpt-nav-group[data-role="others"] {.cgtn-pill-btn:hover{background:#EDEDED;color:#000;}} 
 
+.cgpt-nav-group[data-role="tools"] {#cgpt-list-btn.active:hover{background:#1BE31B;color:#000;}} 
+
 /* ピル型ボタン */
 .cgtn-pill-btn {
   /* ★修正: 幅を100pxにしたので、文字サイズを12pxに上げても大丈夫 */
@@ -237,10 +239,9 @@ input:checked + .slider:before {
 }
 
 #cgpt-list-btn.active {
-  background: #fff;
-  color: #222;
+  background: #0c640d;
+  color: #fff;
   font-weight: 700;
-  border-color: #fff;
 }
 
 /* 2列グリッド */
@@ -538,15 +539,21 @@ input:checked + .slider:before {
     // ★修正: テキストをそのまま表示 (Loading.. や 999/999 対応)
     NS.updateStatusDisplay = (text, subLabel) => {
         const screen = document.getElementById("cgtn-status-monitor");
-        if (!screen)
+        console.log("updateStatusDisplay screen", screen);
+        if (!screen) {
+            console.log("updateStatusDisplay return1");
             return;
+        }
         const cb = document.getElementById("cgtn-power-toggle");
-        if (cb && !cb.checked)
+        if (cb && !cb.checked) {
+            console.log("updateStatusDisplay return2");
             return;
+        }
         // Loading... の場合はクラスを付けて少し小さくするなどの調整も可能
         const isLong = text.length > 8;
         const cls = isLong ? "screen-value loading" : "screen-value";
         screen.innerHTML = `<div class="${cls}">${text}</div>`;
+        console.log("updateStatusDisplay cls:", cls, " text:", text);
     };
     function setIdleMode(idle) {
         const box = document.getElementById("cgpt-nav");

@@ -1,6 +1,6 @@
 // logic.js
 (() => {
-  const UI = window.CGTN_UI;
+  //  const UI = window.CGTN_UI;
   const SH = window.CGTN_SHARED;
   const NS = (window.CGTN_LOGIC = window.CGTN_LOGIC || {});
 
@@ -40,6 +40,81 @@
     );
   }
 
+  // ★追加: ステータス更新 (現在地 / 総数) 2026.01.27
+  NS.updateStatus = function () {
+    const total = NS.ST?.all?.length || 0;
+    // ★ここを修正: 使う瞬間に window.CGTN_UI を参照する
+    const ui = window.CGTN_UI;
+    if (total === 0) {
+      // 0件または停止中は状態に応じた表示
+      const isRunning = (window as any).CGTN_APP?.isRunning?.();
+      ui?.updateStatusDisplay?.(isRunning ? "READY" : "OFF");
+      console.log("updateStatus2 isrunning:", isRunning);
+      return;
+    }
+
+    // 現在のターン位置を計算して表示 (例: "5 / 12")
+    const sc = getTrueScroller();
+    const current = calcCurrentTurnIndex(sc);
+    ui?.updateStatusDisplay?.(`${current} / ${total}`);
+    console.log("updateStatus3 current:", current, " total:", total);
+  };
+
+  // 現在見ているターン番号を計算
+  function calcCurrentTurnIndex(sc) {
+    if (!sc || !NS.ST.all.length) return 0;
+
+    // 画面中央あたりを基準線とする
+    const cfg = SH.getCFG() || {};
+    const bias = Number(cfg.centerBias) || 0.5;
+    const viewportH = sc.clientHeight || window.innerHeight;
+    const scrollTop = sc.scrollTop || 0;
+    const baselineY = scrollTop + viewportH * bias;
+
+    let found = 0;
+    for (let i = 0; i < NS.ST.all.length; i++) {
+      const el = NS.ST.all[i];
+      // articleTopは「その要素をTopに持ってくるためのscrollTop」を返すので
+      // 要素の絶対Y座標 ≈ articleTop(sc, el) とみなせます
+      const y = articleTop(sc, el);
+
+      // 基準線より上にあるなら「通過済み」
+      if (y <= baselineY + 10) {
+        found = i + 1;
+      } else {
+        break; // ソート済みなのでこれ以降は見なくていい
+      }
+    }
+    return found || 1;
+  }
+
+  // スクロール監視 (数値更新用)
+  function bindScrollSpy() {
+    const sc = getTrueScroller();
+    if (!sc) return;
+
+    const handler = () => {
+      // 負荷軽減のため描画フレームに合わせて間引く
+      if (NS._spyRaf) return;
+      NS._spyRaf = requestAnimationFrame(() => {
+        NS._spyRaf = null;
+        NS.updateStatus();
+      });
+    };
+
+    // 重複登録防止
+    if (NS._scrollSpy && NS._scrollSpy.el !== sc) {
+      try {
+        NS._scrollSpy.el.removeEventListener("scroll", NS._scrollSpy.fn);
+      } catch {}
+      NS._scrollSpy = null;
+    }
+    if (!NS._scrollSpy) {
+      sc.addEventListener("scroll", handler, { passive: true });
+      NS._scrollSpy = { el: sc, fn: handler };
+    }
+  }
+
   // ★チャット別ピン・キャッシュ
   let _pinsCache = null; // { [turnId]: true }
   NS._pinsCache = _pinsCache; // デバッグ用
@@ -72,7 +147,7 @@
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   }
-
+  /*
   function getTrueScroller() {
     if (NS._scroller && document.body.contains(NS._scroller))
       return NS._scroller;
@@ -95,6 +170,53 @@
         }
       }
     }
+    NS._scroller = document.scrollingElement || document.documentElement;
+    return NS._scroller;
+  }
+*/
+  // ★差し替え: Universal版のスクロール特定ロジック
+  function isScrollable(el) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (!/(auto|scroll)/.test(style.overflowY)) return false;
+    if (style.display === "none") return false;
+    if (style.overflowY === "hidden" || style.overflowY === "visible")
+      return false;
+    return el.scrollHeight > el.clientHeight + 1;
+  }
+
+  function getTrueScroller() {
+    // 1) 特定済みならキャッシュを返す
+    if (NS._scroller && document.body.contains(NS._scroller))
+      return NS._scroller;
+
+    // 2) 会話要素の親を辿ってスクロール要素を探す
+    const clue =
+      document.querySelector("main article") ||
+      document.querySelector("main [data-message-author-role]") ||
+      document.querySelector("article") ||
+      document.querySelector("[data-message-author-role]");
+
+    if (clue) {
+      // ★修正: 型を Node | null に明示する
+      let node: Node | null = clue;
+      while (node && node !== document.body) {
+        node = node.parentNode;
+        if (node instanceof HTMLElement && isScrollable(node)) {
+          NS._scroller = node;
+          return node;
+        }
+      }
+    }
+
+    // 3) main要素自体
+    const main = document.querySelector("main");
+    if (main && isScrollable(main)) {
+      NS._scroller = main;
+      return main;
+    }
+
+    // 4) 最後の砦
     NS._scroller = document.scrollingElement || document.documentElement;
     return NS._scroller;
   }
@@ -1220,6 +1342,10 @@
 
     // デバッグ公開
     NS.ST = ST;
+
+    // ★追加: スクロール監視を開始し、ステータスを即時更新 2026.1.27
+    bindScrollSpy();
+    NS.updateStatus();
   }
 
   //ダウンロード文抽出ヘルパ（本文・画像・不明の3分岐）
@@ -2613,7 +2739,10 @@
       const cid = cev.detail?.chatId || SH.getChatId?.();
       if (cid) hydratePinsCache?.(cid);
       if (SH.isListOpen?.()) NS.renderList?.(true);
-      UI?.toast?.("保存に失敗しました（容量または通信エラー）", "error");
+      window.CGTN_UI?.toast?.(
+        "保存に失敗しました（容量または通信エラー）",
+        "error",
+      );
     } catch {}
   });
 

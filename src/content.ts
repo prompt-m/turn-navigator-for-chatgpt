@@ -93,11 +93,17 @@
     if (busy) {
       UI?.updateStatusDisplay?.("Loading..");
     } else {
-      // アプリ停止中(OFF)ならREADYに戻さずOFFのままにする
-      if (RUN.idle) return;
-
-      // 完了時は "READY" (または 999/999 等に変更可能)
-      UI?.updateStatusDisplay?.("READY");
+      if (RUN.idle) {
+        // 完了時は "READY" (または 999/999 等に変更可能)
+        UI?.updateStatusDisplay?.("OFF");
+      } else {
+        // ★ READYではなく、現在位置/総数を表示させる 2026.01.27
+        if (typeof LG.updateStatus === "function") {
+          LG.updateStatus();
+        } else {
+          UI?.updateStatusDisplay?.("READY");
+        }
+      }
     }
   }
 
@@ -175,6 +181,20 @@
       const on = forceList || !!SH.getCFG?.()?.list?.enabled;
       if (kind === "chat" && on) {
         await LG.renderList?.(forceList);
+      }
+    } catch (e) {
+      // 2026.01.27
+      console.warn("List load failed", e);
+
+      // ★追加箇所: 失敗したら一覧をOFFに戻す
+      if (forceList) {
+        LG?.setListEnabled?.(false);
+        // UI側のチェックボックスも見た目を戻す
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) {
+          chk.checked = false;
+          chk.dispatchEvent(new Event("change"));
+        }
       }
     } finally {
       // ★ 処理完了（READYに戻る）
@@ -1020,7 +1040,20 @@
     try {
       await initialize();
 
-      // ★復帰時：Idle前の一覧状態があればそれ、なければ設定値
+      // 復帰時は常に一覧OFFで開始する
+      try {
+        LG?.setListEnabled?.(false); // 常にOFF
+
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) chk.checked = false;
+      } catch {}
+
+      try {
+        LG?.updatePinOnlyBadge?.();
+        LG?.updateListChatTitle?.();
+      } catch {}
+
+      /*
       try {
         const enabled =
           RUN.prevListEnabled !== null
@@ -1037,8 +1070,11 @@
         LG?.updatePinOnlyBadge?.();
         LG?.updateListChatTitle?.();
       } catch {}
+*/
     } catch (e) {
       console.warn("[cgtn] start failed", reason, e);
+      // 起動失敗時も念のためOFF 2026.01.26
+      LG?.setListEnabled?.(false);
     }
   }
 
