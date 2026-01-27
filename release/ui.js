@@ -136,23 +136,44 @@ input:checked + .slider:before {
 /* デジタルスクリーン (数値・状態表示) */
 .digital-screen {
   text-align: right;
-  height: 18px;
+  /* height: 18px; ←高さを固定せず、中身なりに伸ばす */
+  min-height: 18px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   pointer-events: none;
-  flex: 1; /* 残りのスペースを埋める */
-  overflow: hidden;
+  flex: 1;
+  /* overflow: hidden; ←縦に積むのではみ出し防止は解除 */
+  margin-left: 2px;
 }
 .digital-screen .screen-value {
-  /* ★修正: 12pxで見やすく。桁が多くても収まるように */
   font-size: 12px; 
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
+  
+  /* ★修正: 縦積みに変更 */
+  display: flex;
+  flex-direction: column; /* 縦並び */
+  align-items: center;  /* 中央寄せ */
+  justify-content: center;
+  line-height: 0.9;       /* 行間を詰める */
 }
-/* ローディング中は少し小さくしても良いかも */
 .digital-screen .screen-value.loading { font-size: 10px; opacity: 0.8; }
+
+/* ★2段組み用スタイル */
+.digital-screen .screen-value .curr {
+  font-size: 15px; /* 現在地を大きく */
+  font-weight: 800;
+  margin-bottom: 1px;
+}
+.digital-screen .screen-value .sub {
+  font-size: 10px; /* 総数は小さく */
+  opacity: 0.75;
+  font-weight: 600;
+  display: flex;
+  gap: 1px;
+}
 
 .digital-screen .off-text { 
   color: #aaa; font-size: 12px; font-weight: 600; 
@@ -536,24 +557,29 @@ input:checked + .slider:before {
             label.title = cb.checked ? T("tipOff") : T("tipOn");
         }
     }
-    // ★修正: テキストをそのまま表示 (Loading.. や 999/999 対応)
+    // ★修正: "数字 / 数字" のパターンならHTMLタグで装飾する
     NS.updateStatusDisplay = (text, subLabel) => {
         const screen = document.getElementById("cgtn-status-monitor");
-        console.log("updateStatusDisplay screen", screen);
-        if (!screen) {
-            console.log("updateStatusDisplay return1");
+        if (!screen)
             return;
-        }
         const cb = document.getElementById("cgtn-power-toggle");
-        if (cb && !cb.checked) {
-            console.log("updateStatusDisplay return2");
+        if (cb && !cb.checked)
             return;
+        let content = text;
+        // 正規表現で "数字 / 数字" を検出
+        const m = text.match(/^(\d+)\s*\/\s*(\d+)$/);
+        if (m) {
+            // ★修正: 2段組み（上が現在値、下が / 総数）
+            content = `
+        <div class="curr">${m[1]}</div>
+        <div class="sub">
+          <span class="sep">/</span><span class="total">${m[2]}</span>
+        </div>`;
         }
-        // Loading... の場合はクラスを付けて少し小さくするなどの調整も可能
+        // Loading... の場合はクラスを付けて文字サイズ調整
         const isLong = text.length > 8;
         const cls = isLong ? "screen-value loading" : "screen-value";
-        screen.innerHTML = `<div class="${cls}">${text}</div>`;
-        console.log("updateStatusDisplay cls:", cls, " text:", text);
+        screen.innerHTML = `<div class="${cls}">${content}</div>`;
     };
     function setIdleMode(idle) {
         const box = document.getElementById("cgpt-nav");
