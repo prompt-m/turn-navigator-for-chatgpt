@@ -38,7 +38,7 @@
         if (total === 0) {
             // 0件または停止中は状態に応じた表示
             const isRunning = window.CGTN_APP?.isRunning?.();
-            ui?.updateStatusDisplay?.(isRunning ? "READY" : "OFF");
+            ui?.updateStatusDisplay?.(isRunning ? "Loading..." : "OFF");
             console.log("updateStatus2 isrunning:", isRunning);
             return;
         }
@@ -2631,6 +2631,58 @@
         catch (e) {
             console.warn("[auto-sync] observe failed", e);
         }
+    };
+    // ============================================================
+    // ★追加: 簡易デバッグロガー
+    // ============================================================
+    NS.logs = [];
+    // ログ追加
+    NS.logError = function (msg, err) {
+        const time = new Date().toLocaleTimeString();
+        const text = err ? String(err.message || err) : "";
+        const stack = err ? String(err.stack || "") : "";
+        const logLine = `[${time}] ${msg}\n${text}\n${stack}\n----------------\n`;
+        console.error("[CGTN]", msg, err); // コンソールにも出す
+        NS.logs.push(logLine);
+        // エラー時はトーストも出す
+        window.CGTN_UI?.toast?.(`Error: ${msg}`, "error");
+    };
+    // ログ表示（簡易モーダル）
+    NS.showLogs = function () {
+        let box = document.getElementById("cgtn-log-viewer");
+        if (!box) {
+            box = document.createElement("div");
+            box.id = "cgtn-log-viewer";
+            // 黒背景のログ画面スタイル
+            box.style.cssText =
+                "position:fixed;inset:20px;z-index:999999;background:rgba(0,0,0,0.95);color:#0f0;font-family:monospace;padding:10px;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 0 20px #000;";
+            box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px;">
+          <strong style="color:#fff">Debug Logs</strong>
+          <div>
+            <button id="cgtn-log-copy" style="margin-right:10px;cursor:pointer;">Copy</button>
+            <button id="cgtn-log-close" style="cursor:pointer;">Close</button>
+          </div>
+        </div>
+        <textarea id="cgtn-log-body" style="flex:1;background:transparent;color:#0f0;border:none;resize:none;font-size:12px;outline:none;" readonly></textarea>
+      `;
+            document.body.appendChild(box);
+            box.querySelector("#cgtn-log-close").addEventListener("click", () => {
+                box.style.display = "none";
+            });
+            box.querySelector("#cgtn-log-copy").addEventListener("click", () => {
+                const ta = document.getElementById("cgtn-log-body");
+                if (ta) {
+                    ta.select();
+                    document.execCommand("copy");
+                    window.CGTN_UI?.toast?.("Copied!", "success");
+                }
+            });
+        }
+        const ta = document.getElementById("cgtn-log-body");
+        if (ta)
+            ta.value = NS.logs.join("") || "(No errors)";
+        box.style.display = "flex";
     };
     // --- expose ---
     NS.ensureTurnsReady = ensureTurnsReady;

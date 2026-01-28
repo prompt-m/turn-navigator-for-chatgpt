@@ -48,56 +48,34 @@
         },
     };
     // 画面操作を一時的にブロック
-    function setUiBusy(busy = true) {
-        const ids = ["cgpt-nav", "cgpt-list-panel"]; // 必要なら増やす
+    // ★引数 label を追加 (デフォルトは "Loading...")
+    function setUiBusy(busy = true, label = "Loading...") {
+        const ids = ["cgpt-nav", "cgpt-list-panel"];
         for (const id of ids) {
             const host = document.getElementById(id);
             if (!host)
                 continue;
-            // CSS-only 無効化
             host.classList.toggle("loading", busy);
-            // 半透明マスク（見た目も分かりやすく）
-            let mask = host.querySelector(":scope > .cgtn-mask");
-            if (busy) {
-                if (!mask) {
-                    mask = document.createElement("div");
-                    mask.className = "cgtn-mask";
-                    Object.assign(mask.style, {
-                        position: "absolute",
-                        inset: "0",
-                        background: "rgba(255,255,255,0.55)",
-                        backdropFilter: "blur(2px)",
-                        cursor: "wait",
-                        zIndex: "9999",
-                        pointerEvents: "auto",
-                    });
-                    // relative が無いと被せられない
-                    if (getComputedStyle(host).position === "static") {
-                        host.style.position = "relative";
-                    }
-                    host.appendChild(mask);
-                }
-            }
-            else {
-                mask?.remove();
-            }
+            // 膜（mask）の処理は前回削除したのでそのまま
+            const mask = host.querySelector(":scope > .cgtn-mask");
+            if (mask)
+                mask.remove();
         }
-        // ★ ステータス表示の更新 2026.01.26
+        // ステータス表示
         if (busy) {
-            UI?.updateStatusDisplay?.("Loading..");
+            // ★修正: 引数で渡された文字を表示する
+            UI?.updateStatusDisplay?.(label);
         }
         else {
             if (RUN.idle) {
-                // 完了時は "READY" (または 999/999 等に変更可能)
                 UI?.updateStatusDisplay?.("OFF");
             }
             else {
-                // ★ READYではなく、現在位置/総数を表示させる 2026.01.27
                 if (typeof LG.updateStatus === "function") {
                     LG.updateStatus();
                 }
                 else {
-                    UI?.updateStatusDisplay?.("READY");
+                    UI?.updateStatusDisplay?.("Loading...");
                 }
             }
         }
@@ -108,14 +86,10 @@
             return;
         const st = document.createElement("style");
         st.id = "cgtn-busy-style";
-        /*
-        st.textContent = `
-          #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none; opacity: .6; cursor: not-allowed; }
-        `;
-    */
         // 2026.01.26
+        // ★修正: opacity: 0.9 を削除しました
         st.textContent = `
-      #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none; opacity: 0.9; }
+      #cgpt-nav.loading, #cgpt-list-panel.loading { pointer-events: none;}
     `;
         document.head.appendChild(st);
     })();

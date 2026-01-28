@@ -19,19 +19,6 @@
         showViz: false,
         list: { maxChars: 60, fontSize: 12 /* 他は不要 */ },
     };
-    /* sync.set の Promise ラッパ（lastError を reject） */
-    /* !!!!
-    function syncSetAsync(obj){
-      return new Promise((resolve, reject)=>{
-        chrome.storage.sync.set(obj, ()=>{
-          const err = chrome.runtime?.lastError;
-          if (err) return reject(err);
-          resolve();
-        });
-      });
-    }
-  */
-    /* sync.set の Promise ラッパ（lastError を reject） */
     function syncSetAsync(obj) {
         return new Promise((resolve, reject) => {
             chrome.storage.sync.set(obj, () => {
@@ -155,26 +142,6 @@
         });
     }
     /* ここまで */
-    /* !!!!
-    function applyToUI(cfg) {
-      const v = sanitize(cfg || {});
-      try {
-        if (exists("centerBias")) $("centerBias").value = v.centerBias;
-        if (exists("headerPx")) $("headerPx").value = v.headerPx;
-        if (exists("eps")) $("eps").value = v.eps;
-        if (exists("lockMs")) $("lockMs").value = v.lockMs;
-        if (exists("showViz")) $("showViz").checked = !!v.showViz;
-  
-        if (exists("listEnabled")) $("listEnabled").checked = !!v.list.enabled;
-        if (exists("pinOnly")) $("pinOnly").checked = !!v.list.pinOnly;
-        if (exists("listMaxItems")) $("listMaxItems").value = v.list.maxItems;
-        if (exists("listMaxChars")) $("listMaxChars").value = v.list.maxChars;
-        if (exists("listFontSize")) $("listFontSize").value = v.list.fontSize;
-      } catch (e) {
-        console.warn("applyToUI failed", e);
-      }
-    }
-  */
     function applyToUI(cfg) {
         const v = sanitize(cfg || {});
         try {
@@ -239,20 +206,6 @@
             },
         });
     }
-    /* !!!!
-    function applyI18N() {
-      const T = window.CGTN_I18N?.t || ((s) => s);
-      document.querySelectorAll("[data-i18n]").forEach((el) => {
-        const key = el.dataset.i18n;
-        const target = el.dataset.i18nTarget || "text"; // 'text' | 'placeholder' | 'title' | 'aria-label'
-        const v = T(key);
-        if (target === "placeholder") el.placeholder = v;
-        else if (target === "title") el.title = v;
-        else if (target === "aria-label") el.setAttribute("aria-label", v);
-        else el.textContent = v;
-      });
-    }
-    */
     function applyI18N() {
         const T = window.CGTN_I18N?.t || ((s) => s);
         document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -310,27 +263,6 @@
         }, ms + 220);
         // 参照持っておくなら el._timers = [t1,t2];
     }
-    /* !!!!
-    function flashMsgPins(key = "options.deleted") {
-      const T = window.CGTN_I18N?.t || ((s) => s);
-      const el = document.getElementById("msg-pins");
-      if (!el) return;
-      el.textContent = T(key);
-      el.classList.add("show");
-      clearTimeout(el._to);
-      el._to = setTimeout(() => el.classList.remove("show"), 1600);
-    }
-  
-    function flashMsgInline(id, key = "options.saved") {
-      const T = window.CGTN_I18N?.t || ((s) => s);
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.textContent = T(key);
-      el.classList.add("show");
-      clearTimeout(el._to);
-      el._to = setTimeout(() => el.classList.remove("show"), 1600);
-    }
-  */
     const flashTimers = new WeakMap();
     function flashMsgPins(key = "options.deleted") {
         const T = window.CGTN_I18N?.t || ((s) => s);
@@ -358,48 +290,6 @@
         const tid = window.setTimeout(() => el.classList.remove("show"), 1600);
         flashTimers.set(el, tid);
     }
-    /* 未使用
-    //エクスポート直前での正規化
-    function onExportPinsClick() {
-      const cfg = SH.getCFG() || {};
-      //const pins = cfg.pinsByChat || {};
-      const pins = getNormalizedPinsForOptions(cfg); // ★ゼロ件除去＋タイトル最新化
-      //const norm = SH.normalizePinsByChat?.(raw, { dropZero: true, preferNewTitle: true }) || raw;
-  
-      const payload = { pinsByChat: pins };
-      const blob = new Blob([JSON.stringify({ pinsByChat: pins }, null, 2)], {
-        type: "application/json",
-      });
-      // 既存のダウンロード処理へ
-      triggerDownload(blob, "pins_backup.json");
-    }
-  */
-    //正規化ヘルパ
-    // === pinsByChat を設定画面向けに正規化 ===
-    // ・ゼロ件ピンは除外
-    // ・タイトルは可能なら最新（getChatTitle or chatIndex.titles）に更新
-    /* !!!!
-    function getNormalizedPinsForOptions(cfg) {
-      const raw = (cfg && cfg.pinsByChat) || {};
-      const out = {};
-      const getTitle = (cid, rec) => {
-        return (
-          SH.getChatTitle?.(cid) ||
-          cfg?.chatIndex?.titles?.[cid]?.title ||
-          rec?.title ||
-          "(No Title)"
-        );
-      };
-  
-      for (const [cid, rec] of Object.entries(raw)) {
-        const pinsObj = rec?.pins || {};
-        const count = Object.values(pinsObj).filter(Boolean).length;
-        if (count === 0) continue; // ★ 0件は削除（表示・エクスポート対象外）
-        out[cid] = { ...rec, title: getTitle(cid, rec) }; // ★ タイトルを最新へ
-      }
-      return out;
-    }
-  */
     function getNormalizedPinsForOptions(cfg) {
         const raw = (cfg && cfg.pinsByChat) || {};
         const out = {};
@@ -482,24 +372,6 @@
         // 今開いているチャットID（options では基本 null でOK）
         const nowOpen = cfg.currentChatId ?? null;
         // ★ rows は配列のまま保持
-        /* !!!!
-        const rows = Object.entries(map)
-          .map(([cid, rec]) => {
-            const pinsArr = Array.isArray(rec?.pins) ? rec.pins : [];
-            const turns = pinsArr.length; // ★ pinsArr の要素数が「会話数」
-            const pinsCount = pinsArr.filter(Boolean).length;
-            const t = SH.getTitleForChatId(cid, rec?.title || "");
-            return {
-              cid,
-              title: t.slice(0, 120),
-              turns,
-              count: pinsCount,
-              date: rec?.updatedAt ? new Date(rec.updatedAt).toLocaleString() : "",
-            };
-          })
-          .sort((a, b) => b.count - a.count || (a.title > b.title ? 1 : -1));
-        */
-        // ★ rows は配列のまま保持
         const rows = Object.entries(map)
             .map(([cid, recU]) => {
             const rec = recU && typeof recU === "object" ? recU : {};
@@ -539,7 +411,7 @@
                 ">": "&gt;",
                 '"': "&quot;",
                 "'": "&#39;",
-            }[m]));
+            })[m]);
             const del = r.count > 0
                 ? `<button class="btn del inline" data-cid="${esc(r.cid)}" title="${T("options.delBtn")}">🗑</button>`
                 : "";
@@ -554,56 +426,6 @@
         })
             .join("");
         const pinsDelBound = new WeakSet(); // !!!!
-        /*
-        tbody.innerHTML = rowHtml;
-    
-        // ← box 未定義対策＋スクロール
-        const box = document.getElementById("pins-table");
-        const wrap = box?.parentElement;
-        if (wrap) wrap.classList.add("cgtn-pins-scroll");
-    
-        // 削除（tbody に委譲） — 二重バインド防止
-        if (!tbody._cgtnDelBound) {
-          tbody._cgtnDelBound = true;
-          tbody.addEventListener("click", async (e) => {
-            const btn = e.target.closest("button.del");
-            if (!btn) return;
-            const cid = btn.getAttribute("data-cid");
-            if (!cid) return;
-            // 共通の通知/再描画ロジックへ一本化
-            deletePinsFromOptions(cid);
-          });
-        }
-    
-        // 「最新にします」（id=pins-refresh）
-        const refreshBtn = document.getElementById("pins-refresh");
-        if (refreshBtn) {
-          refreshBtn.onclick = async () => {
-            if (refreshBtn.classList.contains("is-busy")) return;
-            setBusy(refreshBtn, true, {
-              onTimeout: () =>
-                flashMsgInline?.("pins-msg", "options.refreshTimeout"),
-            });
-            try {
-              const meta = await sendToActive({ type: "cgtn:get-chat-meta" });
-              if (meta?.ok) {
-                const tr = box?.querySelector(`tr[data-cid="${meta.chatId}"]`);
-                if (tr)
-                  tr.querySelector(".title").textContent =
-                    meta.title || meta.chatId;
-              }
-              try {
-                updateSyncUsageLabel();
-              } catch {}
-              flashMsgInline?.("pins-msg", "options.refreshed");
-            } catch (e) {
-              console.warn(e);
-              flashMsgInline?.("pins-msg", "options.refreshFailed");
-            } finally {
-              setBusy(refreshBtn, false);
-            }
-          };
-        }*/
         tbody.innerHTML = rowHtml;
         // ← box 未定義対策＋スクロール
         const box = document.getElementById("pins-table");
@@ -674,7 +496,7 @@
             ">": "&gt;",
             '"': "&quot;",
             "'": "&#39;",
-        }[c]));
+        })[c]);
     }
     document.getElementById("lang-ja")?.addEventListener("click", () => {
         SH.setLang?.("ja"); // i18n.js にある setter を想定（無ければ自前で保持）
@@ -698,28 +520,6 @@
         }
         catch (_) { }
     });
-    /* !!!!
-    document.getElementById("showViz")?.addEventListener("change", (ev) => {
-      const on = !!ev.target.checked;
-  
-      // 1) 設定画面自身へ即時反映
-      try {
-        const cfgNow = (SH.getCFG && SH.getCFG()) || DEF;
-        SH.renderViz?.(cfgNow, on);
-      } catch {}
-      // 2) 設定も保存（他と整合）
-      //    SH.saveSettingsPatch?.({ showViz: on });
-      // 3) ChatGPT タブにも反映を通知
-      chrome.tabs.query(
-        { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
-        (tabs) => {
-          tabs.forEach((tab) => {
-            chrome.tabs.sendMessage(tab.id, { type: "cgtn:viz-toggle", on });
-          });
-        }
-      );
-    });
-    */
     document.getElementById("showViz")?.addEventListener("change", (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLInputElement))
@@ -783,10 +583,6 @@
     document.addEventListener("DOMContentLoaded", async () => {
         try {
             // まず視覚ちらつき防止：showViz を一旦OFFにしてからロード
-            /* !!!!
-            const vizBox = document.getElementById("showViz");
-            if (vizBox) vizBox.checked = false;
-      */
             const vizBox = $inp("showViz");
             if (vizBox)
                 vizBox.checked = false;
@@ -851,26 +647,6 @@
             }
             const form = $("cgtn-options");
             // 入力で即保存
-            /* !!!!
-            form?.addEventListener("input", (ev) => {
-              try {
-                const c2 = uiToCfg();
-                SH.saveSettingsPatch?.(c2);
-                try {
-                  SH.renderViz?.(c2, undefined);
-                } catch {}
-      
-                // 入力元に応じて表示箇所を切り替え
-                const id = ev.target.id || "";
-                if (id.startsWith("list")) {
-                  flashMsgInline("msg-list", "options.saved");
-                } else if (["showViz", "centerBias", "eps", "lockMs"].includes(id)) {
-                  flashMsgInline("msg-adv", "options.saved");
-                }
-              } catch (e) {
-                console.warn("input handler failed", e);
-              }
-            });*/
             form?.addEventListener("input", (ev) => {
                 try {
                     const c2 = uiToCfg();
@@ -898,23 +674,6 @@
                     renderPinsManager();
             });
             // 一覧セクションの保存
-            /* !!!!
-            document.getElementById("saveList")?.addEventListener("click", () => {
-              const cur = SH.getCFG() || {};
-              const patch = {
-                list: {
-                  ...(cur.list || {}),
-                  maxChars: +document.getElementById("listMaxChars").value,
-                  fontSize: +document.getElementById("listFontSize").value,
-                },
-              };
-              SH.saveSettingsPatch?.(patch, () =>
-                flashMsgInline("msg-list", "options.saved")
-              );
-              // リスト幅　文字数から算出
-              window.CGTN_LOGIC?.applyPanelWidthByChars?.(newMaxChars);
-            });
-            */
             document.getElementById("saveList")?.addEventListener("click", () => {
                 const cur = SH.getCFG() || {};
                 const newMaxChars = num("listMaxChars");
@@ -931,27 +690,6 @@
                 window.CGTN_LOGIC?.applyPanelWidthByChars?.(newMaxChars);
             });
             // 一覧セクション：規定に戻す（値を戻して保存）
-            /* !!!!
-            document.getElementById("resetList")?.addEventListener("click", () => {
-              const cur = SH.getCFG() || {};
-              const patch = {
-                list: {
-                  ...(cur.list || {}),
-                  maxChars: DEF.list.maxChars,
-                  fontSize: DEF.list.fontSize,
-                },
-              };
-              // UIも戻す
-              document.getElementById("listMaxChars").value = patch.list.maxChars;
-              document.getElementById("listFontSize").value = patch.list.fontSize;
-      
-              SH.saveSettingsPatch?.(patch, () =>
-                flashMsgInline("msg-list", "options.reset")
-              );
-              // リスト幅　文字数から算出
-              window.CGTN_LOGIC?.applyPanelWidthByChars?.(newMaxChars);
-            });
-            */
             document.getElementById("resetList")?.addEventListener("click", () => {
                 const cur = SH.getCFG() || {};
                 const patch = {
@@ -972,22 +710,6 @@
                 window.CGTN_LOGIC?.applyPanelWidthByChars?.(patch.list.maxChars);
             });
             // 詳細セクションの保存
-            /* !!!!
-            document.getElementById("saveAdv")?.addEventListener("click", () => {
-              const patch = {
-                showViz: !!document.getElementById("showViz").checked,
-                centerBias: +document.getElementById("centerBias").value,
-                eps: +document.getElementById("eps").value,
-                lockMs: +document.getElementById("lockMs").value,
-              };
-              SH.saveSettingsPatch?.(patch, () => {
-                try {
-                  SH.renderViz?.(patch, patch.showViz);
-                } catch {}
-                flashMsgInline("msg-adv", "options.saved");
-              });
-            });
-            */
             document.getElementById("saveAdv")?.addEventListener("click", () => {
                 const patch = {
                     showViz: chk("showViz"),
@@ -1003,34 +725,6 @@
                     flashMsgInline("msg-adv", "options.saved");
                 });
             });
-            /* !!!!
-            document.getElementById("resetAdv")?.addEventListener("click", () => {
-              // 値戻し→保存…
-              flashMsgInline("msg-adv", "options.reset");
-            });
-      
-            // 詳細セクション：規定に戻す（値を戻して保存）
-            document.getElementById("resetAdv")?.addEventListener("click", () => {
-              // UIを既定に
-              document.getElementById("showViz").checked = !!DEF.showViz;
-              document.getElementById("centerBias").value = DEF.centerBias;
-              document.getElementById("eps").value = DEF.eps;
-              document.getElementById("lockMs").value = DEF.lockMs;
-      
-              const patch = {
-                showViz: !!DEF.showViz,
-                centerBias: DEF.centerBias,
-                eps: DEF.eps,
-                lockMs: DEF.lockMs,
-              };
-              SH.saveSettingsPatch?.(patch, () => {
-                try {
-                  SH.renderViz?.(patch, patch.showViz);
-                } catch {}
-                flashMsgInline("msg-adv", "options.reset");
-              });
-            });
-            */
             document.getElementById("resetAdv")?.addEventListener("click", () => {
                 // UIを既定に
                 const sv = $inp("showViz");
@@ -1072,17 +766,6 @@
                 console.warn("buildInfo failed", e);
             }
             const devFlashTimers = new WeakMap();
-            // 開発用の軽いフラッシュ（本番ロジックがあれば不要）
-            /*
-            function devFlash(id, txt) {
-              const el = document.getElementById(id);
-              if (!el) return;
-              el.textContent = txt;
-              el.classList.add("show");
-              clearTimeout(el._t);
-              el._t = setTimeout(() => el.classList.remove("show"), 1500);
-            }
-            */
             function devFlash(id, txt) {
                 const el = document.getElementById(id);
                 if (!el)

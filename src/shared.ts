@@ -36,7 +36,7 @@
   //async function loadSettings(cb?: () => void) { !!!!
   async function loadSettings(cb?: (cfg: any) => void) {
     const all = await new Promise<StorageAll>((resolve) =>
-      chrome.storage.sync.get(null, resolve)
+      chrome.storage.sync.get(null, resolve),
     );
 
     const fileCfg = all?.cgNavSettings ?? {};
@@ -97,14 +97,14 @@
     () => {
       _dying = true;
     },
-    { once: true }
+    { once: true },
   );
   addEventListener(
     "unload",
     () => {
       _dying = true;
     },
-    { once: true }
+    { once: true },
   );
 
   const canUseStorage = () =>
@@ -148,7 +148,7 @@
         const e = chrome.runtime.lastError;
         if (e) rej(e);
         else res(v);
-      })
+      }),
     );
   }
 
@@ -161,7 +161,7 @@
         const e = chrome.runtime.lastError;
         if (e) rej(e);
         else res();
-      })
+      }),
     );
   }
 
@@ -223,7 +223,7 @@
     if (!chrome?.storage?.sync) return SH.getCFG?.() || {};
 
     const all = await new Promise<StorageAll>((resolve) =>
-      chrome.storage.sync.get(null, resolve)
+      chrome.storage.sync.get(null, resolve),
     );
 
     const cfg = all?.cgNavSettings ?? {};
@@ -275,7 +275,7 @@
   // shared.js に追記（削除しない）
   SH.normalizePinsByChat = function (
     pinsByChat,
-    { dropZero = true, preferNewTitle = true } = {}
+    { dropZero = true, preferNewTitle = true } = {},
   ) {
     const map = { ...(pinsByChat || {}) };
     for (const id of Object.keys(map)) {
@@ -395,7 +395,7 @@
   // メタだけ更新（タイトル刷新等）
   SH.touchChatMeta = function (
     chatId = SH.getChatId(),
-    title = SH.getChatTitle()
+    title = SH.getChatTitle(),
   ) {
     const cfg = SH.getCFG?.() || {};
     const map = cfg.pinsByChat || {};
@@ -421,7 +421,7 @@
           path: location.pathname,
           time: new Date().toISOString(),
         },
-        new Error("trace").stack?.split("\n").slice(1, 4).join("\n")
+        new Error("trace").stack?.split("\n").slice(1, 4).join("\n"),
       );
     } else {
       console.debug("[touchChatMeta] keep title", { chatId, oldTitle });
@@ -769,7 +769,7 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
   SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
     // 非同期を使えない箇所のためのフォールバック（空配列）
     console.warn(
-      "[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync"
+      "[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync",
     );
     return [];
   };
@@ -818,7 +818,7 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
           path: location.pathname,
           time: new Date().toISOString(),
         },
-        new Error("trace").stack?.split("\n").slice(1, 4).join("\n")
+        new Error("trace").stack?.split("\n").slice(1, 4).join("\n"),
       );
 
       return { ok: true };
@@ -887,7 +887,7 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
   // トグル（1始まり）付箋データ更新
   SH.togglePinByIndex = async function togglePinByIndex(
     index1,
-    chatId = SH.getChatId?.()
+    chatId = SH.getChatId?.(),
   ) {
     if (!Number.isFinite(index1) || index1 < 1) return false;
     const arr = await SH.getPinsArrAsync(chatId);
@@ -904,7 +904,7 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
       arr[index1 - 1] = next ? 0 : 1;
       try {
         window.CGTN_UI?.toastNearPointer?.(
-          SH.t?.("options.saveFailed") || "Failed to save"
+          SH.t?.("options.saveFailed") || "Failed to save",
         );
       } catch (_) {}
       return false;
@@ -912,7 +912,7 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
     // 付箋バッジ
     try {
       document.dispatchEvent(
-        new CustomEvent("cgtn:pins-updated", { detail: { chatId } })
+        new CustomEvent("cgtn:pins-updated", { detail: { chatId } }),
       );
     } catch {}
 
@@ -1104,44 +1104,30 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
     });
   } catch {}
 
-  // === UIの実状態: 今まさにリストが開いているか？ ===
-  /** UI(checkbox) → ランタイムフラグ → 保存値 の順で判定 */
-  /* !!!!
   SH.isListOpen = function isListOpen() {
-    console.log("***isListOpen***");
-    try {
-      const cb = document.getElementById("cgpt-list-toggle");
-      if (cb) return !!cb.checked;
-      if (
-        window.CGTN_LOGIC &&
-        typeof window.CGTN_LOGIC._panelOpen === "boolean"
-      ) {
-        return !!window.CGTN_LOGIC._panelOpen;
-      }
-      return !!SH.getCFG?.()?.list?.enabled;
-    } catch {
-      return !!SH.getCFG?.()?.list?.enabled;
-    }
-  };
-*/
-  SH.isListOpen = function isListOpen() {
-    console.log("***isListOpen***");
+    let ret;
     try {
       const cb = document.getElementById("cgpt-list-toggle");
       if (cb instanceof HTMLInputElement) {
-        return !!cb.checked;
+        ret = !!cb.checked;
+        console.log("isListOpen1", ret);
+        return ret;
       }
 
+      ret = !!SH.getCFG?.()?.list?.enabled;
       if (
         window.CGTN_LOGIC &&
         typeof window.CGTN_LOGIC._panelOpen === "boolean"
       ) {
-        return !!window.CGTN_LOGIC._panelOpen;
+        ret = !!window.CGTN_LOGIC._panelOpen;
+        console.log("isListOpen2", ret);
+        return ret;
       }
-
-      return !!SH.getCFG?.()?.list?.enabled;
+      console.log("isListOpen3", ret);
+      return ret;
     } catch {
-      return !!SH.getCFG?.()?.list?.enabled;
+      console.log("isListOpen4", ret);
+      return ret;
     }
   };
 

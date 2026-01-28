@@ -1,7 +1,6 @@
-// events.js — クリック配線 / チェック連動（UIのdata-act / data-roleに対応）
+// events.js
 (() => {
   "use strict";
-
   const SH = window.CGTN_SHARED || {};
   const UI = window.CGTN_UI || {};
   const LG = window.CGTN_LOGIC || {};
@@ -11,40 +10,39 @@
     const box = document.getElementById("cgpt-nav");
     if (!box) return;
 
-    // --- 変更監視（トグルスイッチ類） ---
+    // Changeイベント (トグルスイッチ) - 変更なし
     box.addEventListener("change", (e) => {
       const t = e.target;
       if (!(t instanceof HTMLInputElement)) return;
-
-      // ▼ 一覧表示トグル (#cgpt-list-toggle)
       if (t.id === "cgpt-list-toggle") {
         const on = t.checked;
         const btn = document.getElementById("cgpt-list-btn");
         if (btn) btn.classList.toggle("active", on);
-
-        // Logic側に命令を送る
-        if (typeof LG.setListEnabled === "function") {
-          LG.setListEnabled(on);
-        }
+        if (typeof LG.setListEnabled === "function") LG.setListEnabled(on);
       }
-
-      // ▼ 基準線トグル (#cgpt-viz)
       if (t.id === "cgpt-viz") {
         const on = t.checked;
-        if (typeof SH.toggleViz === "function") {
-          SH.toggleViz(on);
-        }
+        if (typeof SH.toggleViz === "function") SH.toggleViz(on);
         SH.saveSettingsPatch?.({ showViz: on });
       }
     });
 
-    // --- クリック監視（ボタン類） ---
+    // Clickイベント
     box.addEventListener("click", (e) => {
       const t = e.target;
-      // ボタン、またはその内部要素をクリックした場合
       const el =
-        t instanceof Element ? t.closest("button, label, input") : null;
+        t instanceof Element
+          ? t.closest("button, label, input, .cgtn-ver")
+          : null;
       if (!el) return;
+
+      // ★追加: バージョン番号(.cgtn-ver)をクリックでログ表示
+      if (el.classList.contains("cgtn-ver")) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof LG.showLogs === "function") LG.showLogs();
+        return;
+      }
 
       // 設定ボタン
       if (el.id === "cgtn-open-settings") {
@@ -52,7 +50,6 @@
           e.preventDefault();
           UI.openSettingsModal();
         } else {
-          // フォールバック: 拡張機能の設定ページを開く
           try {
             chrome.runtime.sendMessage({ cmd: "openOptions" });
           } catch (_) {
@@ -62,29 +59,38 @@
         return;
       }
 
-      // 更新ボタン
+      // ★修正: 更新ボタン
       if (el.id === "cgpt-navi-refresh") {
         e.preventDefault();
-        // UIの再構築とリストの再描画
-        try {
-          if (typeof LG.rebuild === "function") LG.rebuild();
-          if (SH.isListOpen?.() && typeof LG.renderList === "function") {
-            LG.renderList(true);
+
+        // 1. "Refresh..." と表示
+        console.log(" updateStatusDisplay Refresh...");
+        UI.updateStatusDisplay?.("Refresh...");
+
+        // 2. UI描画をブロックしないよう少し待ってから処理開始
+        setTimeout(async () => {
+          try {
+            if (typeof LG.rebuild === "function") LG.rebuild();
+            if (SH.isListOpen?.() && typeof LG.renderList === "function") {
+              await LG.renderList(true);
+            }
+          } catch (err) {
+            // エラー時はログに保存
+            LG.logError?.("Refresh Failed", err);
+          } finally {
+            // 3. 終わったら数値表示に戻す
+            LG.updateStatus?.();
           }
-        } catch (err) {
-          console.warn(err);
-        }
+        }, 50);
         return;
       }
 
-      // ナビゲーションボタン (data-actを持つもの)
+      // ナビゲーションボタン
       if (el instanceof HTMLElement && el.dataset.act) {
         const act = el.dataset.act;
-        // 親グループから役割(role)を取得 (user/assistant/all)
         const grp = el.closest(".cgpt-nav-group");
         const role =
           (grp instanceof HTMLElement ? grp.dataset.role : null) || "all";
-
         switch (act) {
           case "top":
             LG.goTop?.(role);
@@ -102,6 +108,5 @@
       }
     });
   }
-
   NS.bindEvents = bindEvents;
 })();

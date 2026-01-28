@@ -1001,41 +1001,28 @@
         });
     }
     catch { }
-    // === UIの実状態: 今まさにリストが開いているか？ ===
-    /** UI(checkbox) → ランタイムフラグ → 保存値 の順で判定 */
-    /* !!!!
     SH.isListOpen = function isListOpen() {
-      console.log("***isListOpen***");
-      try {
-        const cb = document.getElementById("cgpt-list-toggle");
-        if (cb) return !!cb.checked;
-        if (
-          window.CGTN_LOGIC &&
-          typeof window.CGTN_LOGIC._panelOpen === "boolean"
-        ) {
-          return !!window.CGTN_LOGIC._panelOpen;
-        }
-        return !!SH.getCFG?.()?.list?.enabled;
-      } catch {
-        return !!SH.getCFG?.()?.list?.enabled;
-      }
-    };
-  */
-    SH.isListOpen = function isListOpen() {
-        console.log("***isListOpen***");
+        let ret;
         try {
             const cb = document.getElementById("cgpt-list-toggle");
             if (cb instanceof HTMLInputElement) {
-                return !!cb.checked;
+                ret = !!cb.checked;
+                console.log("isListOpen1", ret);
+                return ret;
             }
+            ret = !!SH.getCFG?.()?.list?.enabled;
             if (window.CGTN_LOGIC &&
                 typeof window.CGTN_LOGIC._panelOpen === "boolean") {
-                return !!window.CGTN_LOGIC._panelOpen;
+                ret = !!window.CGTN_LOGIC._panelOpen;
+                console.log("isListOpen2", ret);
+                return ret;
             }
-            return !!SH.getCFG?.()?.list?.enabled;
+            console.log("isListOpen3", ret);
+            return ret;
         }
         catch {
-            return !!SH.getCFG?.()?.list?.enabled;
+            console.log("isListOpen4", ret);
+            return ret;
         }
     };
     // タイトル解決（副作用なし / DOM非依存）

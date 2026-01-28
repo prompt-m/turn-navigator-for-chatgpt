@@ -143,45 +143,52 @@ input:checked + .slider:before {
 /* デジタルスクリーン (数値・状態表示) */
 .digital-screen {
   text-align: right;
-  /* height: 18px; ←高さを固定せず、中身なりに伸ばす */
-  min-height: 18px;
+  /* ★修正: 18px → 30px に変更（ロード中も高さを維持してガタつき防止） */
+  min-height: 30px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center; /* 枠全体を中央に */
   pointer-events: none;
   flex: 1;
-  /* overflow: hidden; ←縦に積むのではみ出し防止は解除 */
   margin-left: 2px;
 }
+
 .digital-screen .screen-value {
-  font-size: 12px; 
+  font-size: 10px; 
   font-weight: 700;
+  opacity: 0.75;
   color: #fff;
-  white-space: nowrap;
+/*  white-space: nowrap;*/
   
-  /* ★修正: 縦積みに変更 */
-  display: flex;
-  flex-direction: column; /* 縦並び */
-  align-items: center;  /* 中央寄せ */
-  justify-content: center;
-  line-height: 0.9;       /* 行間を詰める */
+  /* ★修正: フレックス設定を削除し、単純な箱にする */
+  width: 100%; /* 親の幅いっぱいに広げる */
+  /* ★追加: "Loading..." の文字を中央に寄せる */
+  text-align: center;
 }
+
 .digital-screen .screen-value.loading { font-size: 10px; opacity: 0.8; }
 
-/* ★2段組み用スタイル */
+/* ★分子：強制的に中央揃え */
 .digital-screen .screen-value .curr {
-  font-size: 15px; /* 現在地を大きく */
+  font-size: 16px;
   font-weight: 800;
   margin-bottom: 1px;
-}
-.digital-screen .screen-value .sub {
-  font-size: 10px; /* 総数は小さく */
-  opacity: 0.75;
-  font-weight: 600;
-  display: flex;
-  gap: 1px;
+  
+  display: flex;           /* 追加 */
+  justify-content: center; /* 追加：これで真ん中に来ます */
+  line-height: 1;
 }
 
+/* ★分母：右揃え */
+.digital-screen .screen-value .sub {
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 700;
+  
+  display: flex;
+  justify-content: flex-end; /* 追加：右端に寄せる */
+  gap: 1px;                  /* スラッシュとの隙間 */
+}
 .digital-screen .off-text { 
   color: #aaa; font-size: 12px; font-weight: 600; 
 }
@@ -497,10 +504,11 @@ input:checked + .slider:before {
         window.CGTN_UI.openSettingsModal?.();
       });
     }
-
+    /*
     const refreshBtn = box.querySelector("#cgpt-navi-refresh");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", (ev) => {
+        console.log("refresh");
         ev.preventDefault();
         ev.stopPropagation();
         try {
@@ -511,7 +519,7 @@ input:checked + .slider:before {
         }
       });
     }
-
+*/
     // ツールチップ
     window.CGTN_SHARED?.applyTooltips?.(
       {
@@ -629,7 +637,7 @@ input:checked + .slider:before {
       if (idle) {
         screen.innerHTML = `<span class="off-text">OFF</span>`;
       } else {
-        screen.innerHTML = `<div class="screen-value" style="color:#aaa">READY</div>`;
+        screen.innerHTML = `<div class="screen-value" style="color:#aaa">Loading...</div>`;
       }
     }
   }
