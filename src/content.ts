@@ -179,7 +179,7 @@
     let __debTo = 0;
     let __gen = 0;
     let __pageInfo = { kind: "other", cid: "", hasTurns: false };
-
+    /*
     const onMessage = (ev: MessageEvent) => {
       (async () => {
         const d = ev && ev.data;
@@ -233,6 +233,74 @@
                 .finally(() => {
                   try {
                     setUiBusy?.(false);
+                  } catch {}
+                });
+            });
+          }, 80);
+        }
+      })();
+    };
+*/
+    const onMessage = (ev: MessageEvent) => {
+      (async () => {
+        const d = ev && ev.data;
+        if (!d || d.source !== "cgtn") return;
+
+        const SH = window.CGTN_SHARED,
+          LG = window.CGTN_LOGIC;
+        const kind = d.kind || "other";
+        const cidNow = d.cid || SH?.getChatId?.();
+
+        __pageInfo = { kind, cid: cidNow || "", hasTurns: !!d.hasTurns };
+        try {
+          SH.setPageInfo?.(__pageInfo);
+        } catch {}
+
+        // ホーム画面などへの遷移ならリセット
+        if (
+          kind === "home" ||
+          kind === "project" ||
+          kind === "other" ||
+          kind === "new"
+        ) {
+          LG?.clearListPanelUI?.();
+          UI?.updateStatusDisplay?.("OFF"); // ここもOFFなどに
+          __lastCid = null;
+          __gen++;
+          return;
+        }
+
+        if (d.type === "url-change" || d.type === "turn-added") {
+          const prev = __lastCid;
+          __lastCid = cidNow;
+          const myGen = ++__gen;
+
+          // ★追加: URLが変わったら、処理開始前に即座に「Loading...」にする
+          if (d.type === "url-change") {
+            try {
+              window.CGTN_PREVIEW?.hide?.("url-change");
+            } catch {}
+            // ここで即座に表示更新！
+            setUiBusy(true, "Loading...");
+          } else {
+            // turn-added（会話が増えただけ）の場合は、操作不能にせず裏で更新したいなら
+            // setUiBusy(true) は呼ばなくても良いですが、
+            // 確実に同期させたいなら呼んでもOKです。今回はLoading表示させます。
+            setUiBusy(true, "Loading...");
+          }
+
+          clearTimeout(__debTo);
+          __debTo = window.setTimeout(() => {
+            requestAnimationFrame(() => {
+              (async () => {
+                if (myGen !== __gen) return;
+                await rebuildAndRenderSafely({});
+              })()
+                .catch((err) => console.warn("[cgtn] rebuild error:", err))
+                .finally(() => {
+                  try {
+                    // 処理が終わったらLoading解除（数字表示に戻る）
+                    setUiBusy(false);
                   } catch {}
                 });
             });
