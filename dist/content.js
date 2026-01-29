@@ -119,58 +119,135 @@
         });
     }
     // 一覧がOFFなら、リスト生成（renderList）をスキップする処理を追加 2026.01.29
+    /*
+    let __buildGen = 0;
+    async function rebuildAndRenderSafely({ forceList = false } = {}) {
+      const LG = window.CGTN_LOGIC,
+        SH = window.CGTN_SHARED,
+        UI = window.CGTN_UI;
+  
+      // ★ 世代IDを発行（競合防止）
+      const myGen = ++__buildGen;
+  
+      // 1. まずは「Loading...」で開始
+      //    (setUiBusyが引数を2つ取るように修正済みであることが前提です)
+      setUiBusy(true, "Loading...");
+  
+      try {
+        // --- A. 待機フェーズ ---
+        // どちらか早い方を待つ
+        await Promise.race([
+          waitForFirstTurnAdded(15000),
+          LG.ensureTurnsReady?.(),
+        ]);
+        // 念のためもう一度安定待ち
+        await LG.ensureTurnsReady?.();
+  
+        // ★ 競合チェック: 待っている間に別の処理が開始されていたら中止
+        if (myGen !== __buildGen) return;
+  
+        // --- B. データ解析フェーズ (Universal版同等の高速処理) ---
+        // ここで ST配列 (データ) だけ作る。リスト(DOM)はまだ作らない。
+        LG.rebuild?.();
+  
+        // ★ 競合チェック
+        if (myGen !== __buildGen) return;
+  
+        // ★ 速攻で数値を表示！ ("345 / 345" がここで出る)
+        if (typeof LG.updateStatus === "function") {
+          LG.updateStatus();
+        }
+  
+        // --- C. リスト生成フェーズ (重い処理) ---
+        const kind = SH.getPageInfo?.()?.kind || "other";
+        const on = forceList || !!SH.getCFG?.()?.list?.enabled;
+  
+        if (kind === "chat" && on) {
+          // [分岐1] 一覧が開いている場合
+  
+          // ステータスを「生成中」に変更してユーザーに重い処理を予告
+          UI?.updateStatusDisplay?.("List Gen...");
+  
+          // 描画更新の隙間(1フレーム)を作ってから重い処理を開始
+          await new Promise((r) => requestAnimationFrame(r));
+          if (myGen !== __buildGen) return; // 念のためチェック
+  
+          // ここで初めて重い処理(DOM生成)を実行
+          await LG.renderList?.(forceList);
+        } else {
+          // [分岐2] 一覧が閉じている場合
+          // ★ リスト生成 (renderList) をスキップ！これにより爆速になります。
+        }
+      } catch (e) {
+        console.warn("List load failed", e);
+  
+        // 失敗時の後始末
+        if (forceList) {
+          LG?.setListEnabled?.(false);
+          const chk = document.getElementById("cgpt-list-toggle");
+          if (chk instanceof HTMLInputElement) {
+            chk.checked = false;
+            chk.dispatchEvent(new Event("change"));
+          }
+        }
+      } finally {
+        // ★ 自分の世代がまだ最新である場合のみ、Busy状態を解除
+        if (myGen === __buildGen) {
+          setUiBusy(false);
+          // 最後に念のため数値を再更新（リスト生成後の確定値）
+          if (typeof LG.updateStatus === "function") LG.updateStatus();
+        }
+      }
+    }
+  */
+    // =================================================================
+    // 修正1: rebuildAndRenderSafely (無駄な待ち時間をカット)
+    // =================================================================
     let __buildGen = 0;
     async function rebuildAndRenderSafely({ forceList = false } = {}) {
         const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED, UI = window.CGTN_UI;
-        // ★ 世代IDを発行（競合防止）
         const myGen = ++__buildGen;
-        // 1. まずは「Loading...」で開始
-        //    (setUiBusyが引数を2つ取るように修正済みであることが前提です)
+        // Loading開始
         setUiBusy(true, "Loading...");
         try {
-            // --- A. 待機フェーズ ---
-            // どちらか早い方を待つ
-            await Promise.race([
-                waitForFirstTurnAdded(15000),
-                LG.ensureTurnsReady?.(),
-            ]);
-            // 念のためもう一度安定待ち
-            await LG.ensureTurnsReady?.();
-            // ★ 競合チェック: 待っている間に別の処理が開始されていたら中止
+            // ★ここが高速化の肝！
+            // すでに画面にターン(article)があるなら、メッセージ待ち(waitForFirstTurnAdded)をスキップする
+            const alreadyHasTurns = !!document.querySelector("article, [data-message-author-role]");
+            if (!alreadyHasTurns) {
+                // まだ無い場合のみ、メッセージ受信を待つ
+                await Promise.race([
+                    waitForFirstTurnAdded(5000), // タイムアウトも短縮
+                    LG.ensureTurnsReady?.(),
+                ]);
+            }
+            // 競合チェック
             if (myGen !== __buildGen)
                 return;
-            // --- B. データ解析フェーズ (Universal版同等の高速処理) ---
-            // ここで ST配列 (データ) だけ作る。リスト(DOM)はまだ作らない。
+            // --- データ解析 (Universal版同等の速度) ---
             LG.rebuild?.();
-            // ★ 競合チェック
             if (myGen !== __buildGen)
                 return;
-            // ★ 速攻で数値を表示！ ("345 / 345" がここで出る)
+            // ★即表示
             if (typeof LG.updateStatus === "function") {
                 LG.updateStatus();
             }
-            // --- C. リスト生成フェーズ (重い処理) ---
+            // --- リスト生成 (重い処理) ---
             const kind = SH.getPageInfo?.()?.kind || "other";
             const on = forceList || !!SH.getCFG?.()?.list?.enabled;
             if (kind === "chat" && on) {
-                // [分岐1] 一覧が開いている場合
-                // ステータスを「生成中」に変更してユーザーに重い処理を予告
+                // 生成中表示
                 UI?.updateStatusDisplay?.("List Gen...");
-                // 描画更新の隙間(1フレーム)を作ってから重い処理を開始
                 await new Promise((r) => requestAnimationFrame(r));
                 if (myGen !== __buildGen)
-                    return; // 念のためチェック
-                // ここで初めて重い処理(DOM生成)を実行
+                    return;
                 await LG.renderList?.(forceList);
             }
             else {
-                // [分岐2] 一覧が閉じている場合
-                // ★ リスト生成 (renderList) をスキップ！これにより爆速になります。
+                // OFF時はスキップ (爆速)
             }
         }
         catch (e) {
             console.warn("List load failed", e);
-            // 失敗時の後始末
             if (forceList) {
                 LG?.setListEnabled?.(false);
                 const chk = document.getElementById("cgpt-list-toggle");
@@ -181,10 +258,8 @@
             }
         }
         finally {
-            // ★ 自分の世代がまだ最新である場合のみ、Busy状態を解除
             if (myGen === __buildGen) {
                 setUiBusy(false);
-                // 最後に念のため数値を再更新（リスト生成後の確定値）
                 if (typeof LG.updateStatus === "function")
                     LG.updateStatus();
             }
@@ -866,54 +941,109 @@
         }
     }
     // ========= 9) 初期セットアップ ========= '25.12.6 改
+    /*
     async function initialize() {
-        console.log("initialize");
-        // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        // 設定ロード & v2 ストレージ移行
+      console.log("initialize");
+      // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+  
+      // 設定ロード & v2 ストレージ移行
+      await SH.loadSettings();
+      try {
+        // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
+        await SH.migratePinsStorageOnce?.();
+      } catch {}
+  
+      // UI 構築 & フォーカス保護まわり
+      UI.installUI();
+      ensureFocusPark();
+      installFocusStealGuard();
+  
+      // 言語・位置などの初期反映
+      UI.applyLang();
+      UI.clampPanelWithinViewport();
+  
+      // 基準線の初期表示（保存 showViz を尊重）
+      try {
+        const cfg = SH?.getCFG?.();
+        SH?.renderViz?.(cfg, !!cfg?.showViz);
+      } catch {}
+  
+      // イベント系のバインド
+      EV.bindEvents();
+      bindPreviewDockOnce();
+      bindBaselineAutoFollow();
+  
+      // URL 変更フック（必要な場合のみ）
+      if (USE_INJECT_URL_HOOK) {
+        injectUrlChangeHook();
+      }
+  
+      // ★ここで手動初期化を追加（ロード時OFF対策） 2026.01.26
+      manualInitPageInfo();
+  
+      // ゴミになったゼロ件レコードの掃除
+      try {
+        SH.cleanupZeroPinRecords?.();
+      } catch {}
+  
+      // ★ 初回 rebuild は「UI とイベントが一通り整ったあと」で、
+      //   かつ ChatGPT 本体の初期化とも競合しないよう 1.2 秒遅らせて実行 '25.12.6
+      setTimeout(() => {
+        // ★ 修正：勝手にリストが開くのを防止
+        //   forceList: true を false に変更しました
+        //    rebuildAndRenderSafely({ forceList: true }).catch((e) =>
+        rebuildAndRenderSafely({ forceList: false }).catch((e) =>
+          console.warn("[init-delayed] rebuildAndRenderSafely failed", e),
+        );
+      }, 1200);
+  
+      // viewport 変化でナビ位置クランプ
+      window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
+        passive: true,
+      });
+      window.addEventListener("orientationchange", () =>
+        UI.clampPanelWithinViewport(),
+      );
+    }
+  */
+    // =================================================================
+    // 修正2: initialize (起動遅延を削除)
+    // =================================================================
+    async function initialize() {
+        // 最初のウェイトも短縮 (1500 -> 100)
+        await new Promise((resolve) => setTimeout(resolve, 100));
         await SH.loadSettings();
         try {
-            // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
             await SH.migratePinsStorageOnce?.();
         }
         catch { }
-        // UI 構築 & フォーカス保護まわり
         UI.installUI();
         ensureFocusPark();
         installFocusStealGuard();
-        // 言語・位置などの初期反映
         UI.applyLang();
         UI.clampPanelWithinViewport();
-        // 基準線の初期表示（保存 showViz を尊重）
         try {
             const cfg = SH?.getCFG?.();
             SH?.renderViz?.(cfg, !!cfg?.showViz);
         }
         catch { }
-        // イベント系のバインド
         EV.bindEvents();
         bindPreviewDockOnce();
         bindBaselineAutoFollow();
-        // URL 変更フック（必要な場合のみ）
         if (USE_INJECT_URL_HOOK) {
             injectUrlChangeHook();
         }
-        // ★ここで手動初期化を追加（ロード時OFF対策） 2026.01.26
         manualInitPageInfo();
-        // ゴミになったゼロ件レコードの掃除
         try {
             SH.cleanupZeroPinRecords?.();
         }
         catch { }
-        // ★ 初回 rebuild は「UI とイベントが一通り整ったあと」で、
-        //   かつ ChatGPT 本体の初期化とも競合しないよう 1.2 秒遅らせて実行 '25.12.6
+        // ★修正: 1200ms の固定待機を 100ms に短縮！
+        // 既に waitForFirstTurnAdded の最適化を入れたので、すぐ呼んでOKです
         setTimeout(() => {
-            // ★ 修正：勝手にリストが開くのを防止
-            //   forceList: true を false に変更しました
-            //    rebuildAndRenderSafely({ forceList: true }).catch((e) =>
             rebuildAndRenderSafely({ forceList: false }).catch((e) => console.warn("[init-delayed] rebuildAndRenderSafely failed", e));
-        }, 1200);
-        // viewport 変化でナビ位置クランプ
+        }, 100); // ← 1200から100へ
         window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
             passive: true,
         });

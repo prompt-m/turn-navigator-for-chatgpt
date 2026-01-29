@@ -14,15 +14,8 @@
     box.addEventListener("change", (e) => {
       const t = e.target;
       if (!(t instanceof HTMLInputElement)) return;
-      /*
-      if (t.id === "cgpt-list-toggle") {
-        const on = t.checked;
-        const btn = document.getElementById("cgpt-list-btn");
-        if (btn) btn.classList.toggle("active", on);
-        if (typeof LG.setListEnabled === "function") LG.setListEnabled(on);
-      }
-*/
       // ▼ 一覧表示トグル (#cgpt-list-toggle)
+      /*
       if (t.id === "cgpt-list-toggle") {
         const on = t.checked;
         const btn = document.getElementById("cgpt-list-btn");
@@ -52,6 +45,48 @@
           }
         }
       }
+      */
+      // ▼ 一覧表示トグル
+      if (t.id === "cgpt-list-toggle") {
+        const on = t.checked;
+        const btn = document.getElementById("cgpt-list-btn");
+        if (btn) btn.classList.toggle("active", on);
+
+        if (on) {
+          // 1. まず表示を変える
+          UI.updateStatusDisplay?.("List Gen...");
+
+          // 2. 描画の更新を待ってから処理開始 (setTimeout 50ms)
+          setTimeout(async () => {
+            try {
+              if (typeof LG.setListEnabled === "function") {
+                // setListEnabled が Promise を返さなくても、
+                // renderList が重ければここでスレッドが占有されます。
+                // もし renderList が async なら await できます。
+                await LG.setListEnabled(true);
+
+                // ★追加: もし setListEnabled が非同期待機せずに戻ってくる仕様の場合、
+                // 強制的にリスト要素ができるまで少し待つロジックを入れても良いですが、
+                // まずは単純な await で試します。
+              }
+            } catch (err) {
+              console.error(err);
+              LG.logError?.("List Gen Failed", err);
+            } finally {
+              // 3. 処理が終わったら確実に数値に戻す
+              if (typeof LG.updateStatus === "function") LG.updateStatus();
+            }
+          }, 50);
+        } else {
+          // OFFにする時は一瞬でOK
+          if (typeof LG.setListEnabled === "function") {
+            LG.setListEnabled(false);
+          }
+          // 即座に数値更新（またはOFF表示）
+          if (typeof LG.updateStatus === "function") LG.updateStatus();
+        }
+      }
+
       if (t.id === "cgpt-viz") {
         const on = t.checked;
         if (typeof SH.toggleViz === "function") SH.toggleViz(on);

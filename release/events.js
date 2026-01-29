@@ -14,44 +14,79 @@
             const t = e.target;
             if (!(t instanceof HTMLInputElement))
                 return;
+            // ▼ 一覧表示トグル (#cgpt-list-toggle)
             /*
             if (t.id === "cgpt-list-toggle") {
               const on = t.checked;
               const btn = document.getElementById("cgpt-list-btn");
               if (btn) btn.classList.toggle("active", on);
-              if (typeof LG.setListEnabled === "function") LG.setListEnabled(on);
+      
+              // ONにする時だけ、重い処理が走る可能性がある 2026.01.29
+              if (on) {
+                // 1. ステータスを「生成中」にする
+                UI.updateStatusDisplay?.("List Gen...");
+      
+                // 2. 描画をブロックしないよう非同期で実行
+                setTimeout(async () => {
+                  try {
+                    if (typeof LG.setListEnabled === "function") {
+                      // ここで renderList が走る
+                      await LG.setListEnabled(true);
+                    }
+                  } finally {
+                    // 3. 終わったら数値表示に戻す
+                    if (typeof LG.updateStatus === "function") LG.updateStatus();
+                  }
+                }, 50);
+              } else {
+                // OFFにする時は一瞬なのでそのままでOK
+                if (typeof LG.setListEnabled === "function") {
+                  LG.setListEnabled(false);
+                }
+              }
             }
-      */
-            // ▼ 一覧表示トグル (#cgpt-list-toggle)
+            */
+            // ▼ 一覧表示トグル
             if (t.id === "cgpt-list-toggle") {
                 const on = t.checked;
                 const btn = document.getElementById("cgpt-list-btn");
                 if (btn)
                     btn.classList.toggle("active", on);
-                // ONにする時だけ、重い処理が走る可能性がある 2026.01.29
                 if (on) {
-                    // 1. ステータスを「生成中」にする
+                    // 1. まず表示を変える
                     UI.updateStatusDisplay?.("List Gen...");
-                    // 2. 描画をブロックしないよう非同期で実行
+                    // 2. 描画の更新を待ってから処理開始 (setTimeout 50ms)
                     setTimeout(async () => {
                         try {
                             if (typeof LG.setListEnabled === "function") {
-                                // ここで renderList が走る
+                                // setListEnabled が Promise を返さなくても、
+                                // renderList が重ければここでスレッドが占有されます。
+                                // もし renderList が async なら await できます。
                                 await LG.setListEnabled(true);
+                                // ★追加: もし setListEnabled が非同期待機せずに戻ってくる仕様の場合、
+                                // 強制的にリスト要素ができるまで少し待つロジックを入れても良いですが、
+                                // まずは単純な await で試します。
                             }
                         }
+                        catch (err) {
+                            console.error(err);
+                            LG.logError?.("List Gen Failed", err);
+                        }
                         finally {
-                            // 3. 終わったら数値表示に戻す
+                            // 3. 処理が終わったら確実に数値に戻す
                             if (typeof LG.updateStatus === "function")
                                 LG.updateStatus();
                         }
                     }, 50);
                 }
                 else {
-                    // OFFにする時は一瞬なのでそのままでOK
+                    // OFFにする時は一瞬でOK
                     if (typeof LG.setListEnabled === "function") {
                         LG.setListEnabled(false);
                     }
+                    // 即座に数値更新（またはOFF表示）
+                    if (typeof LG.updateStatus === "function")
+                        LG.updateStatus();
                 }
             }
             if (t.id === "cgpt-viz") {

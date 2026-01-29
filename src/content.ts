@@ -123,6 +123,7 @@
   }
 
   // 一覧がOFFなら、リスト生成（renderList）をスキップする処理を追加 2026.01.29
+  /*
   let __buildGen = 0;
   async function rebuildAndRenderSafely({ forceList = false } = {}) {
     const LG = window.CGTN_LOGIC,
@@ -202,7 +203,82 @@
       }
     }
   }
+*/
+  // =================================================================
+  // 修正1: rebuildAndRenderSafely (無駄な待ち時間をカット)
+  // =================================================================
+  let __buildGen = 0;
 
+  async function rebuildAndRenderSafely({ forceList = false } = {}) {
+    const LG = window.CGTN_LOGIC,
+      SH = window.CGTN_SHARED,
+      UI = window.CGTN_UI;
+
+    const myGen = ++__buildGen;
+
+    // Loading開始
+    setUiBusy(true, "Loading...");
+
+    try {
+      // ★ここが高速化の肝！
+      // すでに画面にターン(article)があるなら、メッセージ待ち(waitForFirstTurnAdded)をスキップする
+      const alreadyHasTurns = !!document.querySelector(
+        "article, [data-message-author-role]",
+      );
+
+      if (!alreadyHasTurns) {
+        // まだ無い場合のみ、メッセージ受信を待つ
+        await Promise.race([
+          waitForFirstTurnAdded(5000), // タイムアウトも短縮
+          LG.ensureTurnsReady?.(),
+        ]);
+      }
+
+      // 競合チェック
+      if (myGen !== __buildGen) return;
+
+      // --- データ解析 (Universal版同等の速度) ---
+      LG.rebuild?.();
+
+      if (myGen !== __buildGen) return;
+
+      // ★即表示
+      if (typeof LG.updateStatus === "function") {
+        LG.updateStatus();
+      }
+
+      // --- リスト生成 (重い処理) ---
+      const kind = SH.getPageInfo?.()?.kind || "other";
+      const on = forceList || !!SH.getCFG?.()?.list?.enabled;
+
+      if (kind === "chat" && on) {
+        // 生成中表示
+        UI?.updateStatusDisplay?.("List Gen...");
+
+        await new Promise((r) => requestAnimationFrame(r));
+        if (myGen !== __buildGen) return;
+
+        await LG.renderList?.(forceList);
+      } else {
+        // OFF時はスキップ (爆速)
+      }
+    } catch (e) {
+      console.warn("List load failed", e);
+      if (forceList) {
+        LG?.setListEnabled?.(false);
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) {
+          chk.checked = false;
+          chk.dispatchEvent(new Event("change"));
+        }
+      }
+    } finally {
+      if (myGen === __buildGen) {
+        setUiBusy(false);
+        if (typeof LG.updateStatus === "function") LG.updateStatus();
+      }
+    }
+  }
   // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
   (function bindCgtnMessageOnce() {
     if (window.__CGTN_MSG_BOUND__) return;
@@ -947,6 +1023,7 @@
   }
 
   // ========= 9) 初期セットアップ ========= '25.12.6 改
+  /*
   async function initialize() {
     console.log("initialize");
     // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
@@ -1004,6 +1081,60 @@
     }, 1200);
 
     // viewport 変化でナビ位置クランプ
+    window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
+      passive: true,
+    });
+    window.addEventListener("orientationchange", () =>
+      UI.clampPanelWithinViewport(),
+    );
+  }
+*/
+  // =================================================================
+  // 修正2: initialize (起動遅延を削除)
+  // =================================================================
+  async function initialize() {
+    // 最初のウェイトも短縮 (1500 -> 100)
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    await SH.loadSettings();
+    try {
+      await SH.migratePinsStorageOnce?.();
+    } catch {}
+
+    UI.installUI();
+    ensureFocusPark();
+    installFocusStealGuard();
+
+    UI.applyLang();
+    UI.clampPanelWithinViewport();
+
+    try {
+      const cfg = SH?.getCFG?.();
+      SH?.renderViz?.(cfg, !!cfg?.showViz);
+    } catch {}
+
+    EV.bindEvents();
+    bindPreviewDockOnce();
+    bindBaselineAutoFollow();
+
+    if (USE_INJECT_URL_HOOK) {
+      injectUrlChangeHook();
+    }
+
+    manualInitPageInfo();
+
+    try {
+      SH.cleanupZeroPinRecords?.();
+    } catch {}
+
+    // ★修正: 1200ms の固定待機を 100ms に短縮！
+    // 既に waitForFirstTurnAdded の最適化を入れたので、すぐ呼んでOKです
+    setTimeout(() => {
+      rebuildAndRenderSafely({ forceList: false }).catch((e) =>
+        console.warn("[init-delayed] rebuildAndRenderSafely failed", e),
+      );
+    }, 100); // ← 1200から100へ
+
     window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
       passive: true,
     });
