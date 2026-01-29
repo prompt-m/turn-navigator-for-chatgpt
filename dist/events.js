@@ -14,13 +14,45 @@
             const t = e.target;
             if (!(t instanceof HTMLInputElement))
                 return;
+            /*
+            if (t.id === "cgpt-list-toggle") {
+              const on = t.checked;
+              const btn = document.getElementById("cgpt-list-btn");
+              if (btn) btn.classList.toggle("active", on);
+              if (typeof LG.setListEnabled === "function") LG.setListEnabled(on);
+            }
+      */
+            // ▼ 一覧表示トグル (#cgpt-list-toggle)
             if (t.id === "cgpt-list-toggle") {
                 const on = t.checked;
                 const btn = document.getElementById("cgpt-list-btn");
                 if (btn)
                     btn.classList.toggle("active", on);
-                if (typeof LG.setListEnabled === "function")
-                    LG.setListEnabled(on);
+                // ONにする時だけ、重い処理が走る可能性がある 2026.01.29
+                if (on) {
+                    // 1. ステータスを「生成中」にする
+                    UI.updateStatusDisplay?.("List Gen...");
+                    // 2. 描画をブロックしないよう非同期で実行
+                    setTimeout(async () => {
+                        try {
+                            if (typeof LG.setListEnabled === "function") {
+                                // ここで renderList が走る
+                                await LG.setListEnabled(true);
+                            }
+                        }
+                        finally {
+                            // 3. 終わったら数値表示に戻す
+                            if (typeof LG.updateStatus === "function")
+                                LG.updateStatus();
+                        }
+                    }, 50);
+                }
+                else {
+                    // OFFにする時は一瞬なのでそのままでOK
+                    if (typeof LG.setListEnabled === "function") {
+                        LG.setListEnabled(false);
+                    }
+                }
             }
             if (t.id === "cgpt-viz") {
                 const on = t.checked;

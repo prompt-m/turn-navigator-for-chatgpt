@@ -504,22 +504,7 @@ input:checked + .slider:before {
         window.CGTN_UI.openSettingsModal?.();
       });
     }
-    /*
-    const refreshBtn = box.querySelector("#cgpt-navi-refresh");
-    if (refreshBtn) {
-      refreshBtn.addEventListener("click", (ev) => {
-        console.log("refresh");
-        ev.preventDefault();
-        ev.stopPropagation();
-        try {
-          LG.rebuild?.();
-          if (SH.isListOpen?.()) LG.renderList?.(true);
-        } catch (e) {
-          console.warn(e);
-        }
-      });
-    }
-*/
+
     // ツールチップ
     window.CGTN_SHARED?.applyTooltips?.(
       {

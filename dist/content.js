@@ -118,38 +118,61 @@
             window.addEventListener("message", onMsg, true);
         });
     }
+    // 一覧がOFFなら、リスト生成（renderList）をスキップする処理を追加 2026.01.29
     let __buildGen = 0;
     async function rebuildAndRenderSafely({ forceList = false } = {}) {
-        const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED;
+        const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED, UI = window.CGTN_UI;
+        // ★ 世代IDを発行（競合防止）
         const myGen = ++__buildGen;
-        setUiBusy(true); // ★ Loading.. 開始
+        // 1. まずは「Loading...」で開始
+        //    (setUiBusyが引数を2つ取るように修正済みであることが前提です)
+        setUiBusy(true, "Loading...");
         try {
-            // どちらか早い方（turn-added or ensureTurnsReady）
+            // --- A. 待機フェーズ ---
+            // どちらか早い方を待つ
             await Promise.race([
                 waitForFirstTurnAdded(15000),
                 LG.ensureTurnsReady?.(),
             ]);
-            // もう一度だけ安定待ち
+            // 念のためもう一度安定待ち
             await LG.ensureTurnsReady?.();
-            // 競合キャンセル
+            // ★ 競合チェック: 待っている間に別の処理が開始されていたら中止
             if (myGen !== __buildGen)
                 return;
+            // --- B. データ解析フェーズ (Universal版同等の高速処理) ---
+            // ここで ST配列 (データ) だけ作る。リスト(DOM)はまだ作らない。
             LG.rebuild?.();
+            // ★ 競合チェック
             if (myGen !== __buildGen)
                 return;
+            // ★ 速攻で数値を表示！ ("345 / 345" がここで出る)
+            if (typeof LG.updateStatus === "function") {
+                LG.updateStatus();
+            }
+            // --- C. リスト生成フェーズ (重い処理) ---
             const kind = SH.getPageInfo?.()?.kind || "other";
             const on = forceList || !!SH.getCFG?.()?.list?.enabled;
             if (kind === "chat" && on) {
+                // [分岐1] 一覧が開いている場合
+                // ステータスを「生成中」に変更してユーザーに重い処理を予告
+                UI?.updateStatusDisplay?.("List Gen...");
+                // 描画更新の隙間(1フレーム)を作ってから重い処理を開始
+                await new Promise((r) => requestAnimationFrame(r));
+                if (myGen !== __buildGen)
+                    return; // 念のためチェック
+                // ここで初めて重い処理(DOM生成)を実行
                 await LG.renderList?.(forceList);
+            }
+            else {
+                // [分岐2] 一覧が閉じている場合
+                // ★ リスト生成 (renderList) をスキップ！これにより爆速になります。
             }
         }
         catch (e) {
-            // 2026.01.27
             console.warn("List load failed", e);
-            // ★追加箇所: 失敗したら一覧をOFFに戻す
+            // 失敗時の後始末
             if (forceList) {
                 LG?.setListEnabled?.(false);
-                // UI側のチェックボックスも見た目を戻す
                 const chk = document.getElementById("cgpt-list-toggle");
                 if (chk instanceof HTMLInputElement) {
                     chk.checked = false;
@@ -158,9 +181,13 @@
             }
         }
         finally {
-            // ★ 処理完了（READYに戻る）
-            if (myGen === __buildGen)
+            // ★ 自分の世代がまだ最新である場合のみ、Busy状態を解除
+            if (myGen === __buildGen) {
                 setUiBusy(false);
+                // 最後に念のため数値を再更新（リスト生成後の確定値）
+                if (typeof LG.updateStatus === "function")
+                    LG.updateStatus();
+            }
         }
     }
     // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
@@ -172,68 +199,6 @@
         let __debTo = 0;
         let __gen = 0;
         let __pageInfo = { kind: "other", cid: "", hasTurns: false };
-        /*
-        const onMessage = (ev: MessageEvent) => {
-          (async () => {
-            const d = ev && ev.data;
-            if (!d || d.source !== "cgtn") return;
-    
-            const SH = window.CGTN_SHARED,
-              LG = window.CGTN_LOGIC;
-            const kind = d.kind || "other";
-            const cidNow = d.cid || SH?.getChatId?.();
-    
-            __pageInfo = { kind, cid: cidNow || "", hasTurns: !!d.hasTurns };
-            try {
-              SH.setPageInfo?.(__pageInfo);
-            } catch {}
-    
-            if (
-              kind === "home" ||
-              kind === "project" ||
-              kind === "other" ||
-              kind === "new"
-            ) {
-              LG?.clearListPanelUI?.();
-              UI?.updateStatusDisplay?.("READY");
-              __lastCid = null;
-              __gen++;
-              return;
-            }
-    
-            if (d.type === "url-change" || d.type === "turn-added") {
-              const prev = __lastCid;
-              __lastCid = cidNow;
-              const myGen = ++__gen;
-    
-              try {
-                if (d.type === "url-change")
-                  window.CGTN_PREVIEW?.hide?.("url-change");
-              } catch {}
-    
-              try {
-                setUiBusy?.(true);
-              } catch {}
-    
-              clearTimeout(__debTo);
-              __debTo = window.setTimeout(() => {
-                requestAnimationFrame(() => {
-                  (async () => {
-                    if (myGen !== __gen) return;
-                    await rebuildAndRenderSafely({});
-                  })()
-                    .catch((err) => console.warn("[cgtn] rebuild error:", err))
-                    .finally(() => {
-                      try {
-                        setUiBusy?.(false);
-                      } catch {}
-                    });
-                });
-              }, 80);
-            }
-          })();
-        };
-    */
         const onMessage = (ev) => {
             (async () => {
                 const d = ev && ev.data;
@@ -270,6 +235,9 @@
                         catch { }
                         // ここで即座に表示更新！
                         setUiBusy(true, "Loading...");
+                        // ★追加: この瞬間に、古いデータを即座に捨てる！2026.01.29
+                        // これでスクロール等が起きても古い数字が表示されることはなくなります
+                        LG?.clearListPanelUI?.();
                     }
                     else {
                         // turn-added（会話が増えただけ）の場合は、操作不能にせず裏で更新したいなら

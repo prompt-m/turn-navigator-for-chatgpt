@@ -1227,8 +1227,60 @@
             return "";
         }
     }
+    /*
     // 追加：パネルを完全クリア（タイトル/バッジ/本文）
     NS.clearListPanelUI = function clearListPanelUI() {
+      try {
+        const body = document.getElementById("cgpt-list-body");
+        if (body) body.innerHTML = "";
+        const el = document.getElementById("cgpt-chat-title");
+        if (el) {
+          el.textContent = "";
+          el.title = "";
+        }
+        // バッジの場所を変更 '25.11.28
+        const host = document.getElementById("lv-lab-pin");
+        if (host) {
+          host.removeAttribute("aria-pressed");
+          host.classList.remove("active");
+        }
+  
+        // ← フッターは DOM を壊さず「空状態」にする（ボタンは残す）
+        try {
+          NS.clearListFooterInfo?.();
+        } catch {}
+      } catch (e) {
+        console.warn("[clearListPanelUI] failed", e);
+      }
+  
+      // 状態も空に
+      try {
+        const ST = NS.ST || (NS.ST = {});
+        ST.all = [];
+        ST.user = [];
+        ST.assistant = [];
+  
+        // 付箋バッジ/フッターの表示状態も同期（早期returnを避けるため最後に）
+        try {
+          NS.updatePinOnlyBadge?.();
+        } catch {}
+        // ここではフッターは触らない（↑で empty 済）
+      } catch {}
+    };
+  */
+    NS.clearListPanelUI = function clearListPanelUI() {
+        // ★追加1: スクロール監視を即座に停止 (チラつきの主犯を止める)
+        if (NS._scrollSpy) {
+            try {
+                NS._scrollSpy.el.removeEventListener("scroll", NS._scrollSpy.fn);
+            }
+            catch { }
+            NS._scrollSpy = null;
+        }
+        if (NS._spyRaf) {
+            cancelAnimationFrame(NS._spyRaf);
+            NS._spyRaf = null;
+        }
         try {
             const body = document.getElementById("cgpt-list-body");
             if (body)
@@ -1244,7 +1296,7 @@
                 host.removeAttribute("aria-pressed");
                 host.classList.remove("active");
             }
-            // ← フッターは DOM を壊さず「空状態」にする（ボタンは残す）
+            // フッターは DOM を壊さず「空状態」にする
             try {
                 NS.clearListFooterInfo?.();
             }
@@ -1259,14 +1311,20 @@
             ST.all = [];
             ST.user = [];
             ST.assistant = [];
-            // 付箋バッジ/フッターの表示状態も同期（早期returnを避けるため最後に）
+            // 付箋バッジ/フッターの表示状態も同期
             try {
                 NS.updatePinOnlyBadge?.();
             }
             catch { }
-            // ここではフッターは触らない（↑で empty 済）
         }
         catch { }
+        // ★追加2: ステータスを更新 (データが空なので "Loading..." になる)
+        if (typeof NS.updateStatus === "function") {
+            NS.updateStatus();
+        }
+        else {
+            window.CGTN_UI?.updateStatusDisplay?.("Loading...");
+        }
     };
     NS.updateListChatTitle = function updateListChatTitle() {
         const el = document.getElementById("cgpt-chat-title");
