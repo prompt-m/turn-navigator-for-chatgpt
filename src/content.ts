@@ -123,90 +123,10 @@
   }
 
   // 一覧がOFFなら、リスト生成（renderList）をスキップする処理を追加 2026.01.29
-  /*
-  let __buildGen = 0;
-  async function rebuildAndRenderSafely({ forceList = false } = {}) {
-    const LG = window.CGTN_LOGIC,
-      SH = window.CGTN_SHARED,
-      UI = window.CGTN_UI;
-
-    // ★ 世代IDを発行（競合防止）
-    const myGen = ++__buildGen;
-
-    // 1. まずは「Loading...」で開始
-    //    (setUiBusyが引数を2つ取るように修正済みであることが前提です)
-    setUiBusy(true, "Loading...");
-
-    try {
-      // --- A. 待機フェーズ ---
-      // どちらか早い方を待つ
-      await Promise.race([
-        waitForFirstTurnAdded(15000),
-        LG.ensureTurnsReady?.(),
-      ]);
-      // 念のためもう一度安定待ち
-      await LG.ensureTurnsReady?.();
-
-      // ★ 競合チェック: 待っている間に別の処理が開始されていたら中止
-      if (myGen !== __buildGen) return;
-
-      // --- B. データ解析フェーズ (Universal版同等の高速処理) ---
-      // ここで ST配列 (データ) だけ作る。リスト(DOM)はまだ作らない。
-      LG.rebuild?.();
-
-      // ★ 競合チェック
-      if (myGen !== __buildGen) return;
-
-      // ★ 速攻で数値を表示！ ("345 / 345" がここで出る)
-      if (typeof LG.updateStatus === "function") {
-        LG.updateStatus();
-      }
-
-      // --- C. リスト生成フェーズ (重い処理) ---
-      const kind = SH.getPageInfo?.()?.kind || "other";
-      const on = forceList || !!SH.getCFG?.()?.list?.enabled;
-
-      if (kind === "chat" && on) {
-        // [分岐1] 一覧が開いている場合
-
-        // ステータスを「生成中」に変更してユーザーに重い処理を予告
-        UI?.updateStatusDisplay?.("List Gen...");
-
-        // 描画更新の隙間(1フレーム)を作ってから重い処理を開始
-        await new Promise((r) => requestAnimationFrame(r));
-        if (myGen !== __buildGen) return; // 念のためチェック
-
-        // ここで初めて重い処理(DOM生成)を実行
-        await LG.renderList?.(forceList);
-      } else {
-        // [分岐2] 一覧が閉じている場合
-        // ★ リスト生成 (renderList) をスキップ！これにより爆速になります。
-      }
-    } catch (e) {
-      console.warn("List load failed", e);
-
-      // 失敗時の後始末
-      if (forceList) {
-        LG?.setListEnabled?.(false);
-        const chk = document.getElementById("cgpt-list-toggle");
-        if (chk instanceof HTMLInputElement) {
-          chk.checked = false;
-          chk.dispatchEvent(new Event("change"));
-        }
-      }
-    } finally {
-      // ★ 自分の世代がまだ最新である場合のみ、Busy状態を解除
-      if (myGen === __buildGen) {
-        setUiBusy(false);
-        // 最後に念のため数値を再更新（リスト生成後の確定値）
-        if (typeof LG.updateStatus === "function") LG.updateStatus();
-      }
-    }
-  }
-*/
   // =================================================================
   // 修正1: rebuildAndRenderSafely (無駄な待ち時間をカット)
   // =================================================================
+
   let __buildGen = 0;
 
   async function rebuildAndRenderSafely({ forceList = false } = {}) {
@@ -216,54 +136,57 @@
 
     const myGen = ++__buildGen;
 
-    // Loading開始
-    setUiBusy(true, "Loading...");
+    // 1. 高速スキャン (Universalロジック)
+    //    前の画面の残骸かもしれないが、まずはスピード優先で表示する
+    let fastDisplayed = false;
+    if (typeof LG.runFastUniversalScan === "function") {
+      fastDisplayed = LG.runFastUniversalScan();
+    }
+
+    // 表示できなかった時だけ Loading... を出す
+    if (!fastDisplayed) {
+      setUiBusy(true, "Loading...");
+    }
 
     try {
-      // ★ここが高速化の肝！
-      // すでに画面にターン(article)があるなら、メッセージ待ち(waitForFirstTurnAdded)をスキップする
-      const alreadyHasTurns = !!document.querySelector(
-        "article, [data-message-author-role]",
-      );
-
-      if (!alreadyHasTurns) {
-        // まだ無い場合のみ、メッセージ受信を待つ
-        await Promise.race([
-          waitForFirstTurnAdded(5000), // タイムアウトも短縮
-          LG.ensureTurnsReady?.(),
-        ]);
+      // --- A. 待機フェーズ ---
+      if (!fastDisplayed) {
+        const alreadyHasTurns = !!document.querySelector("article");
+        if (!alreadyHasTurns) {
+          await Promise.race([
+            waitForFirstTurnAdded(3000),
+            LG.ensureTurnsReady?.(),
+          ]);
+        }
       }
 
-      // 競合チェック
       if (myGen !== __buildGen) return;
 
-      // --- データ解析 (Universal版同等の速度) ---
+      // --- B. 正規データ構築 ---
       LG.rebuild?.();
 
-      if (myGen !== __buildGen) return;
-
-      // ★即表示
+      // 確定値を表示
       if (typeof LG.updateStatus === "function") {
         LG.updateStatus();
       }
 
-      // --- リスト生成 (重い処理) ---
+      if (!fastDisplayed && myGen === __buildGen) {
+        setUiBusy(false);
+      }
+
+      // --- C. リスト生成 (一覧ON時のみ) ---
       const kind = SH.getPageInfo?.()?.kind || "other";
       const on = forceList || !!SH.getCFG?.()?.list?.enabled;
 
       if (kind === "chat" && on) {
-        // 生成中表示
         UI?.updateStatusDisplay?.("List Gen...");
-
         await new Promise((r) => requestAnimationFrame(r));
         if (myGen !== __buildGen) return;
-
         await LG.renderList?.(forceList);
-      } else {
-        // OFF時はスキップ (爆速)
       }
     } catch (e) {
       console.warn("List load failed", e);
+      // エラー時のフォールバック
       if (forceList) {
         LG?.setListEnabled?.(false);
         const chk = document.getElementById("cgpt-list-toggle");
@@ -276,9 +199,31 @@
       if (myGen === __buildGen) {
         setUiBusy(false);
         if (typeof LG.updateStatus === "function") LG.updateStatus();
+
+        // ============================================================
+        // ★追加: ゾンビDOM対策 (念のための再チェック)
+        // ============================================================
+        // 処理が速すぎて「前のページのDOM」を拾ってしまった場合に備え、
+        // 1秒後にこっそりもう一度だけスキャンして、違っていたら修正する
+        setTimeout(() => {
+          // 世代が変わっていたら何もしない（ユーザーがまた移動したなど）
+          if (myGen !== __buildGen) return;
+
+          // 再スキャン実行 (Universalロジックで十分)
+          if (typeof LG.runFastUniversalScan === "function") {
+            // 現在の表示とDOMの実態がズレていないか確認
+            // (runFastUniversalScan は画面更新も行うので、呼ぶだけでOK)
+            LG.runFastUniversalScan();
+          } else {
+            // なければ正規rebuild
+            LG.rebuild?.();
+            LG.updateStatus?.();
+          }
+        }, 1000); // 1000ms後に再確認
       }
     }
   }
+
   // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
   (function bindCgtnMessageOnce() {
     if (window.__CGTN_MSG_BOUND__) return;

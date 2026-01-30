@@ -15,38 +15,6 @@
       const t = e.target;
       if (!(t instanceof HTMLInputElement)) return;
       // ▼ 一覧表示トグル (#cgpt-list-toggle)
-      /*
-      if (t.id === "cgpt-list-toggle") {
-        const on = t.checked;
-        const btn = document.getElementById("cgpt-list-btn");
-        if (btn) btn.classList.toggle("active", on);
-
-        // ONにする時だけ、重い処理が走る可能性がある 2026.01.29
-        if (on) {
-          // 1. ステータスを「生成中」にする
-          UI.updateStatusDisplay?.("List Gen...");
-
-          // 2. 描画をブロックしないよう非同期で実行
-          setTimeout(async () => {
-            try {
-              if (typeof LG.setListEnabled === "function") {
-                // ここで renderList が走る
-                await LG.setListEnabled(true);
-              }
-            } finally {
-              // 3. 終わったら数値表示に戻す
-              if (typeof LG.updateStatus === "function") LG.updateStatus();
-            }
-          }, 50);
-        } else {
-          // OFFにする時は一瞬なのでそのままでOK
-          if (typeof LG.setListEnabled === "function") {
-            LG.setListEnabled(false);
-          }
-        }
-      }
-      */
-      // ▼ 一覧表示トグル
       if (t.id === "cgpt-list-toggle") {
         const on = t.checked;
         const btn = document.getElementById("cgpt-list-btn");
@@ -175,5 +143,43 @@
       }
     });
   }
+
+  // ============================================================
+  // ★追加: Universal版ロジックの移植 (簡易高速スキャン) 2026.01.30
+  // ============================================================
+  NS.runFastUniversalScan = function () {
+    // 1. 記事要素を単純取得 (Universal版と同じアプローチ)
+    const articles = document.querySelectorAll("article");
+    const total = articles.length;
+
+    if (total === 0) return false; // まだDOMがない
+
+    // 2. 現在地をざっくり計算 (スクロール位置から推定)
+    //    Universal版が行っている「中央付近の要素を探す」処理の簡易版です
+    let current = 0;
+    const center = window.innerHeight / 2;
+
+    // 全要素ループは重いので、バイナリサーチや軽量探索が理想ですが
+    // Universal版同様、単純ループでもDOM操作よりは遥かに速いです
+    for (let i = 0; i < total; i++) {
+      const rect = articles[i].getBoundingClientRect();
+      // 画面内に入ってきたらそれを現在地とする
+      if (rect.top < center && rect.bottom > 0) {
+        current = i + 1;
+      }
+      // 画面より下に行ったら終了
+      if (rect.top > window.innerHeight) break;
+    }
+    // 見つからなければ最後尾または1
+    if (current === 0) current = total;
+
+    // 3. UIを直接更新 (正規のデータ構築を待たない)
+    window.CGTN_UI?.updateStatusDisplay?.(`${current} / ${total}`);
+
+    // スクロール連動用に簡易的にスパイを登録しておく（チラつき防止）
+    // (正規のLogicが走るまでの繋ぎです)
+    return true;
+  };
+
   NS.bindEvents = bindEvents;
 })();
