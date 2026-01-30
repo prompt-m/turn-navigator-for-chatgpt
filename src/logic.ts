@@ -1540,11 +1540,11 @@
 
       <!-- ★ 表示切替（CSSだけで絞り込み） -->
       <div id="cgpt-list-filter" role="group" aria-label="Filter">
-        <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span class="cgtn-pill-btn"></span></label>
-        <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span class="cgtn-pill-btn"></span></label>
-        <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span class="cgtn-pill-btn"></span></label>
+        <label id="lv-lab-all"><input type="radio" name="cgtn-lv" id="lv-all" checked><span class="cgpt-filter-pill"></span></label>
+        <label id="lv-lab-user"><input type="radio" name="cgtn-lv" id="lv-user"><span class="cgpt-filter-pill"></span></label>
+        <label id="lv-lab-asst"><input type="radio" name="cgtn-lv" id="lv-assist"><span class="cgpt-filter-pill"></span></label>
         <label id="lv-lab-pin" class="cgtn-badgehost">
-          <input type="radio" name="cgtn-lv" id="lv-pin"><span class="cgtn-pill-btn"></span><span class="cgtn-badge"></span>
+          <input type="radio" name="cgtn-lv" id="lv-pin"><span class="cgpt-filter-pill"></span><span class="cgtn-badge"></span>
         </label>
 
       </div>

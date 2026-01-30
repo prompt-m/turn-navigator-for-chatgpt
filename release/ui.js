@@ -332,9 +332,7 @@ input:checked + .slider:before {
 .cgtn-dock-body {height: calc(100% - 40px); overflow: auto; padding: 10px 12px; white-space: pre-wrap; user-select: text; line-height: 1.6; max-height: 60vh;}
 .cgtn-dock-resize {position: absolute; right: 6px; bottom: 6px; width: 14px; height: 14px; cursor: nwse-resize; opacity: .7; color: #2c313a;}
 #cgpt-list-filter {display:flex; gap:8px; padding:6px 8px; position:sticky; top:34px; z-index:1; background:rgba(255,255,255,.85); backdrop-filter:blur(4px); justify-content: center; align-items: center;}
-#cgpt-list-filter label {user-select: none; cursor: pointer;}
-#cgpt-list-filter label:has(input:checked) .cgtn-pill-btn {background:#222; color:#fff; border-color:#222;}
-#cgpt-list-filter label:hover .cgtn-pill-btn {background: rgba(0,0,0,.06);}
+#cgpt-list-filter label {position: relative; user-select: none; cursor: pointer;}
 #cgpt-list-filter input[type="radio"] {position:absolute; opacity:0; pointer-events:none; margin:0;}
 .cgtn-badge {position: absolute; top: -4px; right: -4px; min-width: 14px; height: 14px; padding: 0 4px; border-radius: 999px; background: #e11; color: #fff; font-size: 10px; font-weight: 700; text-align: center; box-shadow: 0 0 0 2px #fff; display: flex; align-items: center; justify-content: center; line-height: 1;}
 .cgtn-dock-body::-webkit-scrollbar, #cgpt-list-body::-webkit-scrollbar{width: 10px;}
@@ -344,6 +342,42 @@ input:checked + .slider:before {
 #cgpt-list-panel .cgtn-iconbtn {display: inline-flex; align-items: center; justify-content: center; padding: 0;}
 #cgpt-list-body .cgtn-clip-pin svg.cgtn-pin-svg {width:16px; height:16px; display:block; stroke:currentColor; fill:none;}
 #cgpt-list-body .cgtn-clip-pin.on svg.cgtn-pin-svg {fill:currentColor;}
+/* --- リストパネル用フィルタボタン --- */
+.cgpt-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* サイズと余白 */
+  padding: 4px 10px;
+  min-width: 50px; /* ある程度の幅を持たせる */
+  border-radius: 14px;
+  
+  /* 文字設定 */
+  font-size: 11px;
+  font-weight: 600;
+  
+  /* ★OFFの状態（薄いグレーで控えめに） */
+  color: #666;
+  background-color: #f0f0f0; 
+  border: 1px solid transparent;
+  
+  transition: all 0.2s ease;
+}
+
+/* ホバー時 */
+#cgpt-list-filter label:hover .cgpt-filter-pill {
+  background-color: #e5e5e5;
+  color: #333;
+}
+
+/* ★ONの状態（inputがチェックされたら黒く反転！） */
+#cgpt-list-filter input:checked + .cgpt-filter-pill {
+  background-color: #333; /* ナビに合わせた濃い色 */
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
   `;
     const injectCss = (css) => {
         const s = document.createElement("style");
