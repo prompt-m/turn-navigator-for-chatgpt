@@ -1635,7 +1635,7 @@
     NS.applyPanelWidthByChars(SH.getCFG()?.list?.maxChars || 52);
 
     try {
-      applyListFilterLang();
+      NS.applyListFilterLang();
     } catch {}
     // ツールチップ用titleを登録 '25.11.23
     if (!listBox._tipsBound) {
@@ -1993,18 +1993,24 @@
     return listBox;
   }
   // ensureListBox ここまで
-
-  // ★ ロールフィルタのラベルに辞書を適用 '25.11.20
-  function applyListFilterLang() {
+  // ★ ロールフィルタのラベル言語適用（新クラス対応版） 2026.01.31
+  NS.applyListFilterLang = function () {
     try {
       const panel = document.getElementById("cgpt-list-panel");
       if (!panel) return;
+
+      // 翻訳関数（SH.T がなければそのままで）
+      //      const T = (key) =>
+      //        window.CGTN_SHARED?.T ? window.CGTN_SHARED.T(key) : key;
       const T = SH.T || SH?.t || ((k) => k);
 
-      const sAll = panel.querySelector("#lv-lab-all span");
-      const sUser = panel.querySelector("#lv-lab-user span");
-      const sAsst = panel.querySelector("#lv-lab-asst span");
-      const sPin = panel.querySelector("#lv-lab-pin span");
+      // ★修正点: 新しいクラス .cgpt-filter-pill を指定します
+      const sAll = panel.querySelector("#lv-lab-all .cgpt-filter-pill");
+      const sUser = panel.querySelector("#lv-lab-user .cgpt-filter-pill");
+      const sAsst = panel.querySelector("#lv-lab-asst .cgpt-filter-pill");
+      const sPin = panel.querySelector("#lv-lab-pin .cgpt-filter-pill");
+
+      // テキスト更新 (キー名は辞書に合わせてください)
       if (sAll) sAll.textContent = T("all"); // 全体
       if (sUser) sUser.textContent = T("user"); // ユーザー
       if (sAsst) sAsst.textContent = T("assistant"); // アシスタント
@@ -2012,10 +2018,7 @@
     } catch (e) {
       console.warn("[applyListFilterLang] failed", e);
     }
-  }
-
-  // 外からも呼べるように公開
-  NS.applyListFilterLang = applyListFilterLang;
+  };
 
   // 行右端🗒️のイベントを二重で拾い、誤クリック防止
   function addPinHandlers(btn, art) {

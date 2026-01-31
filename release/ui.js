@@ -241,7 +241,7 @@ input:checked + .slider:before {
 .cgpt-nav-group[data-role="tools"] {#cgpt-list-btn:hover{background:#EDEDED;color:#000;}} 
 .cgpt-nav-group[data-role="others"] {.cgtn-pill-btn:hover{background:#EDEDED;color:#000;}} 
 
-.cgpt-nav-group[data-role="tools"] {#cgpt-list-btn.active:hover{background:#1BE31B;color:#000;}} 
+/*.cgpt-nav-group[data-role="tools"] {#cgpt-list-btn.active:hover{background:#1BE31B;color:#000;}}*/ 
 
 /* ピル型ボタン */
 .cgtn-pill-btn {
@@ -377,6 +377,39 @@ input:checked + .slider:before {
   color: #fff;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
+/* --- リストパネル：フッター用ミニボタン (更新・付箋全操作) --- */
+.cgtn-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* ボタンの大きさ */
+  width: 32px;
+  height: 32px;
+  
+  /* デフォルトのスタイルをリセット */
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px; /* 角を少し丸める */
+  cursor: pointer;
+  color: #333;
+  
+  transition: background-color 0.2s;
+}
+
+/* ホバー時の背景色 */
+.cgtn-mini-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* 中のアイコン(SVG)のサイズ制限 */
+/* これがないと、SVGが巨大になったり見えなくなったりします */
+.cgtn-mini-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block; /* 隙間対策 */
+}  
 
   `;
     const injectCss = (css) => {
@@ -574,6 +607,22 @@ input:checked + .slider:before {
         const cb = box.querySelector("#cgtn-power-toggle");
         if (cb instanceof HTMLInputElement)
             updateSwitchTooltip(cb);
+        // プレビュータイトル
+        const h = document.querySelector("#cgtn-preview-title");
+        if (h)
+            h.textContent = T("preview");
+        // リストパネルのロールフィルタも言語を反映 '25.11.20
+        try {
+            // フィルタボタンと言語の更新
+            window.CGTN_LOGIC?.applyListFilterLang?.();
+            // リストパネルのフッターも言語を反映 '25.11.20
+            window.CGTN_LOGIC?.updateListFooterInfo?.();
+            // リストパネルのタイトル
+            window.CGTN_LOGIC?.updateListChatTitle?.();
+        }
+        catch (e) {
+            console.warn("List panel lang update failed", e);
+        }
     }
     function updateSwitchTooltip(cb) {
         if (!cb)
