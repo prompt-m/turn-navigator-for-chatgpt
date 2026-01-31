@@ -128,7 +128,7 @@
   // =================================================================
 
   let __buildGen = 0;
-
+  /*
   async function rebuildAndRenderSafely({ forceList = false } = {}) {
     const LG = window.CGTN_LOGIC,
       SH = window.CGTN_SHARED,
@@ -223,7 +223,104 @@
       }
     }
   }
+*/
+  async function rebuildAndRenderSafely({ forceList = false } = {}) {
+    const LG = window.CGTN_LOGIC,
+      SH = window.CGTN_SHARED,
+      UI = window.CGTN_UI;
 
+    const myGen = ++__buildGen;
+    console.log("rebuildAndRenderSafely myGen:", myGen);
+    // 1. 高速スキャン (Universalロジック)
+    let fastDisplayed = false;
+    if (typeof LG.runFastUniversalScan === "function") {
+      fastDisplayed = LG.runFastUniversalScan();
+    }
+
+    // 表示できなかった時だけ Loading... を出す
+    if (!fastDisplayed) {
+      setUiBusy(true, "Loading...");
+    }
+
+    try {
+      // --- A. 待機フェーズ ---
+      if (!fastDisplayed) {
+        const alreadyHasTurns = !!document.querySelector("article");
+        if (!alreadyHasTurns) {
+          await Promise.race([
+            waitForFirstTurnAdded(3000),
+            LG.ensureTurnsReady?.(),
+          ]);
+        }
+      }
+
+      if (myGen !== __buildGen) return;
+
+      // --- B. 正規データ構築 ---
+      LG.rebuild?.();
+
+      // 確定値を表示
+      if (typeof LG.updateStatus === "function") {
+        LG.updateStatus();
+      }
+
+      // ★削除: ここにあった「一旦 Loading を消す処理」を削除しました
+      // if (!fastDisplayed && myGen === __buildGen) { setUiBusy(false); }
+
+      // --- C. リスト生成 (一覧ON時のみ) ---
+      const kind = SH.getPageInfo?.()?.kind || "other";
+      const on = forceList || !!SH.getCFG?.()?.list?.enabled;
+
+      if (kind === "chat" && on) {
+        // ★修正: リストを作るなら、強制的に Loading... を表示！
+        // (高速スキャンで既に数字が出ていても、ここで上書きして「処理中」を伝えます)
+        setUiBusy(true, "Loading...");
+        // UI?.updateStatusDisplay?.("List Gen..."); // 必要なら残してもOKですが setUiBusyの方が目立ちます
+
+        await new Promise((r) => requestAnimationFrame(r));
+        if (myGen !== __buildGen) return;
+        await LG.renderList?.(forceList);
+      } else {
+        // ★追加: リストを作らない場合のみ、ここで Loading を消す
+        // (高速スキャン失敗で Loading が出っぱなしの場合の解除用)
+        if (!fastDisplayed && myGen === __buildGen) {
+          console.log("setUiBusy(false)1");
+          setUiBusy(false);
+        }
+      }
+    } catch (e) {
+      console.warn("List load failed", e);
+      // エラー時のフォールバック
+      if (forceList) {
+        LG?.setListEnabled?.(false);
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) {
+          chk.checked = false;
+          chk.dispatchEvent(new Event("change"));
+        }
+      }
+    } finally {
+      if (myGen === __buildGen) {
+        // 最終的に必ず Loading を消す
+        console.log("setUiBusy(false)2");
+        setUiBusy(false);
+        if (typeof LG.updateStatus === "function") LG.updateStatus();
+
+        // ============================================================
+        // ★追加: ゾンビDOM対策 (念のための再チェック)
+        // ============================================================
+        setTimeout(() => {
+          if (myGen !== __buildGen) return;
+          if (typeof LG.runFastUniversalScan === "function") {
+            LG.runFastUniversalScan();
+          } else {
+            LG.rebuild?.();
+            LG.updateStatus?.();
+          }
+        }, 1000);
+      }
+    }
+  }
   // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
   (function bindCgtnMessageOnce() {
     if (window.__CGTN_MSG_BOUND__) return;

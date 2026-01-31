@@ -123,11 +123,107 @@
     // 修正1: rebuildAndRenderSafely (無駄な待ち時間をカット)
     // =================================================================
     let __buildGen = 0;
+    /*
+    async function rebuildAndRenderSafely({ forceList = false } = {}) {
+      const LG = window.CGTN_LOGIC,
+        SH = window.CGTN_SHARED,
+        UI = window.CGTN_UI;
+  
+      const myGen = ++__buildGen;
+  
+      // 1. 高速スキャン (Universalロジック)
+      //    前の画面の残骸かもしれないが、まずはスピード優先で表示する
+      let fastDisplayed = false;
+      if (typeof LG.runFastUniversalScan === "function") {
+        fastDisplayed = LG.runFastUniversalScan();
+      }
+  
+      // 表示できなかった時だけ Loading... を出す
+      if (!fastDisplayed) {
+        setUiBusy(true, "Loading...");
+      }
+  
+      try {
+        // --- A. 待機フェーズ ---
+        if (!fastDisplayed) {
+          const alreadyHasTurns = !!document.querySelector("article");
+          if (!alreadyHasTurns) {
+            await Promise.race([
+              waitForFirstTurnAdded(3000),
+              LG.ensureTurnsReady?.(),
+            ]);
+          }
+        }
+  
+        if (myGen !== __buildGen) return;
+  
+        // --- B. 正規データ構築 ---
+        LG.rebuild?.();
+  
+        // 確定値を表示
+        if (typeof LG.updateStatus === "function") {
+          LG.updateStatus();
+        }
+  
+        if (!fastDisplayed && myGen === __buildGen) {
+          setUiBusy(false);
+        }
+  
+        // --- C. リスト生成 (一覧ON時のみ) ---
+        const kind = SH.getPageInfo?.()?.kind || "other";
+        const on = forceList || !!SH.getCFG?.()?.list?.enabled;
+  
+        if (kind === "chat" && on) {
+          UI?.updateStatusDisplay?.("List Gen...");
+          await new Promise((r) => requestAnimationFrame(r));
+          if (myGen !== __buildGen) return;
+          await LG.renderList?.(forceList);
+        }
+      } catch (e) {
+        console.warn("List load failed", e);
+        // エラー時のフォールバック
+        if (forceList) {
+          LG?.setListEnabled?.(false);
+          const chk = document.getElementById("cgpt-list-toggle");
+          if (chk instanceof HTMLInputElement) {
+            chk.checked = false;
+            chk.dispatchEvent(new Event("change"));
+          }
+        }
+      } finally {
+        if (myGen === __buildGen) {
+          setUiBusy(false);
+          if (typeof LG.updateStatus === "function") LG.updateStatus();
+  
+          // ============================================================
+          // ★追加: ゾンビDOM対策 (念のための再チェック)
+          // ============================================================
+          // 処理が速すぎて「前のページのDOM」を拾ってしまった場合に備え、
+          // 1秒後にこっそりもう一度だけスキャンして、違っていたら修正する
+          setTimeout(() => {
+            // 世代が変わっていたら何もしない（ユーザーがまた移動したなど）
+            if (myGen !== __buildGen) return;
+  
+            // 再スキャン実行 (Universalロジックで十分)
+            if (typeof LG.runFastUniversalScan === "function") {
+              // 現在の表示とDOMの実態がズレていないか確認
+              // (runFastUniversalScan は画面更新も行うので、呼ぶだけでOK)
+              LG.runFastUniversalScan();
+            } else {
+              // なければ正規rebuild
+              LG.rebuild?.();
+              LG.updateStatus?.();
+            }
+          }, 1000); // 1000ms後に再確認
+        }
+      }
+    }
+  */
     async function rebuildAndRenderSafely({ forceList = false } = {}) {
         const LG = window.CGTN_LOGIC, SH = window.CGTN_SHARED, UI = window.CGTN_UI;
         const myGen = ++__buildGen;
+        console.log("rebuildAndRenderSafely myGen:", myGen);
         // 1. 高速スキャン (Universalロジック)
-        //    前の画面の残骸かもしれないが、まずはスピード優先で表示する
         let fastDisplayed = false;
         if (typeof LG.runFastUniversalScan === "function") {
             fastDisplayed = LG.runFastUniversalScan();
@@ -155,18 +251,28 @@
             if (typeof LG.updateStatus === "function") {
                 LG.updateStatus();
             }
-            if (!fastDisplayed && myGen === __buildGen) {
-                setUiBusy(false);
-            }
+            // ★削除: ここにあった「一旦 Loading を消す処理」を削除しました
+            // if (!fastDisplayed && myGen === __buildGen) { setUiBusy(false); }
             // --- C. リスト生成 (一覧ON時のみ) ---
             const kind = SH.getPageInfo?.()?.kind || "other";
             const on = forceList || !!SH.getCFG?.()?.list?.enabled;
             if (kind === "chat" && on) {
-                UI?.updateStatusDisplay?.("List Gen...");
+                // ★修正: リストを作るなら、強制的に Loading... を表示！
+                // (高速スキャンで既に数字が出ていても、ここで上書きして「処理中」を伝えます)
+                setUiBusy(true, "Loading...");
+                // UI?.updateStatusDisplay?.("List Gen..."); // 必要なら残してもOKですが setUiBusyの方が目立ちます
                 await new Promise((r) => requestAnimationFrame(r));
                 if (myGen !== __buildGen)
                     return;
                 await LG.renderList?.(forceList);
+            }
+            else {
+                // ★追加: リストを作らない場合のみ、ここで Loading を消す
+                // (高速スキャン失敗で Loading が出っぱなしの場合の解除用)
+                if (!fastDisplayed && myGen === __buildGen) {
+                    console.log("setUiBusy(false)1");
+                    setUiBusy(false);
+                }
             }
         }
         catch (e) {
@@ -183,30 +289,25 @@
         }
         finally {
             if (myGen === __buildGen) {
+                // 最終的に必ず Loading を消す
+                console.log("setUiBusy(false)2");
                 setUiBusy(false);
                 if (typeof LG.updateStatus === "function")
                     LG.updateStatus();
                 // ============================================================
                 // ★追加: ゾンビDOM対策 (念のための再チェック)
                 // ============================================================
-                // 処理が速すぎて「前のページのDOM」を拾ってしまった場合に備え、
-                // 1秒後にこっそりもう一度だけスキャンして、違っていたら修正する
                 setTimeout(() => {
-                    // 世代が変わっていたら何もしない（ユーザーがまた移動したなど）
                     if (myGen !== __buildGen)
                         return;
-                    // 再スキャン実行 (Universalロジックで十分)
                     if (typeof LG.runFastUniversalScan === "function") {
-                        // 現在の表示とDOMの実態がズレていないか確認
-                        // (runFastUniversalScan は画面更新も行うので、呼ぶだけでOK)
                         LG.runFastUniversalScan();
                     }
                     else {
-                        // なければ正規rebuild
                         LG.rebuild?.();
                         LG.updateStatus?.();
                     }
-                }, 1000); // 1000ms後に再確認
+                }, 1000);
             }
         }
     }

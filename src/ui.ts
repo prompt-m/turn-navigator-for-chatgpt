@@ -587,6 +587,7 @@ input:checked + .slider:before {
         "#cgpt-list-btn": "nav.list",
         "#cgpt-navi-refresh": "nav.refresh",
         "#cgtn-open-settings": "nav.openSettings",
+        "#cgpt-drag": "headerDrag",
       },
       document,
     );
@@ -613,7 +614,7 @@ input:checked + .slider:before {
       window.CGTN_LOGIC.renderList(true);
     }
   }
-
+  /*
   function applyLang() {
     const box = document.getElementById("cgpt-nav");
     if (!box) return;
@@ -660,6 +661,53 @@ input:checked + .slider:before {
     // 3. ★ここが整理のポイント！
     // ツールチップは「Shared」に一括更新させる
     // ----------------------------------------------------
+    window.CGTN_SHARED?.updateTooltips?.();
+  }
+*/
+
+  function applyLang() {
+    const box = document.getElementById("cgpt-nav");
+    if (!box) return;
+
+    // 1. ナビパネル内のテキスト更新
+    // (title属性の更新は削除してOK -> SH.updateTooltipsにお任せ)
+    box.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      const txt = T(key);
+      if (key && txt) {
+        el.textContent = txt;
+        // el.title = txt; // ← ★削除OK！
+      }
+    });
+
+    // 2. ドラッグヘッダー
+    // ★ installUI の applyTooltips リストに "#cgpt-drag": "headerDrag" を追加して、
+    //    ここの手動更新は削除してしまうのが一番スマートです。
+    // const dragHeader = box.querySelector("#cgpt-drag");
+    // if (dragHeader instanceof HTMLElement) dragHeader.title = T("headerDrag");
+
+    // 3. 電源スイッチ (ON/OFFの状態によって文言が変わる特殊なやつ)
+    // ★これだけは「状態」に依存するので、専用関数を呼ぶ今のまま残します
+    const cb = box.querySelector("#cgtn-power-toggle");
+    if (cb instanceof HTMLInputElement) updateSwitchTooltip(cb); // ← ★キープ！
+
+    // 4. プレビュータイトル (テキスト更新)
+    const h = document.querySelector("#cgtn-preview-title");
+    // const T = ... (上で定義してあればOK)
+    if (h) {
+      h.textContent = T("preview");
+    }
+    // 5. リストパネル関連 (Logicにお任せ)
+    try {
+      window.CGTN_LOGIC?.applyListFilterLang?.();
+      window.CGTN_LOGIC?.updateListFooterInfo?.();
+      window.CGTN_LOGIC?.updateListChatTitle?.();
+    } catch (e) {
+      console.warn("List panel lang update failed", e);
+    }
+
+    // 6. ツールチップ一括更新 (Sharedにお任せ)
+    // これがリストパネル内のツールチップも含めて全部書き換えてくれます
     window.CGTN_SHARED?.updateTooltips?.();
   }
 

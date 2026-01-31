@@ -398,68 +398,127 @@
             return "ja";
         }
     }
+    /*
     // 言語切替フックの登録先
-    // const _langHooks = new Set(); !!!!
+    const _langHooks = new Set<() => void>();
+  
+    // 言語切替時に再実行したい処理を登録
+    SH.onLangChange = function onLangChange(fn) {
+      if (typeof fn === "function") _langHooks.add(fn);
+    };
+  
+    const _registrations = [];
+  
+    // ★共通処理関数（applyとupdateでコードを重複させないため）
+    SH.applyTooltipsToRoot = function (root, pairs) {
+      const T = SH.T || SH.t || ((k) => k); // 翻訳関数を安全に確保
+  
+      Object.entries(pairs || {}).forEach(([sel, key]) => {
+        // 該当要素をすべて探す
+        root.querySelectorAll(sel).forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+  
+          const txt = T(key);
+          if (txt) {
+            // 1. title属性（マウスホバー時の文字）
+            el.title = txt;
+  
+            // 2. aria-label属性（スクリーンリーダー用）
+            // もともと aria-label を持っている要素（ボタンなど）なら、そこも更新してあげると親切です
+            if (el.hasAttribute("aria-label")) {
+              el.setAttribute("aria-label", txt);
+            }
+          }
+        });
+      });
+    };
+  
+    // 新規登録 & 初回適用
+    SH.applyTooltips = function (pairs, root = document) {
+      if (!pairs) return;
+      // 履歴に保存
+      _registrations.push({ root, pairs });
+      // 即座に適用
+      SH.applyTooltipsToRoot(root, pairs);
+    };
+  
+    // 再適用（言語切替時）
+    SH.updateTooltips = function () {
+      // 1. 登録済みツールチップの一斉更新
+      _registrations.forEach(({ root, pairs }) => {
+        // 要素がDOMから消えていてもエラーにはならないので安全です
+        SH.applyTooltipsToRoot(root, pairs);
+      });
+  
+      // 2. ★重要: 既存のフック処理（これを消さないように！）
+      if (typeof _langHooks !== "undefined" && Array.isArray(_langHooks)) {
+        _langHooks.forEach((fn) => {
+          try {
+            fn();
+          } catch (e) {
+            console.warn("onLangChange hook failed", e);
+          }
+        });
+      }
+    };
+  */
+    // --- 内部変数 ---
+    const _registrations = []; // ツールチップの登録場所
     const _langHooks = new Set();
-    /** 言語切替時に再実行したい処理を登録 */
+    /** 言語切替時に再実行したい処理を登録 (content.tsなどが使用) */
     SH.onLangChange = function onLangChange(fn) {
         if (typeof fn === "function")
             _langHooks.add(fn);
     };
-    // 直近の登録を覚えておいて、言語切替時に再適用
-    /* !!!!
-    const _registrations = [];
-    SH.applyTooltips = function (pairs, root = document) {
-      const L = SH.curLang?.() || "ja";
-      if (!pairs) return;
-      // 保存（同一root+keysは上書き）
-      _registrations.push({ root, pairs });
-  
-      Object.entries(pairs).forEach(([sel, key]) => {
-        root.querySelectorAll(sel).forEach((el) => {
-          const s = t(key);
-          if (s) el.title = s;
-        });
-      });
-    };*/
-    const _registrations = [];
-    SH.applyTooltips = function (pairs, root = document) {
-        const L = SH.curLang?.() || "ja";
-        if (!pairs)
-            return;
-        _registrations.push({ root, pairs });
-        Object.entries(pairs).forEach(([sel, key]) => {
-            root.querySelectorAll(sel).forEach((el) => {
+    /** 内部用: 指定されたルート以下のツールチップを一括適用 */
+    SH.applyTooltipsToRoot = function (root, pairs) {
+        // 翻訳関数 (無ければキーをそのまま返す)
+        const T = SH.T || SH.t || ((k) => k);
+        Object.entries(pairs || {}).forEach(([sel, key]) => {
+            // セレクタに一致する要素をすべて探す
+            const targets = root.querySelectorAll ? root.querySelectorAll(sel) : [];
+            targets.forEach((el) => {
                 if (!(el instanceof HTMLElement))
                     return;
-                const s = t(key);
-                if (s)
-                    el.title = s;
+                const txt = T(key);
+                if (txt) {
+                    // 1. title属性（マウスホバー用）
+                    el.title = txt;
+                    // 2. aria-label属性（読み上げ用）
+                    // もともと持っている要素なら更新してあげる
+                    if (el.hasAttribute("aria-label")) {
+                        el.setAttribute("aria-label", txt);
+                    }
+                }
             });
         });
     };
-    /** 既存: ツールチップの再適用 */
+    /** 新規登録 & 初回適用 (installUIなどで使用) */
+    SH.applyTooltips = function (pairs, root = document) {
+        if (!pairs)
+            return;
+        // 履歴に保存（あとで言語切替時に使うため）
+        _registrations.push({ root, pairs });
+        // 今すぐ適用
+        SH.applyTooltipsToRoot(root, pairs);
+    };
+    /** 再適用 (言語切替時に ui.ts から呼ばれる) */
     SH.updateTooltips = function () {
-        const L = SH.curLang?.() || "ja";
-        // 既存のツールチップ再適用
+        // 1. 登録済みツールチップの一斉更新
         _registrations.forEach(({ root, pairs }) => {
-            Object.entries(pairs || {}).forEach(([sel, key]) => {
-                root.querySelectorAll(sel).forEach((el) => {
-                    const s = t(key);
-                    if (s)
-                        el.title = s;
-                });
+            SH.applyTooltipsToRoot(root, pairs);
+        });
+        // 2. ★重要: 登録されたフック処理を実行 (SetなのでforEachでOK)
+        if (_langHooks && _langHooks.size > 0) {
+            _langHooks.forEach((fn) => {
+                try {
+                    fn();
+                }
+                catch (e) {
+                    console.warn("onLangChange hook failed", e);
+                }
             });
-        });
-        // ★ 新規：言語切替フックを一斉実行
-        _langHooks.forEach((fn) => {
-            try {
-                fn();
-            }
-            catch (e) {
-                console.warn("onLangChange hook failed", e);
-            }
-        });
+        }
     };
     const isNum = (v) => Number.isFinite(Number(v));
     const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
