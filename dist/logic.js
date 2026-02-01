@@ -48,36 +48,6 @@
         ui?.updateStatusDisplay?.(`${current} / ${total}`);
         console.log("updateStatus3 current:", current, " total:", total);
     };
-    // 現在見ているターン番号を計算
-    /*
-    function calcCurrentTurnIndex(sc) {
-      if (!sc || !NS.ST.all.length) return 0;
-  
-      // 画面中央あたりを基準線とする
-      const cfg = SH.getCFG() || {};
-      const bias = Number(cfg.centerBias) || 0.5;
-      const viewportH = sc.clientHeight || window.innerHeight;
-      const scrollTop = sc.scrollTop || 0;
-      const baselineY = scrollTop + viewportH * bias;
-  
-      let found = 0;
-      for (let i = 0; i < NS.ST.all.length; i++) {
-        const el = NS.ST.all[i];
-        // articleTopは「その要素をTopに持ってくるためのscrollTop」を返すので
-        // 要素の絶対Y座標 ≈ articleTop(sc, el) とみなせます
-        const y = articleTop(sc, el);
-  
-        // 基準線より上にあるなら「通過済み」
-        if (y <= baselineY + 10) {
-          found = i + 1;
-        } else {
-          break; // ソート済みなのでこれ以降は見なくていい
-        }
-      }
-      return found || 1;
-    }
-  */
-    // src/logic.ts
     // ★最適化: 二分探索で現在地を探す（計算量 O(N) -> O(log N)） 2026.02.01
     function calcCurrentTurnIndex(sc) {
         if (!sc || !NS.ST.all.length)
@@ -1656,6 +1626,32 @@
                         }
                     }
                 }
+                // ★追加: 3. 「全表示」ボタンの処理
+                if (target.closest(".cgtn-show-all-btn")) {
+                    const SH = window.CGTN_SHARED;
+                    try {
+                        const cfg2 = SH.getCFG ? SH.getCFG() : {};
+                        if (SH.saveSettingsPatch) {
+                            SH.saveSettingsPatch({
+                                list: { ...(cfg2.list || {}), pinOnly: false },
+                            });
+                        }
+                        const allRadio = document.getElementById("lv-all");
+                        if (allRadio instanceof HTMLInputElement)
+                            allRadio.checked = true;
+                        // ここは設定変更なので renderList(true) してOK
+                        if (typeof NS.renderList === "function") {
+                            NS.renderList(true, { pinOnlyOverride: false });
+                        }
+                        if (typeof NS.updateListFooterInfo === "function") {
+                            NS.updateListFooterInfo();
+                        }
+                    }
+                    catch (e) {
+                        console.warn("show-all click failed", e);
+                    }
+                    return;
+                }
             });
         })(listBox); // ← ここで ensureListBox 内の変数 listBox を渡しています
         // ★★★ 修正版コード（ここまで） ★★★
@@ -2073,7 +2069,7 @@
             </div>
           `;
                     row.querySelector(".txt").textContent = attachLine;
-                    /*
+                    /* bindListEvents へ移動 2026.02.01
                     row.addEventListener("click", (ev) => {
                       const t = ev.target;
                       if (!(t instanceof Element)) return;
@@ -2128,7 +2124,7 @@
                         if (isAsst)
                             downloads++;
                     }
-                    /*
+                    /* bindListEvents へ移動 2026.02.01
                     row2.addEventListener("click", (ev) => {
                       const t = ev.target;
                       if (!(t instanceof Element)) return;
@@ -2165,22 +2161,22 @@
         <button class="show-all" type="button">${T("list.showAll")}</button>
       `;
             body.appendChild(empty);
+            /* bindListEvents へ移動 2026.02.01
             empty.querySelector(".show-all")?.addEventListener("click", () => {
-                try {
-                    const cfg2 = SH.getCFG() || {};
-                    SH.saveSettingsPatch({
-                        list: { ...(cfg2.list || {}), pinOnly: false },
-                    });
-                    const allRadio = document.getElementById("lv-all");
-                    if (allRadio instanceof HTMLInputElement)
-                        allRadio.checked = true;
-                    NS.renderList?.(true, { pinOnlyOverride: false });
-                    NS.updateListFooterInfo?.();
-                }
-                catch (e) {
-                    console.warn("show-all click failed", e);
-                }
+              try {
+                const cfg2 = SH.getCFG() || {};
+                SH.saveSettingsPatch({
+                  list: { ...(cfg2.list || {}), pinOnly: false },
+                });
+                const allRadio = document.getElementById("lv-all");
+                if (allRadio instanceof HTMLInputElement) allRadio.checked = true;
+                NS.renderList?.(true, { pinOnlyOverride: false });
+                NS.updateListFooterInfo?.();
+              } catch (e) {
+                console.warn("show-all click failed", e);
+              }
             });
+      */
         }
         const rowsCount = body.querySelectorAll(".row").length;
         NS._lastVisibleRows = rowsCount;
@@ -2205,6 +2201,7 @@
             panel.style.visibility = "visible";
         }
     };
+    // renderList ここまで
     // ======================================================
     // 一覧パネル ON / OFF
     // ======================================================
@@ -2595,6 +2592,55 @@
         const width = Math.max(minW, Math.min(maxW, Math.round(charsPerLine * charW + padding)));
         panel.style.width = width + "px";
     };
+    // ★追加: 行のイベント委譲から呼ばれるピン留め実行関数
+    // 2026.02.01
+    NS.togglePin = async function (article) {
+        if (!article)
+            return;
+        const cid = SH.getChatId?.();
+        if (!cid)
+            return;
+        // ターン要素からインデックス(1始まり)を取得
+        const key = NS.getTurnKey(article);
+        const idx1 = Number(String(key).replace("turn:", ""));
+        if (!idx1)
+            return;
+        // ストレージ上のピン状態をトグル
+        const ret = await SH.togglePinByIndex?.(idx1, cid);
+        let nextState = !!ret;
+        if (ret && typeof ret === "object" && "pinned" in ret) {
+            nextState = !!ret.pinned;
+        }
+        // UI反映（同じターンの行すべて）
+        // ※ rowsByTurn は内部関数なので、ここで再取得するか、ロジックを流用
+        const body = document.getElementById("cgpt-list-body");
+        if (body) {
+            const rows = body.querySelectorAll(`.row[data-idx="${idx1}"]`);
+            rows.forEach((r) => {
+                const row = r;
+                if (nextState)
+                    row.dataset.pin = "1";
+                else
+                    row.removeAttribute("data-pin");
+                // 既存の paintPinRow があれば使う、なければ手動でクラス操作
+                const clip = row.querySelector(".cgtn-clip-pin");
+                if (clip) {
+                    clip.setAttribute("aria-pressed", String(nextState));
+                    clip.classList.toggle("off", !nextState);
+                    clip.classList.toggle("on", nextState);
+                }
+            });
+        }
+        // バッジ・フッター更新
+        try {
+            NS.updatePinOnlyBadge?.();
+        }
+        catch { }
+        try {
+            NS.updateListFooterInfo?.();
+        }
+        catch { }
+    };
     // --- expose ---
     window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
         getTurnKey: NS.getTurnKey || getTurnKey,
@@ -2802,4 +2848,5 @@
     NS.getTurnKey = getTurnKey;
     NS.pickAllTurns = pickAllTurns;
     NS.isRealTurn = isRealTurn;
+    NS.scrollToHead = scrollToHead;
 })();
