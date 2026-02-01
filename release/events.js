@@ -5,6 +5,8 @@
     const UI = window.CGTN_UI || {};
     const LG = window.CGTN_LOGIC || {};
     const NS = (window.CGTN_EVENTS = window.CGTN_EVENTS || {});
+    // ★追加: 世代管理カウンター（関数の外に置いてください）
+    let listToggleGen = 0;
     function bindEvents() {
         const box = document.getElementById("cgpt-nav");
         if (!box)
@@ -20,39 +22,40 @@
                 const btn = document.getElementById("cgpt-list-btn");
                 if (btn)
                     btn.classList.toggle("active", on);
+                // ★ 今回のクリックに番号を振る
+                const myGen = ++listToggleGen;
                 if (on) {
-                    // 1. まず表示を変える
+                    // 1. Loading表示
                     UI.updateStatusDisplay?.("List Gen...");
-                    // 2. 描画の更新を待ってから処理開始 (setTimeout 50ms)
+                    // 2. 遅延実行
                     setTimeout(async () => {
+                        // ★チェック: 待っている間に別のクリックがあったら、もう何もしない
+                        if (myGen !== listToggleGen)
+                            return;
                         try {
                             if (typeof LG.setListEnabled === "function") {
-                                // setListEnabled が Promise を返さなくても、
-                                // renderList が重ければここでスレッドが占有されます。
-                                // もし renderList が async なら await できます。
+                                // ここで待機。途中でOFFにされると、logic側のキャンセル機能により
+                                // この await はすぐに false で返ってくる
                                 await LG.setListEnabled(true);
-                                // ★追加: もし setListEnabled が非同期待機せずに戻ってくる仕様の場合、
-                                // 強制的にリスト要素ができるまで少し待つロジックを入れても良いですが、
-                                // まずは単純な await で試します。
                             }
                         }
                         catch (err) {
-                            console.error(err);
                             LG.logError?.("List Gen Failed", err);
                         }
-                        finally {
-                            // 3. 処理が終わったら確実に数値に戻す
+                        // ★チェック: 処理が終わった後も、まだ自分が最新世代か確認
+                        if (myGen === listToggleGen) {
                             if (typeof LG.updateStatus === "function")
                                 LG.updateStatus();
                         }
                     }, 50);
                 }
                 else {
-                    // OFFにする時は一瞬でOK
+                    // OFFにする時
+                    // ★ logic側で古いON処理をキャンセルしてくれるので、ここは投げるだけでOK
                     if (typeof LG.setListEnabled === "function") {
                         LG.setListEnabled(false);
                     }
-                    // 即座に数値更新（またはOFF表示）
+                    // 即座に数値更新
                     if (typeof LG.updateStatus === "function")
                         LG.updateStatus();
                 }
