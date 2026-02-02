@@ -1203,46 +1203,121 @@
     const ST = { all: [], user: [], assistant: [], page: 1 };
     let _rebuildTicket = 0;
     let _rebuildCid = null;
-    function rebuild(cidFromMsg) {
-        const my = ++_rebuildTicket;
-        // この実行の “対象チャットID” を確定（以降はこれで評価）
-        const startCid = cidFromMsg || SH.getChatId?.();
-        _rebuildCid = startCid || _rebuildCid;
-        NS._scroller = getTrueScroller();
-        // ===== 材料スナップショットを nextST に作る =====
-        const nextST = { all: [], user: [], assistant: [], page: 1 };
-        const allRaw = pickAllTurns().filter(isRealTurn);
-        nextST.all = sortByY(allRaw);
-        // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
-        if (nextST.all.length === 0) {
-            NS.clearListPanelUI?.();
-            // ↓ この後の確定ブロックで my/cid の照合を通す
-        }
-        else {
-            const roleOf = (a) => getTurnRole(a); // 既存ヘルパに委譲
-            nextST.user = nextST.all.filter((a) => roleOf(a) === "user");
-            nextST.assistant = nextST.all.filter((a) => roleOf(a) === "assistant");
-            // 可能なら Set も用意（描画側が速くなる）
-            nextST._userSet = new Set(nextST.user);
-            nextST._asstSet = new Set(nextST.assistant);
-        }
-        // ===== 確定直前ガード & コミット =====
-        if (my !== _rebuildTicket)
-            return;
-        const curCid = SH.getChatId?.();
-        if (startCid && curCid && startCid !== curCid)
-            return;
-        ST.all = nextST.all;
-        ST.user = nextST.user;
-        ST.assistant = nextST.assistant;
-        ST._userSet = nextST._userSet ?? new Set(ST.user);
-        ST._asstSet = nextST._asstSet ?? new Set(ST.assistant);
-        // デバッグ公開
-        NS.ST = ST;
-        // ★追加: スクロール監視を開始し、ステータスを即時更新 2026.1.27
-        bindScrollSpy();
-        NS.updateStatus();
+    /*
+    function rebuild(cidFromMsg?: string) {
+      const my = ++_rebuildTicket;
+  
+      // この実行の “対象チャットID” を確定（以降はこれで評価）
+      const startCid = cidFromMsg || SH.getChatId?.();
+      _rebuildCid = startCid || _rebuildCid;
+  
+      NS._scroller = getTrueScroller();
+  
+      // ===== 材料スナップショットを nextST に作る =====
+      const nextST: TurnState = { all: [], user: [], assistant: [], page: 1 };
+  
+      const allRaw = pickAllTurns().filter(isRealTurn);
+      nextST.all = sortByY(allRaw);
+  
+      // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
+      if (nextST.all.length === 0) {
+        NS.clearListPanelUI?.();
+        // ↓ この後の確定ブロックで my/cid の照合を通す
+      } else {
+        const roleOf = (a: TurnEl) => getTurnRole(a); // 既存ヘルパに委譲
+  
+        nextST.user = nextST.all.filter((a) => roleOf(a) === "user");
+        nextST.assistant = nextST.all.filter((a) => roleOf(a) === "assistant");
+  
+        // 可能なら Set も用意（描画側が速くなる）
+        nextST._userSet = new Set(nextST.user);
+        nextST._asstSet = new Set(nextST.assistant);
+      }
+  
+      // ===== 確定直前ガード & コミット =====
+      if (my !== _rebuildTicket) return;
+  
+      const curCid = SH.getChatId?.();
+      if (startCid && curCid && startCid !== curCid) return;
+  
+      ST.all = nextST.all;
+      ST.user = nextST.user;
+      ST.assistant = nextST.assistant;
+      ST._userSet = nextST._userSet ?? new Set(ST.user);
+      ST._asstSet = nextST._asstSet ?? new Set(ST.assistant);
+  
+      // デバッグ公開
+      NS.ST = ST;
+  
+      // ★追加: スクロール監視を開始し、ステータスを即時更新 2026.1.27
+      bindScrollSpy();
+      NS.updateStatus();
     }
+  */
+    // src/logic.ts
+    // ★修正: エラーハンドリングとリトライ機能を追加した rebuild
+    NS.rebuild = function (cidFromMsg) {
+        try {
+            // ===== 既存の処理 =====
+            const my = ++_rebuildTicket;
+            const startCid = cidFromMsg || SH.getChatId?.();
+            _rebuildCid = startCid || _rebuildCid;
+            NS._scroller = getTrueScroller();
+            // 型チェックを緩和するために : any をつけます
+            const nextST = { all: [], user: [], assistant: [], page: 1 };
+            // 1. 取得部分を安全にガード
+            let allRaw = [];
+            try {
+                allRaw = pickAllTurns().filter(isRealTurn);
+            }
+            catch (e) {
+                console.warn("pickAllTurns temporary error", e);
+            }
+            nextST.all = sortByY(allRaw);
+            // 0件の場合はクリア処理
+            if (nextST.all.length === 0) {
+                NS.clearListPanelUI?.();
+            }
+            else {
+                const roleOf = (a) => getTurnRole(a);
+                nextST.user = nextST.all.filter((a) => roleOf(a) === "user");
+                nextST.assistant = nextST.all.filter((a) => roleOf(a) === "assistant");
+                try {
+                    nextST._userSet = new Set(nextST.user);
+                    nextST._asstSet = new Set(nextST.assistant);
+                }
+                catch { }
+            }
+            if (my !== _rebuildTicket)
+                return;
+            const curCid = SH.getChatId?.();
+            if (startCid && curCid && startCid !== curCid)
+                return;
+            // コミット
+            ST.all = nextST.all;
+            ST.user = nextST.user;
+            ST.assistant = nextST.assistant;
+            ST._userSet = nextST._userSet ?? new Set(ST.user);
+            ST._asstSet = nextST._asstSet ?? new Set(ST.assistant);
+            NS.ST = ST;
+            bindScrollSpy();
+            NS.updateStatus(); // ここまで来れば Loading... が消えて数字になる
+            // ====================
+        }
+        catch (err) {
+            // ★ ここが重要！ エラーが起きても死なずにリトライ予約をする
+            console.error("[rebuild] crashed, retrying...", err);
+            setTimeout(() => {
+                // まだデータが取れていなければ再挑戦
+                if (!NS.ST.all.length) {
+                    console.log("Retry rebuild...");
+                    NS.rebuild?.(); // 自分をもう一度呼ぶ
+                    // 必要なら renderList も呼ぶ
+                    // NS.renderList?.(true);
+                }
+            }, 1000); // 1秒後に再挑戦
+        }
+    };
     //ダウンロード文抽出ヘルパ（本文・画像・不明の3分岐）
     //これで PDF 例は ⭳（ChatGPT_Turn_Navigator_Promo.pdf）
     //画像系は ⭳（画像）
@@ -2840,7 +2915,6 @@
     NS.ensureTurnsReady = ensureTurnsReady;
     NS.clearListFooterInfo = clearListFooterInfo;
     NS.updatePinOnlyBadge = updatePinOnlyBadge;
-    NS.rebuild = rebuild;
     NS.goTop = goTop;
     NS.goBottom = goBottom;
     NS.goPrev = goPrev;

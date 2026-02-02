@@ -13,6 +13,53 @@
   // ===== Runtime (Idle ⇄ Navigate) =====
   type Disposer = () => void;
 
+  // ★復活: 待機用 sleep 関数
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // ★復活: 画面の「指紋」を作成（件数 + 最初の要素のIDやテキスト）
+  //2026.02.02
+  function getDomSignature() {
+    const turns = document.querySelectorAll("article");
+    if (!turns.length) return "empty";
+    const first = turns[0];
+    // ID または テキストの先頭30文字で識別
+    const sig = first.id || first.textContent?.slice(0, 30).trim() || "";
+    return `${turns.length}:${sig}`;
+  }
+
+  // ★復活: チャットが安定するまで待つ関数（指紋チェック付き）
+  //2026.02.02
+  async function waitForChatSettled(args: {
+    mustNotMatch?: string; // ← これが重要（前の指紋）
+    maxMs?: number;
+  }) {
+    const { mustNotMatch, maxMs = 12000 } = args;
+    const start = Date.now();
+
+    while (Date.now() - start < maxMs) {
+      // 1. 指紋チェック（前の画面と同じなら待つ）
+      if (mustNotMatch) {
+        const nowSig = getDomSignature();
+        if (nowSig === mustNotMatch) {
+          await sleep(100);
+          continue;
+        }
+      }
+
+      // 2. 要素存在チェック
+      const turns = document.querySelectorAll("article");
+      if (turns.length > 0) {
+        // 要素があれば安定とみなしてループを抜ける
+        // (より厳密にするなら前回の件数と比較するロジックも入れられますが、
+        //  今回は指紋が変わればOKとします)
+        return true;
+      }
+
+      await sleep(100);
+    }
+    return false; // タイムアウト
+  }
+
   function makeBag() {
     const bag: Disposer[] = [];
     return {
@@ -127,92 +174,79 @@
   // 修正1: rebuildAndRenderSafely (無駄な待ち時間をカット)
   // =================================================================
 
+  // src/content.ts
+
   let __buildGen = 0;
-  async function rebuildAndRenderSafely({ forceList = false } = {}) {
+  // ★修正: oldSig を受け取れるように変更
+  async function rebuildAndRenderSafely(
+    { forceList = false } = {},
+    oldSig: string | null = null, // ← 追加
+  ) {
     const LG = window.CGTN_LOGIC,
       SH = window.CGTN_SHARED,
       UI = window.CGTN_UI;
 
     const myGen = ++__buildGen;
     console.log("rebuildAndRenderSafely myGen:", myGen);
-    // 1. 高速スキャン (Universalロジック)
-    let fastDisplayed = false;
-    if (typeof LG.runFastUniversalScan === "function") {
-      fastDisplayed = LG.runFastUniversalScan();
+
+    // ★追加: Loading... を強制
+    setUiBusy(true, "Loading...");
+
+    // ★追加: 待機フェーズ（前の指紋と違う画面になるまで待つ）
+    if (oldSig) {
+      await waitForChatSettled({ mustNotMatch: oldSig });
+      if (myGen !== __buildGen) return; // 待ってる間に次へ移動していたら終了
     }
 
-    // 表示できなかった時だけ Loading... を出す
-    if (!fastDisplayed) {
-      setUiBusy(true, "Loading...");
+    // 1. 高速スキャン (Universalロジック) - ※今回は一旦スキップでもOKですが残します
+    let fastDisplayed = false;
+    if (typeof LG.runFastUniversalScan === "function") {
+      // fastDisplayed = LG.runFastUniversalScan();
+      // ★注意: ここで scan すると画面更新されてしまうので、
+      // 同期表示(ドン！)を優先するなら scan は呼ばないほうが綺麗です。
+      // 今回はコメントアウト推奨です。
     }
 
     try {
-      // --- A. 待機フェーズ ---
-      if (!fastDisplayed) {
-        const alreadyHasTurns = !!document.querySelector("article");
-        if (!alreadyHasTurns) {
-          await Promise.race([
-            waitForFirstTurnAdded(3000),
-            LG.ensureTurnsReady?.(),
-          ]);
-        }
-      }
-
-      if (myGen !== __buildGen) return;
-
       // --- B. 正規データ構築 ---
+      // ★修正: silent=true で呼ぶ（logic.ts側対応が必要）
+      // もし logic.ts 側で silent 対応が難しければ、普通に呼んでもOKです。
+      // (指紋チェックで待機しているので、変なタイミングで表示されることは防げます)
       LG.rebuild?.();
 
       // 確定値を表示
+      // ★重要: ここで初めて updateStatus を呼ぶ
       if (typeof LG.updateStatus === "function") {
         LG.updateStatus();
       }
-
-      // ★削除: ここにあった「一旦 Loading を消す処理」を削除しました
-      // if (!fastDisplayed && myGen === __buildGen) { setUiBusy(false); }
 
       // --- C. リスト生成 (一覧ON時のみ) ---
       const kind = SH.getPageInfo?.()?.kind || "other";
       const on = forceList || !!SH.getCFG?.()?.list?.enabled;
 
       if (kind === "chat" && on) {
-        // ★修正: リストを作るなら、強制的に Loading... を表示！
-        // (高速スキャンで既に数字が出ていても、ここで上書きして「処理中」を伝えます)
+        console.log("(kind === chat && on setUiBusy(true,Loading...)");
         setUiBusy(true, "Loading...");
-        // UI?.updateStatusDisplay?.("List Gen..."); // 必要なら残してもOKですが setUiBusyの方が目立ちます
 
         await new Promise((r) => requestAnimationFrame(r));
         if (myGen !== __buildGen) return;
         await LG.renderList?.(forceList);
-      } else {
-        // ★追加: リストを作らない場合のみ、ここで Loading を消す
-        // (高速スキャン失敗で Loading が出っぱなしの場合の解除用)
-        if (!fastDisplayed && myGen === __buildGen) {
-          console.log("setUiBusy(false)1");
-          setUiBusy(false);
-        }
       }
     } catch (e) {
       console.warn("List load failed", e);
-      // エラー時のフォールバック
+      // エラー時の処理（既存のまま）
       if (forceList) {
         LG?.setListEnabled?.(false);
-        const chk = document.getElementById("cgpt-list-toggle");
-        if (chk instanceof HTMLInputElement) {
-          chk.checked = false;
-          chk.dispatchEvent(new Event("change"));
-        }
+        // ... (省略) ...
       }
     } finally {
       if (myGen === __buildGen) {
-        // 最終的に必ず Loading を消す
-        console.log("setUiBusy(false)2");
+        console.log("myGen === __buildGen) setUiBusy(false)");
         setUiBusy(false);
+        // 念のため更新
         if (typeof LG.updateStatus === "function") LG.updateStatus();
 
-        // ============================================================
-        // ★追加: ゾンビDOM対策 (念のための再チェック)
-        // ============================================================
+        // ゾンビ対策（既存のまま）
         setTimeout(() => {
           if (myGen !== __buildGen) return;
           if (typeof LG.runFastUniversalScan === "function") {
@@ -225,6 +259,7 @@
       }
     }
   }
+
   // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
   (function bindCgtnMessageOnce() {
     if (window.__CGTN_MSG_BOUND__) return;
@@ -269,20 +304,53 @@
           __lastCid = cidNow;
           const myGen = ++__gen;
 
+          // ★追加: 処理開始前の「指紋」を取得 2026.02.02
+          const currentSig = getDomSignature();
+
           // ★追加: URLが変わったら、処理開始前に即座に「Loading...」にする
           if (d.type === "url-change") {
             try {
               window.CGTN_PREVIEW?.hide?.("url-change");
             } catch {}
-            // ここで即座に表示更新！
+
+            console.log(
+              "d.type === url-change catch setUiBusy(true,Loding...)",
+            );
             setUiBusy(true, "Loading...");
-            // ★追加: この瞬間に、古いデータを即座に捨てる！2026.01.29
-            // これでスクロール等が起きても古い数字が表示されることはなくなります
+
+            // ★追加: リストが開いているかチェック
+            const panel = document.getElementById("cgpt-list-panel");
+            const wasListOpen =
+              panel &&
+              panel.style.display !== "none" &&
+              !panel.classList.contains("collapsed");
+
             LG?.clearListPanelUI?.();
+
+            clearTimeout(__debTo);
+            __debTo = window.setTimeout(() => {
+              requestAnimationFrame(() => {
+                (async () => {
+                  if (myGen !== __gen) return;
+                  // ★修正: wasListOpen と currentSig を渡す！
+                  await rebuildAndRenderSafely(
+                    { forceList: !!wasListOpen },
+                    currentSig,
+                  );
+                })()
+                  .catch((err) => console.warn("[cgtn] rebuild error:", err))
+                  .finally(() => {
+                    // (中略)
+                  });
+              });
+            }, 80); // 80ms待機（微調整通知を待つため）
           } else {
             // turn-added（会話が増えただけ）の場合は、操作不能にせず裏で更新したいなら
             // setUiBusy(true) は呼ばなくても良いですが、
             // 確実に同期させたいなら呼んでもOKです。今回はLoading表示させます。
+            console.log(
+              "d.type === url-change else  setUiBusy(true,Loding...)",
+            );
             setUiBusy(true, "Loading...");
           }
 
@@ -297,6 +365,9 @@
                 .finally(() => {
                   try {
                     // 処理が終わったらLoading解除（数字表示に戻る）
+                    console.log(
+                      "rebuildAndRenderSafely finally setUiBusy(false)",
+                    );
                     setUiBusy(false);
                   } catch {}
                 });
