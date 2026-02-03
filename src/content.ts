@@ -1,4 +1,4 @@
-// content.js — Entry (refactor skeleton)
+// content.ts — Entry (refactor skeleton)
 (function () {
   "use strict";
   if (document.getElementById("cgpt-nav")) return;
@@ -9,7 +9,6 @@
   const LG = window.CGTN_LOGIC;
 
   // 2026.1.22
-  // ===== Runtime (Idle ⇄ Navigate) =====
   // ===== Runtime (Idle ⇄ Navigate) =====
   type Disposer = () => void;
 
@@ -171,91 +170,85 @@
 
   // 一覧がOFFなら、リスト生成（renderList）をスキップする処理を追加 2026.01.29
   // =================================================================
-  // 修正1: rebuildAndRenderSafely (無駄な待ち時間をカット)
+  //  rebuildAndRenderSafely (爆速FastScan優先版)
   // =================================================================
-
-  // src/content.ts
-
   let __buildGen = 0;
-  // ★修正: oldSig を受け取れるように変更
   async function rebuildAndRenderSafely(
     { forceList = false } = {},
-    oldSig: string | null = null, // ← 追加
+    oldSig: string | null = null,
   ) {
-    const LG = window.CGTN_LOGIC,
-      SH = window.CGTN_SHARED,
-      UI = window.CGTN_UI;
+    const LG = window.CGTN_LOGIC;
+    const SH = window.CGTN_SHARED;
+    // const UI = window.CGTN_UI;
 
     const myGen = ++__buildGen;
-    console.log("rebuildAndRenderSafely myGen:", myGen);
+    // console.log("rebuildAndRenderSafely myGen:", myGen);
 
-    // ★追加: Loading... を強制
+    // 1. Loading... を出すが、FastScanですぐ上書きされること前提
     setUiBusy(true, "Loading...");
 
-    // ★追加: 待機フェーズ（前の指紋と違う画面になるまで待つ）
-    if (oldSig) {
-      await waitForChatSettled({ mustNotMatch: oldSig });
-      if (myGen !== __buildGen) return; // 待ってる間に次へ移動していたら終了
+    // ★ここが変更点: 待機よりも先に、まずFastScanで数字を出す！
+    // これにより、ユーザーは瞬時に「345 / 345」を目にすることができます。
+    let fastDone = false;
+    if (typeof LG.runFastUniversalScan === "function") {
+      fastDone = LG.runFastUniversalScan();
     }
 
-    // 1. 高速スキャン (Universalロジック) - ※今回は一旦スキップでもOKですが残します
-    let fastDisplayed = false;
-    if (typeof LG.runFastUniversalScan === "function") {
-      // fastDisplayed = LG.runFastUniversalScan();
-      // ★注意: ここで scan すると画面更新されてしまうので、
-      // 同期表示(ドン！)を優先するなら scan は呼ばないほうが綺麗です。
-      // 今回はコメントアウト推奨です。
+    // 2. 待機フェーズ（前の指紋と違う画面になるまで待つ）
+    // FastScanが成功していれば、すでに新しい画面なので待つ必要はありません。
+    // 失敗（まだDOMがない）場合のみ、しっかりと待ちます。
+    if (!fastDone && oldSig) {
+      await waitForChatSettled({ mustNotMatch: oldSig });
+      if (myGen !== __buildGen) return;
     }
 
     try {
-      // --- B. 正規データ構築 ---
-      // ★修正: silent=true で呼ぶ（logic.ts側対応が必要）
-      // もし logic.ts 側で silent 対応が難しければ、普通に呼んでもOKです。
-      // (指紋チェックで待機しているので、変なタイミングで表示されることは防げます)
+      // 3. 正規ロジック再構築（内部データの確定）
       LG.rebuild?.();
 
-      // 確定値を表示
-      // ★重要: ここで初めて updateStatus を呼ぶ
+      // 4. リストを作るかどうか判定
+      const kind = SH.getPageInfo?.()?.kind || "other";
+      const cfg = SH.getCFG?.() || {};
+      const needList = kind === "chat" && (forceList || !!cfg.list?.enabled);
+
+      if (needList) {
+        // console.log("Render List...");
+        await new Promise((r) => requestAnimationFrame(r));
+        if (myGen !== __buildGen) return;
+        await LG.renderList?.(true);
+      }
+
+      // 5. 最終更新（リスト作成等でズレた表示を補正）
       if (typeof LG.updateStatus === "function") {
         LG.updateStatus();
       }
-
-      // --- C. リスト生成 (一覧ON時のみ) ---
-      const kind = SH.getPageInfo?.()?.kind || "other";
-      const on = forceList || !!SH.getCFG?.()?.list?.enabled;
-
-      if (kind === "chat" && on) {
-        console.log("(kind === chat && on setUiBusy(true,Loading...)");
-        setUiBusy(true, "Loading...");
-
-        await new Promise((r) => requestAnimationFrame(r));
-        if (myGen !== __buildGen) return;
-        await LG.renderList?.(forceList);
-      }
     } catch (e) {
       console.warn("List load failed", e);
-      // エラー時の処理（既存のまま）
+      // エラー時のフォールバック
       if (forceList) {
         LG?.setListEnabled?.(false);
-        // ... (省略) ...
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) {
+          chk.checked = false;
+          chk.dispatchEvent(new Event("change"));
+        }
       }
     } finally {
       if (myGen === __buildGen) {
-        console.log("myGen === __buildGen) setUiBusy(false)");
         setUiBusy(false);
-        // 念のため更新
-        if (typeof LG.updateStatus === "function") LG.updateStatus();
 
-        // ゾンビ対策（既存のまま）
+        // ★ダメ押しリトライ（0件対策）
+        // ChatGPTの描画が遅れていて0件だった場合、1.2秒後にもう一度だけスキャンする
         setTimeout(() => {
           if (myGen !== __buildGen) return;
-          if (typeof LG.runFastUniversalScan === "function") {
-            LG.runFastUniversalScan();
-          } else {
+          const total = LG.ST?.all?.length || 0;
+          if (total === 0) {
+            if (typeof LG.runFastUniversalScan === "function")
+              LG.runFastUniversalScan();
             LG.rebuild?.();
             LG.updateStatus?.();
           }
-        }, 1000);
+        }, 1200);
       }
     }
   }
@@ -1039,81 +1032,22 @@
     }
   }
 
-  // ========= 9) 初期セットアップ ========= '25.12.6 改
-  /*
-  async function initialize() {
-    console.log("initialize");
-    // ★ 初期処理を 1 秒遅らせる（ChatGPT 本体のロード完了を待つ） '25.12.6
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // 設定ロード & v2 ストレージ移行
-    await SH.loadSettings();
-    try {
-      // v2 移行を使う場合はここで 1 回だけ（無ければ無視される）
-      await SH.migratePinsStorageOnce?.();
-    } catch {}
-
-    // UI 構築 & フォーカス保護まわり
-    UI.installUI();
-    ensureFocusPark();
-    installFocusStealGuard();
-
-    // 言語・位置などの初期反映
-    UI.applyLang();
-    UI.clampPanelWithinViewport();
-
-    // 基準線の初期表示（保存 showViz を尊重）
-    try {
-      const cfg = SH?.getCFG?.();
-      SH?.renderViz?.(cfg, !!cfg?.showViz);
-    } catch {}
-
-    // イベント系のバインド
-    EV.bindEvents();
-    bindPreviewDockOnce();
-    bindBaselineAutoFollow();
-
-    // URL 変更フック（必要な場合のみ）
-    if (USE_INJECT_URL_HOOK) {
-      injectUrlChangeHook();
-    }
-
-    // ★ここで手動初期化を追加（ロード時OFF対策） 2026.01.26
-    manualInitPageInfo();
-
-    // ゴミになったゼロ件レコードの掃除
-    try {
-      SH.cleanupZeroPinRecords?.();
-    } catch {}
-
-    // ★ 初回 rebuild は「UI とイベントが一通り整ったあと」で、
-    //   かつ ChatGPT 本体の初期化とも競合しないよう 1.2 秒遅らせて実行 '25.12.6
-    setTimeout(() => {
-      // ★ 修正：勝手にリストが開くのを防止
-      //   forceList: true を false に変更しました
-      //    rebuildAndRenderSafely({ forceList: true }).catch((e) =>
-      rebuildAndRenderSafely({ forceList: false }).catch((e) =>
-        console.warn("[init-delayed] rebuildAndRenderSafely failed", e),
-      );
-    }, 1200);
-
-    // viewport 変化でナビ位置クランプ
-    window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
-      passive: true,
-    });
-    window.addEventListener("orientationchange", () =>
-      UI.clampPanelWithinViewport(),
-    );
-  }
-*/
   // =================================================================
-  // 修正2: initialize (起動遅延を削除)
+  // 修正後: initialize (起動遅延を極限まで短縮)
   // =================================================================
   async function initialize() {
-    // 最初のウェイトも短縮 (1500 -> 100)
+    // ★変更点: 待機を100msに短縮 (1500msも待つ必要はありません)
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    await SH.loadSettings();
+    // ★追加: データ構造が古ければ自動変換して保存し直す 2026.02.03
+    // (loadSettings の前にやるのがポイントです)
+    try {
+      await SH.migrateStorageIfNeeded?.();
+    } catch (e) {
+      console.warn("Migration check failed", e);
+    }
+
+    await SH.loadSettings(); // ここで v2 データが読み込まれる
     try {
       await SH.migratePinsStorageOnce?.();
     } catch {}
@@ -1144,13 +1078,12 @@
       SH.cleanupZeroPinRecords?.();
     } catch {}
 
-    // ★修正: 1200ms の固定待機を 100ms に短縮！
-    // 既に waitForFirstTurnAdded の最適化を入れたので、すぐ呼んでOKです
+    // ★変更点: 初回スキャンの待機も100msに短縮
     setTimeout(() => {
       rebuildAndRenderSafely({ forceList: false }).catch((e) =>
         console.warn("[init-delayed] rebuildAndRenderSafely failed", e),
       );
-    }, 100); // ← 1200から100へ
+    }, 100);
 
     window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
       passive: true,

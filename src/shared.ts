@@ -57,24 +57,6 @@
   // 読み込み完了を待つ（完了済みなら即解決）
   //  SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _onLoadedResolvers.push(r));
   // ---- load 完了の通知仕組み ----
-  /* !!!!  
-  const _resolves = [];
-  SH.whenLoaded = () =>
-    _loaded ? Promise.resolve() : new Promise((r) => _resolves.push(r));
-
-  // 読み込み完了を宣言（1回だけ）
-  SH.markLoaded = () => {
-    if (_loaded) return;
-    _loaded = true;
-    const list = _onLoadedResolvers.splice(0);
-    for (const fn of list) {
-      try {
-        fn();
-      } catch {}
-    }
-  };
-*/
-
   const _resolves: Array<() => void> = [];
   SH.whenLoaded = (): Promise<void> =>
     _loaded ? Promise.resolve() : new Promise<void>((r) => _resolves.push(r));
@@ -204,19 +186,6 @@
   }
 
   SH.syncSetAsync = syncSetAsync; // 既存の名前空間にあわせて
-
-  // === sync から最新を強制ロードしてメモリCFGに反映 ===
-  /* !!!!
-  SH.reloadFromSync = async function () {
-    if (!chrome?.storage?.sync) return SH.getCFG?.() || {};
-    const all = await new Promise((res) => chrome.storage.sync.get(null, res));
-    const cfg = all && all.cgNavSettings ? all.cgNavSettings : {};
-    try {
-      setCFG(cfg);
-    } catch {}
-    return cfg;
-  };
-  */
 
   // === sync から最新を強制ロードしてメモリCFGに反映 ===
   SH.reloadFromSync = async function () {
@@ -467,71 +436,6 @@
     }
   }
 
-  /*
-  // 言語切替フックの登録先
-  const _langHooks = new Set<() => void>();
-
-  // 言語切替時に再実行したい処理を登録 
-  SH.onLangChange = function onLangChange(fn) {
-    if (typeof fn === "function") _langHooks.add(fn);
-  };
-
-  const _registrations = [];
-
-  // ★共通処理関数（applyとupdateでコードを重複させないため）
-  SH.applyTooltipsToRoot = function (root, pairs) {
-    const T = SH.T || SH.t || ((k) => k); // 翻訳関数を安全に確保
-
-    Object.entries(pairs || {}).forEach(([sel, key]) => {
-      // 該当要素をすべて探す
-      root.querySelectorAll(sel).forEach((el) => {
-        if (!(el instanceof HTMLElement)) return;
-
-        const txt = T(key);
-        if (txt) {
-          // 1. title属性（マウスホバー時の文字）
-          el.title = txt;
-
-          // 2. aria-label属性（スクリーンリーダー用）
-          // もともと aria-label を持っている要素（ボタンなど）なら、そこも更新してあげると親切です
-          if (el.hasAttribute("aria-label")) {
-            el.setAttribute("aria-label", txt);
-          }
-        }
-      });
-    });
-  };
-
-  // 新規登録 & 初回適用 
-  SH.applyTooltips = function (pairs, root = document) {
-    if (!pairs) return;
-    // 履歴に保存
-    _registrations.push({ root, pairs });
-    // 即座に適用
-    SH.applyTooltipsToRoot(root, pairs);
-  };
-
-  // 再適用（言語切替時） 
-  SH.updateTooltips = function () {
-    // 1. 登録済みツールチップの一斉更新
-    _registrations.forEach(({ root, pairs }) => {
-      // 要素がDOMから消えていてもエラーにはならないので安全です
-      SH.applyTooltipsToRoot(root, pairs);
-    });
-
-    // 2. ★重要: 既存のフック処理（これを消さないように！）
-    if (typeof _langHooks !== "undefined" && Array.isArray(_langHooks)) {
-      _langHooks.forEach((fn) => {
-        try {
-          fn();
-        } catch (e) {
-          console.warn("onLangChange hook failed", e);
-        }
-      });
-    }
-  };
-*/
-
   // --- 内部変数 ---
   const _registrations = []; // ツールチップの登録場所
   const _langHooks = new Set<() => void>();
@@ -607,27 +511,6 @@
     return dst;
   }
 
-  // 旧 pinsByChat → 分割キーへ一度だけ移行(content.js initialize)
-  /* !!!!
-  SH.migratePinsStorageOnce = async function () {
-    const cfg = SH.getCFG?.() || {};
-    if (!cfg.pinsByChat) return; // 既に移行済み
-
-    const map = cfg.pinsByChat || {};
-    const idx = (cfg.pinsIndex = cfg.pinsIndex || {});
-    for (const [cid, rec] of Object.entries(map)) {
-      const arr = Array.isArray(rec?.pins) ? rec.pins : [];
-      const pins = arr.map((v) => (!!v ? 1 : 0));
-      const k = KEY_PINS(cid);
-      await syncSetAsync({ [k]: pins });
-      idx[cid] = { count: pins.filter(Boolean).length, updatedAt: Date.now() };
-    }
-    // 旧データを設定から削除
-    delete cfg.pinsByChat;
-    SH.setCFG?.(cfg);
-    await syncSetAsync({ [KEY_CFG]: cfg });
-  };
-*/
   SH.migratePinsStorageOnce = async function () {
     const cfg: any = SH.getCFG?.() || {};
     if (!cfg.pinsByChat) return; // 既に移行済み
@@ -650,24 +533,6 @@
     SH.setCFG?.(cfg);
     await syncSetAsync({ [KEY_CFG]: cfg });
   };
-
-  /* !!!!
-  function cleanupZeroPinRecords() {
-    const cfg = SH.getCFG() || {};
-    const map = { ...(cfg.pinsByChat || {}) };
-    let changed = false;
-    for (const [cid, rec] of Object.entries(map)) {
-      const pins = Array.isArray(rec?.pins)
-        ? rec.pins
-        : Object.values(rec?.pins || {});
-      if (!pins.some(Boolean)) {
-        delete map[cid];
-        changed = true;
-      }
-    }
-    if (changed) SH.saveSettingsPatch({ pinsByChat: map });
-  }
-*/
 
   function cleanupZeroPinRecords() {
     const cfg: any = SH.getCFG() || {};
@@ -712,27 +577,12 @@
       }
     });
   }
-  /* !!!!
-  SH.loadPinsMapAsync = async function loadPinsMapAsync() {
-    const cfg = await _loadCfgRaw();
-    const map = cfg.pinsByChat || {};
-    return map; // { [chatId]: boolean[] }
-  };
-*/
+
   SH.loadPinsMapAsync = async function loadPinsMapAsync() {
     const cfg: any = await _loadCfgRaw();
     const map = cfg?.pinsByChat || {};
     return map; // { [chatId]: boolean[] }
   };
-
-  /* !!!!  
-  SH.savePinsMapAsync = async function savePinsMapAsync(nextMap) {
-    const cfg = await _loadCfgRaw();
-    cfg.pinsByChat = nextMap || {};
-    await _saveCfgRaw(cfg);
-    return true;
-  };
-*/
 
   SH.savePinsMapAsync = async function savePinsMapAsync(nextMap: any) {
     const cfg: any = await _loadCfgRaw();
@@ -749,85 +599,6 @@
     await SH.savePinsMapAsync(map);
     return true;
   };
-
-  /*
-  SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr){
-    console.log("◎setPinsArrAsync◎ :chatId", chatId, " pinsArr:", pinsArr);
-
-    const safeArr = Array.isArray(pinsArr) ? pinsArr.slice() : [];
-    const map = await SH.loadPinsMapAsync();
-
-    if (safeArr.length === 0) {
-      // 要素ゼロならレコード自体を削除
-      delete map[chatId];
-    } else {
-      const prev   = map[chatId] || {};
-      const title  = (SH.getChatTitle?.() || prev.title || '').trim();
-      const now    = Date.now();
-
-      map[chatId] = {
-        ...prev,
-        pins: safeArr,
-        title,
-        updatedAt: now
-      };
-    }
-
-    await SH.savePinsMapAsync(map);
-    return true;
-  };
-*/
-
-  /*
-  // === ピン保存バッファリング =======================================
-  const PIN_SAVE_DEBOUNCE_MS = 1200;      // まとめ書きの待ち時間
-  const _pinSaveBuf = new Map();          // chatId -> { arr, timer, lastErrorAt }
-
-  function scheduleBufferedPinsSave(chatId, pinsArr){
-console.log("◆scheduleBufferedPinsSave◆ :chatId",chatId," pinsArr:",pinsArr);
-    if (!chatId) return;
-    let buf = _pinSaveBuf.get(chatId);
-    if (!buf){
-      buf = { arr: pinsArr.slice(), timer: null, lastErrorAt: 0 };
-      _pinSaveBuf.set(chatId, buf);
-    } else {
-      buf.arr = pinsArr.slice();          // 最新状態で上書き
-    }
-    if (buf.timer) return;                // 既にタイマがあれば何もしない
-
-console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
-
-    buf.timer = setTimeout(async () => {
-      buf.timer = null;
-      try{
-        // 実保存（失敗すると quota エラーなどがここに飛んでくる）
-        await SH.setPinsArrAsync?.(chatId, buf.arr);
-      }catch(e){
-        console.warn('[pins-buffer] save failed', e);
-        const now = Date.now();
-        // 連続アラートを防ぐため 5 秒に 1 回まで
-        if (!buf.lastErrorAt || now - buf.lastErrorAt > 5000){
-          buf.lastErrorAt = now;
-          const t = window.CGTN_I18N?.t || (s=>s);
-          const title = t('storage.saveFailed.title') ||
-                        '付箋の保存に失敗しました';
-          const body  = t('storage.saveFailed.body')  ||
-                        'しばらく待ってから再度お試しください。\n' +
-                        '（ストレージの上限に達している可能性があります）';
-          try{ alert(`${title}\n\n${body}`); }catch(_){}
-        }
-      }
-    }, PIN_SAVE_DEBOUNCE_MS);
-  }
-
-  // 新フォーマット用：cfg.pinsByChat から配列だけ取り出す
-  SH.getPinsArrFromCfg = function(chatId = SH.getChatId?.()) {
-    const cfg = SH.getCFG?.() || {};
-    const rec = cfg.pinsByChat?.[chatId];
-    const arr = Array.isArray(rec?.pins) ? rec.pins : [];
-    return arr.slice();
-  };
-*/
 
   // 読み出しは同期しても良いけど、呼び元の都合上 sync版も提供
   SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
@@ -1135,20 +906,6 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
     renderViz(CFG, _visible);
   }
 
-  /*
-  (function(NS){
-    SH.titleEscape = function(s){
-      return String(s || '').replace(/[&<>"']/g, c => ({
-        '&':'&amp;',
-        '<':'&lt;',
-        '>':'&gt;',
-        '"':'&quot;',
-        "'":'&#39;'
-      }[c]));
-    };
-  })(window.CGTN_SHARED);
-*/
-
   SH.titleEscape = function (s) {
     return String(s ?? "")
       .replace(/&/g, "&amp;")
@@ -1256,9 +1013,144 @@ console.log("◆scheduleBufferedPinsSave◆ :buf.timer",buf.timer);
     }
   };
 
+  // src/shared.ts に追加
+
+  // =================================================================
+  // Data Migration & Backup (v1 -> v2)
+  // =================================================================
+
+  // v1データをv2へ変換する「通訳」関数
+  function migrateV1toV2(raw: any) {
+    // すでに v2 ならそのまま返す
+    if (raw.meta && raw.meta.version >= 2) {
+      return raw;
+    }
+
+    console.log("[Migrate] Converting v1 -> v2...", raw);
+
+    // 1. 設定(settings) と ピンデータ(pinsByChat) を分離する
+    const newSettings = { ...raw };
+    const newPinsByChat: Record<string, any> = {};
+
+    // v1の構造: raw.list.pinsByChat だったり、raw.pinsByChat だったりする可能性を網羅
+    // (もし v1.0.1 で pinsByChat がルートにあった場合も考慮)
+    if (raw.pinsByChat) {
+      Object.assign(newPinsByChat, raw.pinsByChat);
+      delete newSettings.pinsByChat;
+    }
+    if (raw.list && raw.list.pinsByChat) {
+      Object.assign(newPinsByChat, raw.list.pinsByChat);
+      // 設定側からは削除（容量節約）
+      // ※注: JSのオブジェクト参照の問題を避けるため deep copy 推奨ですが簡易的に delete
+      try {
+        delete newSettings.list.pinsByChat;
+      } catch {}
+    }
+
+    // 不要なメタデータを設定から消す
+    delete newSettings.meta;
+
+    return {
+      meta: { version: 2 },
+      settings: newSettings,
+      pinsByChat: newPinsByChat,
+    };
+  }
+
+  // ★ 自動マイグレーション（起動時にチェック）
+  SH.migrateStorageIfNeeded = async function () {
+    return new Promise<void>((resolve) => {
+      chrome.storage.sync.get(null, (raw: any) => {
+        if (!raw || Object.keys(raw).length === 0) {
+          // データがない（新規インストール）なら何もしない
+          resolve();
+          return;
+        }
+
+        // バージョンチェック
+        const ver = raw.meta?.version || 0;
+        if (ver >= 2) {
+          // 最新なので何もしない
+          resolve();
+          return;
+        }
+
+        // v1 -> v2 変換実行
+        console.log(`[AutoMigrate] Found v${ver} data. Upgrading to v2...`);
+        const v2Data = migrateV1toV2(raw);
+
+        // 保存（フラットに展開して保存）
+        const toSave = {
+          meta: v2Data.meta,
+          ...v2Data.settings, // list, showViz 等を展開
+          pinsByChat: v2Data.pinsByChat,
+        };
+
+        // 一度クリアしてから保存（ゴミ掃除のため）
+        // ※「拡張機能のコンテキスト無効化」エラーが出ても、
+        // 次回の起動でまたここを通るので整合性は保たれます。
+        chrome.storage.sync.clear(() => {
+          chrome.storage.sync.set(toSave, () => {
+            console.log("[AutoMigrate] Done.");
+            resolve();
+          });
+        });
+      });
+    });
+  };
+
+  // ★ エクスポート機能（JSON生成）
+  SH.exportAllData = async function () {
+    const raw = await new Promise<any>((r) => chrome.storage.sync.get(null, r));
+
+    // エクスポート前に必ずマイグレーションを通す（常に最新形式で出力）
+    const v2Data = migrateV1toV2(raw);
+
+    return {
+      meta: {
+        appName: "TurnNavigator",
+        version: 2,
+        exportedAt: Date.now(),
+      },
+      data: {
+        settings: v2Data.settings,
+        pinsByChat: v2Data.pinsByChat,
+      },
+    };
+  };
+
+  // ★ インポート機能（JSON読込）
+  SH.importData = async function (jsonObj: any) {
+    if (!jsonObj) throw new Error("Empty data");
+
+    // 構造チェック
+    let candidate = jsonObj.data || jsonObj; // {data: ...} ラッパーがあってもなくても対応
+
+    // 読み込んだデータもマイグレーションを通す（古いバックアップでも対応可能に）
+    const v2Data = migrateV1toV2(candidate);
+
+    const toSave = {
+      meta: v2Data.meta,
+      ...v2Data.settings,
+      pinsByChat: v2Data.pinsByChat,
+    };
+
+    // 保存実行
+    await new Promise<void>((resolve, reject) => {
+      chrome.storage.sync.clear(() => {
+        chrome.storage.sync.set(toSave, () => {
+          if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+          else resolve();
+        });
+      });
+    });
+
+    // メモリ上の設定もリロード
+    await SH.loadSettings();
+    return true;
+  };
+
   SH.DEFAULTS = DEFAULTS;
-  //  SH.getCFG       = () => CFG;
-  //  SH.setCFG       = setCFG;
   SH.loadSettings = loadSettings;
   SH.computeAnchor = computeAnchor;
   SH.renderViz = renderViz;

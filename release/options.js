@@ -1,4 +1,4 @@
-// options.js — 設定画面（i18n.js/ shared.js に統一）
+// options.ts — 設定画面
 (() => {
     "use strict";
     const SH = window.CGTN_SHARED || {};
@@ -579,6 +579,86 @@
             catch (_) { }
         }
     }
+    // =================================================================
+    // ★追加: エクスポート・インポート (Backup / Restore)
+    // =================================================================
+    // --- Export ---
+    document.getElementById("btn-export")?.addEventListener("click", async () => {
+        // ボタンを一時的にBusyにする（連打防止）
+        const btn = document.getElementById("btn-export");
+        setBusy(btn, true);
+        try {
+            if (!SH.exportAllData) {
+                throw new Error("Export function not found in shared.js");
+            }
+            // データを生成
+            const data = await SH.exportAllData();
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            // ダウンロード発火
+            const a = document.createElement("a");
+            a.href = url;
+            // ファイル名: turn-navigator-backup-YYYY-MM-DD.json
+            const date = new Date().toISOString().slice(0, 10);
+            a.download = `turn-navigator-backup-${date}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            // 成功メッセージ（ボタンの近くにポワン）
+            toastNearPointer(T("opts.exportSuccess") || "Exported!");
+        }
+        catch (e) {
+            console.error(e);
+            alert("Export failed: " + e);
+        }
+        finally {
+            setBusy(btn, false);
+        }
+    });
+    // --- Import ---
+    const inpFile = document.getElementById("inp-import-file");
+    const btnImport = document.getElementById("btn-import");
+    // Importボタンを押したら、隠しファイル入力をクリックさせる
+    btnImport?.addEventListener("click", () => {
+        if (inpFile) {
+            inpFile.value = ""; // 同じファイルを再度選べるようにリセット
+            inpFile.click();
+        }
+    });
+    // ファイルが選択されたら実行
+    inpFile?.addEventListener("change", () => {
+        const file = inpFile.files?.[0];
+        if (!file)
+            return;
+        // 確認ダイアログ
+        const msg = T("opts.importConfirm") ||
+            "現在のデータを上書きしてインポートしますか？\n(この操作は取り消せません)";
+        if (!confirm(msg))
+            return;
+        const btn = document.getElementById("btn-import");
+        setBusy(btn, true);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const text = e.target?.result;
+                const json = JSON.parse(text);
+                if (!SH.importData) {
+                    throw new Error("Import function not found in shared.js");
+                }
+                await SH.importData(json);
+                alert(T("opts.importSuccess") || "インポート完了！ページをリロードします。");
+                location.reload();
+            }
+            catch (err) {
+                console.error(err);
+                alert("Import Error: " + err);
+                setBusy(btn, false);
+            }
+        };
+        reader.readAsText(file);
+    });
     // 初期化
     document.addEventListener("DOMContentLoaded", async () => {
         try {
@@ -799,6 +879,55 @@
         }
         catch (e) {
             console.error("options init failed", e);
+        }
+    });
+    // src/options.ts に追加
+    // =================================================================
+    // Debug Section
+    // =================================================================
+    const debugSection = document.getElementById("debug-section");
+    const debugOutput = document.getElementById("debug-output");
+    const btnRefresh = document.getElementById("btn-debug-refresh");
+    const btnClear = document.getElementById("btn-debug-clear");
+    // データ表示関数
+    async function showDebugData() {
+        if (!debugOutput)
+            return;
+        debugOutput.textContent = "Loading...";
+        // ストレージから生データを取得
+        chrome.storage.sync.get(null, (data) => {
+            // 見やすく整形して表示
+            const json = JSON.stringify(data, null, 2);
+            debugOutput.textContent = json;
+            // バージョンチェックのヒントを表示
+            const ver = data.meta?.version;
+            if (ver === 2) {
+                debugOutput.style.borderLeft = "3px solid #4caf50"; // 緑線 (OK)
+            }
+            else {
+                debugOutput.style.borderLeft = "3px solid #ff9800"; // オレンジ (古い)
+            }
+        });
+    }
+    // 展開したときにデータをロード
+    debugSection?.addEventListener("toggle", (e) => {
+        if (debugSection.open) {
+            showDebugData();
+        }
+    });
+    // リフレッシュボタン
+    btnRefresh?.addEventListener("click", (e) => {
+        e.stopPropagation(); // 閉じてしまわないように
+        showDebugData();
+    });
+    // 全消去ボタン（Danger!）
+    btnClear?.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const msg = "【警告】\nストレージのデータを完全に消去します。\n設定も付箋もすべて初期状態に戻ります。\nよろしいですか？";
+        if (confirm(msg)) {
+            await new Promise((r) => chrome.storage.sync.clear(r));
+            alert("データを消去しました。\nページをリロードします。");
+            location.reload();
         }
     });
 })();

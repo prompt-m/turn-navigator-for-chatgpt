@@ -147,6 +147,24 @@
             }
         });
     }
+    // ★追加: 隠し機能「ターン数をダブルクリックでログ表示」 2026.02.03
+    const statusLabel = document.getElementById("cgpt-nav-status"); // 数字が出ている場所
+    if (statusLabel) {
+        statusLabel.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // logic.ts にある showLogs を呼び出す
+            const LG = window.CGTN_LOGIC;
+            if (typeof LG.showLogs === "function") {
+                LG.showLogs();
+            }
+            else {
+                alert("Log viewer is not available.");
+            }
+        });
+        // ユーザーに「ここ押せるよ」と教えないために cursor: pointer はあえて付けません
+        statusLabel.title = "Double-click to view logs"; // ヒントだけこっそり
+    }
     // ============================================================
     // ★追加: Universal版ロジックの移植 (簡易高速スキャン) 2026.01.30
     // ============================================================

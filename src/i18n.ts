@@ -105,6 +105,10 @@
       "opts.pins.btn.delete": "削除",
       "opts.pins.note":
         "各チャットの付箋を一覧。不要になった付箋データは削除できます。",
+      "opts.btnExport": "エクスポート",
+      "opts.btnImport": "インポート",
+      "opts.backupDesc":
+        "付箋データをJSONファイルにエクスポートまたはバックアップから復元します。",
       "options.refreshTitles": "再計算",
       "options.openChatAndRefresh":
         "チャット名を表示するには、ChatGPT画面を開いて［最新にする］を押してください。",
@@ -233,6 +237,10 @@
       "opts.pins.btn.delete": "Delete",
       "opts.pins.note":
         "Displays pinned data per chat. You can delete unneeded pin data.",
+      "opts.btnExport": "Export",
+      "opts.btnImport": "Import",
+      "opts.backupDesc":
+        "Export your pins and settings to a JSON file, or restore from a backup.",
       // ===== Tooltips =====
       "nav.top": "Go to top",
       "nav.bottom": "Go to bottom",

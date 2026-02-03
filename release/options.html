@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
@@ -11,8 +11,8 @@
         --bd: #ddd;
         --bg: #fff;
         --pill: #f5f6f8;
-        --label-col: 300px; /* ラベル固定幅（200–300で調整） */
-        --pins-h: 360px; /* 付箋島の最大高さ */
+        --label-col: 300px;
+        --pins-h: 360px;
         --radius: 12px;
       }
       @media (prefers-color-scheme: dark) {
@@ -28,7 +28,14 @@
       /* base */
       body {
         margin: 24px;
-        font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+        /* 右上に言語ボタンを置くスペースを確保 */
+        padding-top: 10px;
+        font:
+          16px/1.4 system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Helvetica,
           Arial;
         color: var(--fg);
         background: var(--bg);
@@ -50,15 +57,15 @@
         border-radius: var(--radius);
         background: var(--pill);
         padding: 24px;
-        padding-top: 56px; /* 言語トグル分 */
+        margin-top: 24px; /* 上部マージン追加 */
       }
 
-      /* lang switch */
+      /* lang switch (Global Top Right) */
       .lang-switch {
         position: absolute;
-        top: 12px;
-        right: 14px;
-        z-index: 2;
+        top: 24px;
+        right: 24px;
+        z-index: 10;
         display: flex;
         gap: 8px;
       }
@@ -69,26 +76,22 @@
         place-items: center;
         padding: 8px 14px;
         border: 1px solid var(--bd);
-        border-radius: 5px px;
-        background: #f2f2f7;
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+        border-radius: 6px;
+        background: var(--pill); /* カードと同じ色で馴染ませる */
+        font-size: 14px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       }
       .pill-btn:hover {
-        background: #fff;
-      }
-      @media (prefers-color-scheme: dark) {
-        .pill-btn {
-          background: #3a3a40;
-          box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
-        }
+        background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%);
+        border-color: #bbb;
       }
 
-      /* section block：左バー＋インデント */
+      /* section block */
       .section-block {
         display: grid;
         grid-template-columns: 12px 1fr;
         gap: 10px;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
       }
       .section-block::before {
         content: "";
@@ -102,75 +105,53 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
-      } /*gap:12px*/
+      }
 
       .section-title {
         font-size: 18px;
         font-weight: 700;
-        margin-top: 10px;
+        margin-top: 4px;
         margin-bottom: 4px;
       }
 
-      /* セクション右肩のツールバー（使用量＋最新にする） */
-      .section-head {
+      /* Data Toolbar (New Layout) */
+      .data-toolbar {
         display: flex;
-        align-items: flex-end;
-        gap: 10px;
         flex-wrap: wrap;
+        align-items: center;
         justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+        margin-bottom: 8px;
       }
-      .section-tools {
+      .data-actions-left {
+        display: flex;
+        gap: 10px;
+      }
+      .data-actions-right {
         display: flex;
         align-items: center;
         gap: 10px;
         margin-left: auto;
-        white-space: nowrap;
       }
+
       .usage-label {
         padding: 6px 10px;
         border: 1px solid var(--bd);
-        border-radius: 8px;
+        border-radius: 6px;
         background: var(--bg);
-        font: 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-          Arial;
-        opacity: 0.9;
-      }
-
-      .hint-row {
-        display: flex;
-        align-items: center; /* 垂直中央揃え */
-        gap: 10px; /* ２つの間の余白 */
-      }
-
-      .hint-row .hint {
-        margin: 0; /* デフォルトの<p>余白を消す */
-        white-space: nowrap; /* 折り返さない */
+        font-size: 13px;
+        color: var(--muted);
       }
 
       .hint {
-        opacity: 1;
         color: var(--muted);
         font-size: 14px;
-        transition: opacity 0.25s;
         margin: 4px 0 8px;
       }
-      .hint.show {
-        opacity: 1;
-      }
-      .flash-msg {
-        color: var(--fg);
-        font-weight: 500;
-        opacity: 0;
-        transition: opacity 0.3s;
-      }
-      .flash-msg.show {
-        opacity: 1;
-      }
 
-      /* 設定行：ラベル左固定／入力右フレキシブル */
+      /* Settings Row */
       .settings {
-        font: 14px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-          Arial;
         display: grid;
         grid-template-columns: var(--label-col) 1fr;
         gap: 14px;
@@ -178,7 +159,7 @@
         background: var(--bg);
         border: 1px solid var(--bd);
         border-radius: 10px;
-        padding: 4px 10px; /*14px 16px*/
+        padding: 4px 10px;
       }
       .settings + .settings {
         margin-top: 10px;
@@ -197,11 +178,8 @@
         background: var(--bg);
         color: var(--fg);
       }
-      input[type="checkbox"] {
-        cursor: pointer;
-      }
 
-      /* 保存帯（軽いスティッキー） */
+      /* Actions Sticky Footer */
       .section-actions {
         position: sticky;
         bottom: -4px;
@@ -210,40 +188,56 @@
         align-items: center;
         padding-top: 8px;
         background: linear-gradient(to top, var(--pill) 70%, transparent);
+        z-index: 5;
       }
 
-      .btn {
-        /* 旧: all:revert だと状況によって横幅が伸びることがある */
-        /* ここから追加 */
+      /* Buttons */
+      .btn,
+      .cgtn-btn {
         all: unset;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         padding: 8px 14px;
-        border-radius: 5px;
+        border-radius: 6px;
         border: 1px solid var(--bd);
-        background: var(--pill);
-        font: inherit;
+        background: var(--bg); /* 白背景で見やすく */
+        color: var(--fg);
+        font-size: 14px;
         cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         user-select: none;
-        /* ここまで */
+        transition: background 0.2s;
       }
-
-      /* ここから追加：ボタンスピナー */
+      .btn:hover,
+      .cgtn-btn:hover {
+        background: #f0f0f5;
+      }
+      .btn.small {
+        padding: 4px 10px;
+        font-size: 13px;
+      }
+      /* Import button slightly different */
+      .cgtn-btn.secondary {
+        background: #fafafa;
+        color: #555;
+      }
+      .cgtn-btn.secondary:hover {
+        background: #eee;
+      }
+      /* Spinner */
       .btn.is-busy {
-        position: relative;
         pointer-events: none;
-        opacity: 0.85;
+        opacity: 0.8;
       }
       .btn.is-busy::after {
         content: "";
         position: absolute;
         right: 10px;
         top: 50%;
-        width: 16px;
-        height: 16px;
-        margin-top: -8px;
+        width: 14px;
+        height: 14px;
+        margin-top: -7px;
         border-radius: 50%;
         border: 2px solid currentColor;
         border-right-color: transparent;
@@ -254,11 +248,7 @@
           transform: rotate(360deg);
         }
       }
-      /* ここまで */
 
-      .btn:hover {
-        background: color-mix(in srgb, var(--pill) 90%, var(--fg) 10%);
-      }
       .msg-inline {
         margin-left: 6px;
         font-size: 14px;
@@ -270,18 +260,18 @@
         opacity: 1;
       }
 
-      /* 付箋アイランド */
+      /* Pins Table Island */
       .island {
         background: var(--bg);
         border: 1px solid var(--bd);
         border-radius: 10px;
-        padding: 12px;
+        padding: 0; /* テーブルを端まで広げるためパディングなし */
+        overflow: hidden; /* 角丸用 */
       }
 
-      /* ここから追加：テーブルだけスクロール */
       .pins-wrap {
-        /* ラッパ：高さの上限は維持（カード内での視覚的まとまり） */
         max-height: var(--pins-h);
+        overflow-y: auto;
       }
 
       .cgtn-pins-table {
@@ -291,188 +281,187 @@
       }
       .cgtn-pins-table th,
       .cgtn-pins-table td {
-        padding: 6px 8px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
       }
       .cgtn-pins-table thead th {
         position: sticky;
         top: 0;
-        background: var(--pill);
+        background: #f9f9fb; /* ヘッダー色 */
+        font-weight: 600;
+        color: var(--muted);
         z-index: 1;
+        border-bottom: 1px solid var(--bd);
       }
-      /* ここから追加：No. / チャット / 会話数 / 付箋数 / 更新 = 5% / 45% / 10% / 10% / 30% */
+
+      /* Column Widths */
       .cgtn-pins-table th:nth-child(1),
       .cgtn-pins-table td:nth-child(1) {
-        width: 5%;
+        width: 40px;
         text-align: right;
-        padding-right: 10px;
+        color: var(--muted);
       }
       .cgtn-pins-table th:nth-child(2),
       .cgtn-pins-table td:nth-child(2) {
-        width: 45%;
-        word-break: break-word;
-        white-space: normal;
+        width: auto;
       }
       .cgtn-pins-table th:nth-child(3),
       .cgtn-pins-table td:nth-child(3) {
-        width: 10%;
+        width: 80px;
         text-align: right;
       }
       .cgtn-pins-table th:nth-child(4),
       .cgtn-pins-table td:nth-child(4) {
-        width: 10%;
+        width: 80px;
         text-align: right;
       }
       .cgtn-pins-table th:nth-child(5),
       .cgtn-pins-table td:nth-child(5) {
-        width: 30%;
+        width: 140px;
         text-align: center;
-        vertical-align: middle;
       }
-      /* 付箋数セルのボタン間隔 */
+
       .cgtn-pins-table td.count .btn.inline {
-        margin-left: 10px;
-      }
-      /* 右寄せはそのまま */
-      .cgtn-pins-table td.count {
-        text-align: right;
+        margin-left: 6px;
+        padding: 2px 6px;
+        font-size: 11px;
       }
       .cgtn-pins-table .count .btn.del {
+        color: #d32f2f;
+        border-color: #ffcccc;
+        background: #fff5f5;
         margin-left: 8px;
       }
-
-      .cgtn-pins-scroll {
-        overflow-y: auto;
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        border-radius: 6px;
-        max-height: 280px; /* 表だけスクロール */
-        background: var(--bg);
+      .cgtn-pins-table .count .btn.del:hover {
+        background: #ffe0e0;
       }
 
-      #sync-usage {
-        display: inline-block;
-        min-width: 320px; /* 好きな幅に。280–360px 目安 */
-        text-align: right;
-        white-space: nowrap;
-      }
-
-      /* responsive */
+      /* Responsive */
       @media (max-width: 720px) {
         :root {
-          --label-col: 160px;
-          --pins-h: min(50vh, 360px);
+          --label-col: 140px;
         }
         .settings {
           grid-template-columns: 1fr;
         }
-      }
-
-      /* 補助 */
-      footer .desc {
-        margin-top: 12px;
-      }
-      #cgtn-floater {
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        z-index: 9999;
+        .lang-switch {
+          position: relative;
+          top: auto;
+          right: auto;
+          justify-content: flex-end;
+          margin-bottom: 10px;
+        }
+        .data-toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .data-actions-right {
+          margin-left: 0;
+          justify-content: space-between;
+        }
       }
     </style>
   </head>
   <body>
-    <h1 id="opt-title" data-i18n="opts.title"></h1>
-    <p class="desc" id="opt-desc" data-i18n="opts.tips"></p>
+    <div class="lang-switch">
+      <button
+        id="lang-ja"
+        class="pill-btn"
+        type="button"
+        data-i18n="opts.lang.ja"
+      >
+        日本語
+      </button>
+      <button
+        id="lang-en"
+        class="pill-btn"
+        type="button"
+        data-i18n="opts.lang.en"
+      >
+        English
+      </button>
+    </div>
+
+    <div style="padding-right: 140px">
+      <h1 id="opt-title" data-i18n="opts.title">ChatGPT Turn Navigator</h1>
+      <p class="desc" id="opt-desc" data-i18n="opts.tips">
+        設定を変更すると、開いているChatGPTタブに即座に反映されます。
+      </p>
+    </div>
 
     <form id="cgtn-options" class="card" autocomplete="off">
-      <!-- 言語トグル（既存 i18n.js と互換ID） -->
-      <div class="lang-switch">
-        <button
-          id="lang-ja"
-          class="pill-btn"
-          type="button"
-          data-i18n="opts.lang.ja"
-        ></button>
-        <button
-          id="lang-en"
-          class="pill-btn"
-          type="button"
-          data-i18n="opts.lang.en"
-        ></button>
-      </div>
-
-      <!-- ===== 付箋データ管理 ===== -->
       <div class="section-block">
         <div class="section-inner">
+          <div class="section-title" data-i18n="options.pinsTitle">
+            付箋データ管理
+          </div>
           <div
-            class="section-head"
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-            "
+            class="hint"
+            data-i18n="options.pinsHint"
+            style="margin-bottom: 0"
           >
-            <div>
-              <div class="section-title" data-i18n="options.pinsTitle">
-                付箋データ管理
-              </div>
-              <div class="hint" data-i18n="options.pinsHint">
-                各チャットの付箋を一覧。不要になったチャットは削除できます。
-              </div>
+            各チャットの付箋を一覧・管理します。
+          </div>
+
+          <div class="data-toolbar">
+            <div class="data-actions-left">
+              <button id="btn-export" class="cgtn-btn" type="button">
+                <span style="font-size: 1.1em; margin-right: 4px">📤</span>
+                <span data-i18n="opts.btnExport">Export</span>
+              </button>
+              <button id="btn-import" class="cgtn-btn secondary" type="button">
+                <span style="font-size: 1.1em; margin-right: 4px">📥</span>
+                <span data-i18n="opts.btnImport">Import</span>
+              </button>
+              <input
+                type="file"
+                id="inp-import-file"
+                accept=".json"
+                style="display: none"
+              />
             </div>
-            <div
-              class="section-tools"
-              style="display: flex; align-items: center; gap: 8px"
-            >
-              <span
-                id="sync-usage"
-                class="usage-label"
-                style="min-width: 18ch"
-                title="chrome.storage.sync usage"
-                >sync...</span
+
+            <div class="data-actions-right">
+              <span id="sync-usage" class="usage-label" title="Storage Usage"
+                >loading...</span
               >
               <button id="pins-refresh" class="btn small" type="button">
-                <span data-i18n="options.refreshTitles">最新にします</span>
+                <span style="font-size: 1.1em; margin-right: 2px">↻</span>
+                <span data-i18n="options.refreshTitles">Reload</span>
               </button>
             </div>
           </div>
 
-          <div class="island" style="margin-top: 8px">
+          <div class="island">
             <div class="pins-wrap">
-              <div class="table-scroll">
-                <table id="pins-table" class="cgtn-pins-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 72px">No.</th>
-                      <th data-i18n="options.thChat">チャット</th>
-                      <th style="width: 120px" data-i18n="options.thTurns">
-                        会話数
-                      </th>
-                      <th style="width: 120px" data-i18n="options.thCount">
-                        付箋数
-                      </th>
-                      <th style="width: 180px" data-i18n="options.thUpdated">
-                        更新
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody id="pins-tbody"></tbody>
-                </table>
-              </div>
+              <table id="pins-table" class="cgtn-pins-table">
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th data-i18n="options.thChat">Chat Title</th>
+                    <th data-i18n="options.thTurns">Turns</th>
+                    <th data-i18n="options.thCount">Pins</th>
+                    <th data-i18n="options.thUpdated">Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="pins-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
-      <!-- ===== /付箋データ管理 ===== -->
-
-      <!-- ===== 一覧パネルの表示設定（保存帯つき） ===== -->
       <div class="section-block">
         <div class="section-inner">
-          <div class="section-title" data-i18n="options.listTitle"></div>
+          <div class="section-title" data-i18n="options.listTitle">
+            一覧パネル表示設定
+          </div>
 
           <div class="settings">
             <label for="listMaxChars"
-              ><b id="lbl-listMaxChars" data-i18n="options.listMaxChars"></b
-            ></label>
+              ><b id="lbl-listMaxChars" data-i18n="options.listMaxChars"
+                >文字数</b
+              ></label
+            >
             <input
               id="listMaxChars"
               name="listMaxChars"
@@ -485,8 +474,10 @@
 
           <div class="settings">
             <label for="listFontSize"
-              ><b id="lbl-listFontSize" data-i18n="options.listFontSize"></b
-            ></label>
+              ><b id="lbl-listFontSize" data-i18n="options.listFontSize"
+                >フォントサイズ</b
+              ></label
+            >
             <input
               id="listFontSize"
               name="listFontSize"
@@ -503,27 +494,32 @@
               class="btn"
               type="button"
               data-i18n="options.saveBtn"
-            ></button>
+            >
+              保存
+            </button>
             <button
               id="resetList"
               class="btn"
               type="button"
               data-i18n="options.resetBtn"
-            ></button>
+            >
+              リセット
+            </button>
             <span id="msg-list" class="msg-inline" aria-live="polite"></span>
           </div>
         </div>
       </div>
 
-      <!-- ===== 詳細設定（保存帯つき） ===== -->
       <div class="section-block">
         <div class="section-inner">
-          <div class="section-title" data-i18n="options.detailTitle"></div>
+          <div class="section-title" data-i18n="options.detailTitle">
+            詳細設定
+          </div>
 
           <div class="settings">
             <label for="showViz"
-              ><b id="lbl-showViz" data-i18n="nav.viz"></b
-            ></label>
+              ><b id="lbl-showViz" data-i18n="nav.viz">基準線</b></label
+            >
             <div>
               <label
                 style="
@@ -534,15 +530,23 @@
                 "
               >
                 <input id="showViz" name="showViz" type="checkbox" />
-                <span class="hint" id="hint-showViz" data-i18n="nav.viz"></span>
+                <span
+                  class="hint"
+                  id="hint-showViz"
+                  data-i18n="nav.viz"
+                  style="margin: 0"
+                  >ガイド線を表示</span
+                >
               </label>
             </div>
           </div>
 
           <div class="settings">
             <label for="centerBias"
-              ><b id="lbl-centerBias" data-i18n="options.centerBias"></b
-            ></label>
+              ><b id="lbl-centerBias" data-i18n="options.centerBias"
+                >判定位置</b
+              ></label
+            >
             <div>
               <input
                 id="centerBias"
@@ -562,8 +566,8 @@
 
           <div class="settings">
             <label for="eps"
-              ><b id="lbl-eps" data-i18n="options.eps"></b
-            ></label>
+              ><b id="lbl-eps" data-i18n="options.eps">吸着範囲</b></label
+            >
             <div>
               <input
                 id="eps"
@@ -579,8 +583,10 @@
 
           <div class="settings">
             <label for="lockMs"
-              ><b id="lbl-lockMs" data-i18n="options.lockMs"></b
-            ></label>
+              ><b id="lbl-lockMs" data-i18n="options.lockMs"
+                >ロック時間</b
+              ></label
+            >
             <input
               id="lockMs"
               name="lockMs"
@@ -597,13 +603,17 @@
               class="btn"
               type="button"
               data-i18n="options.saveBtn"
-            ></button>
+            >
+              保存
+            </button>
             <button
               id="resetAdv"
               class="btn"
               type="button"
               data-i18n="options.resetBtn"
-            ></button>
+            >
+              リセット
+            </button>
             <span id="msg-adv" class="msg-inline" aria-live="polite"></span>
           </div>
         </div>
@@ -611,11 +621,70 @@
     </form>
 
     <footer>
-      <p class="desc hint" id="buildInfo" style="margin-top: 12px"></p>
+      <p
+        class="desc hint"
+        id="buildInfo"
+        style="margin-top: 24px; text-align: right; opacity: 0.5"
+      ></p>
     </footer>
+
+    <div
+      style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px"
+    >
+      <details
+        id="debug-section"
+        style="cursor: pointer; color: #aaa; font-size: 11px"
+      >
+        <summary style="user-select: none">Debug Storage Data</summary>
+        <div
+          style="
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: default;
+          "
+        >
+          <div style="margin-bottom: 8px; display: flex; gap: 8px">
+            <button
+              id="btn-debug-refresh"
+              style="padding: 2px 8px; font-size: 11px"
+            >
+              ↻ Refresh
+            </button>
+            <button
+              id="btn-debug-clear"
+              style="
+                padding: 2px 8px;
+                font-size: 11px;
+                color: red;
+                margin-left: auto;
+              "
+            >
+              ⚠ Clear All Data
+            </button>
+          </div>
+          <pre
+            id="debug-output"
+            style="
+              white-space: pre-wrap;
+              word-break: break-all;
+              font-family: monospace;
+              font-size: 10px;
+              color: #333;
+              max-height: 300px;
+              overflow-y: auto;
+            "
+          >
+(Click Refresh to view data)</pre
+          >
+        </div>
+      </details>
+    </div>
+
     <div id="cgtn-floater" aria-live="polite" aria-atomic="true"></div>
 
-    <!-- 既存ロジックを読み込み -->
     <script src="i18n.js"></script>
     <script src="shared.js"></script>
     <script src="options.js"></script>

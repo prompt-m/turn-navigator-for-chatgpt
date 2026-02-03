@@ -41,6 +41,7 @@
   }
 
   // ★追加: ステータス更新 (現在地 / 総数) 2026.01.27
+  /*
   NS.updateStatus = function () {
     const total = NS.ST?.all?.length || 0;
     // ★ここを修正: 使う瞬間に window.CGTN_UI を参照する
@@ -58,6 +59,74 @@
     const current = calcCurrentTurnIndex(sc);
     ui?.updateStatusDisplay?.(`${current} / ${total}`);
     console.log("updateStatus3 current:", current, " total:", total);
+  };
+  */
+
+  // src/logic.ts
+
+  // ★修正: 「0件でもチャット画面なら操作許可」にする
+  NS.updateStatus = function updateStatus() {
+    const SH = window.CGTN_SHARED;
+    const UI = window.CGTN_UI;
+    const nav = document.getElementById("cgpt-nav");
+
+    // 1. ページ種類の判定
+    const info = SH.getPageInfo?.() || {};
+    const kind = info.kind || "other";
+
+    // ★変更点: 「データが空かどうか」をOFFの条件から外しました。
+    // チャット画面(chat/temporary)なら、0件でも常時ONにします。
+    const isChat = kind === "chat" || kind === "temporary";
+
+    // OFFにするのは「ホーム」や「プロジェクト」などの画面だけ
+    const isOff = !isChat;
+
+    if (isOff) {
+      // --- OFFモード (Home / Project / New Chat 等) ---
+      UI?.updateStatusDisplay?.("OFF");
+      // パネルを薄くして操作禁止に
+      if (nav) nav.classList.add("disabled");
+      return;
+    }
+
+    // --- ONモード (チャット画面) ---
+    // 禁止マスクを外す（たとえ0件でも、ボタンを押せるようにする）
+    if (nav) nav.classList.remove("disabled");
+
+    const list = NS.ST?.all || [];
+    const total = list.length;
+
+    if (total === 0) {
+      // 0件の場合は「0 / 0」と表示して終了
+      // (ここで終わりでも、下の計算を通しても結果は同じですが、明示的に)
+      UI?.updateStatusDisplay?.("0 / 0");
+      return;
+    }
+
+    // --- 以下、現在位置の計算（既存ロジック） ---
+    const sc =
+      NS._scroller || document.scrollingElement || document.documentElement;
+    const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
+    const yStar = (sc.scrollTop || 0) + anchorY;
+    const eps = Number(SH.getCFG?.()?.eps) || 20;
+
+    // 簡易探索
+    let current = 0;
+    for (let i = 0; i < total; i++) {
+      const el = list[i];
+      // ※ articleTop は logic.js 内で定義されている前提
+      const top =
+        typeof articleTop === "function" ? articleTop(sc, el) : el.offsetTop;
+
+      if (top <= yStar + eps) {
+        current = i + 1;
+      } else {
+        break;
+      }
+    }
+
+    // 表示更新
+    UI?.updateStatusDisplay?.(`${current} / ${total}`);
   };
 
   // ★最適化: 二分探索で現在地を探す（計算量 O(N) -> O(log N)） 2026.02.01
@@ -270,29 +339,38 @@
     return article;
   }
 
-  //行へスクロールする関数
-  function scrollListToTurn(turnKey) {
+  // 行へスクロールする関数（修正版）
+  function scrollListToTurn(turnKey?: string | null) {
     const sc = document.getElementById("cgpt-list-body");
     if (!sc) return;
 
-    // ★ 改修: turnKey が未指定なら末尾にスクロール
+    // ★追加: turnKey が未指定（null/undefined/空）なら末尾にスクロール
     if (!turnKey) {
+      // 最後の行を探す
       const last = sc.querySelector(".row:last-of-type");
-      if (last) last.scrollIntoView({ block: "end", inline: "nearest" });
-      else sc.scrollTop = sc.scrollHeight;
+      if (last) {
+        last.scrollIntoView({ block: "end", inline: "nearest" });
+      } else {
+        // 行がなくてもとりあえずスクロール位置を一番下へ
+        sc.scrollTop = sc.scrollHeight;
+      }
       return;
     }
 
+    // 指定がある場合はその行へ
     const row = sc.querySelector(
-      `.row[data-turn="${CSS.escape(turnKey)}"]`,
-    ) as HTMLElement | null;
+      `.row[data-idx="${CSS.escape(String(getIndex1FromTurnKey(turnKey)))}"]`,
+    );
+    // ※ data-idx で探す方が確実ですが、JS版に合わせて data-turn 検索が必要なら適宜調整してください
+    // 今回のTS版は .row[data-idx="..."] で統一しているので上記でOKです
+
     if (!row) return;
 
-    const top = row.offsetTop - (sc.clientHeight / 2 - row.clientHeight / 2);
-    sc.scrollTo({
-      top: Math.max(0, top),
-      behavior: "instant" as ScrollBehavior,
-    });
+    // 行をパネル中央付近に出す
+    const top =
+      (row as HTMLElement).offsetTop -
+      (sc.clientHeight / 2 - (row as HTMLElement).clientHeight / 2);
+    sc.scrollTo({ top: Math.max(0, top), behavior: "auto" }); // 初回は instant/auto でパッと移動
   }
 
   // === List Panel 専用（ゆるめ） ===
@@ -1020,32 +1098,6 @@
       console.warn("[bulkSetPins] savePinsArrAsync error", e);
     }
 
-    // --- DOM 同期：対象 idx1 の行だけ data-pin / 🔖 を更新 ---
-    /* !!!!
-    try {
-      const body = qListBody();
-      if (body) {
-        const rows = body.querySelectorAll(".row[data-idx]");
-        const targetSet = new Set(targets.map(String)); // "1","2",...
-
-        for (const row of rows) {
-          const idx1 = row.dataset.idx;
-          if (!targetSet.has(idx1)) continue; // 対象外のターンは触らない
-
-          // role=全体の時は全行、role=user/asst の時は
-          // data-role で既に ST 側で絞り込み済みなので、そのまま適用
-          if (doPinOn) row.dataset.pin = "1";
-          else row.removeAttribute("data-pin");
-
-          try {
-            paintPinRow(row, doPinOn);
-          } catch (_) {}
-        }
-      }
-    } catch (e) {
-      console.warn("[bulkSetPins] sync DOM failed", e);
-    }*/
-
     try {
       const body = qListBody();
       if (body) {
@@ -1137,39 +1189,6 @@
   function lockFor(ms) {
     _lockUntil = performance.now() + (Number(ms) || 0);
   }
-
-  // ターン検出<article>
-  /* !!!!
-  function pickAllTurns() {
-    const seen = new Set();
-    let list = Array.from(document.querySelectorAll(TURN_SEL));
-    if (!list.length) {
-      const nodes = Array.from(
-        document.querySelectorAll("[data-message-author-role]")
-      );
-      list = nodes
-        .map((n) => n.closest("article") || n)
-        .filter((el) => el && !seen.has(el) && (seen.add(el), true));
-    }
-
-    // ★追加：DIVが紛れていたら、上位にある<article>を辿る
-    list = list.map((el) =>
-      el.tagName === "ARTICLE" ? el : el.closest("article") || el
-    );
-
-    const visible = list.filter((a) => {
-      try {
-        const r = a.getBoundingClientRect();
-        const disp = getComputedStyle(a).display;
-        return r.height > 10 && disp !== "none";
-      } catch {
-        return false;
-      }
-    });
-
-    return visible;
-  }
-  */
 
   // ターン検出<article>
   function pickAllTurns(): HTMLElement[] {
@@ -1351,59 +1370,6 @@
 
   let _rebuildTicket = 0;
   let _rebuildCid: string | null = null;
-  /*
-  function rebuild(cidFromMsg?: string) {
-    const my = ++_rebuildTicket;
-
-    // この実行の “対象チャットID” を確定（以降はこれで評価）
-    const startCid = cidFromMsg || SH.getChatId?.();
-    _rebuildCid = startCid || _rebuildCid;
-
-    NS._scroller = getTrueScroller();
-
-    // ===== 材料スナップショットを nextST に作る =====
-    const nextST: TurnState = { all: [], user: [], assistant: [], page: 1 };
-
-    const allRaw = pickAllTurns().filter(isRealTurn);
-    nextST.all = sortByY(allRaw);
-
-    // <article> 0 件 → パネルをリセットして終了（ただしチケット/チャット照合は通す）
-    if (nextST.all.length === 0) {
-      NS.clearListPanelUI?.();
-      // ↓ この後の確定ブロックで my/cid の照合を通す
-    } else {
-      const roleOf = (a: TurnEl) => getTurnRole(a); // 既存ヘルパに委譲
-
-      nextST.user = nextST.all.filter((a) => roleOf(a) === "user");
-      nextST.assistant = nextST.all.filter((a) => roleOf(a) === "assistant");
-
-      // 可能なら Set も用意（描画側が速くなる）
-      nextST._userSet = new Set(nextST.user);
-      nextST._asstSet = new Set(nextST.assistant);
-    }
-
-    // ===== 確定直前ガード & コミット =====
-    if (my !== _rebuildTicket) return;
-
-    const curCid = SH.getChatId?.();
-    if (startCid && curCid && startCid !== curCid) return;
-
-    ST.all = nextST.all;
-    ST.user = nextST.user;
-    ST.assistant = nextST.assistant;
-    ST._userSet = nextST._userSet ?? new Set(ST.user);
-    ST._asstSet = nextST._asstSet ?? new Set(ST.assistant);
-
-    // デバッグ公開
-    NS.ST = ST;
-
-    // ★追加: スクロール監視を開始し、ステータスを即時更新 2026.1.27
-    bindScrollSpy();
-    NS.updateStatus();
-  }
-*/
-
-  // src/logic.ts
 
   // ★修正: エラーハンドリングとリトライ機能を追加した rebuild
   NS.rebuild = function (cidFromMsg) {

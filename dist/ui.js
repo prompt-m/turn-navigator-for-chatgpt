@@ -46,6 +46,18 @@
   }
 }
 
+/* === OFF状態（操作禁止マスク） === */
+#cgpt-nav.disabled {
+  cursor: not-allowed !important; /* 全体に進入禁止マーク */
+}
+#cgpt-nav.disabled .cgpt-nav-group,
+#cgpt-nav.disabled label,
+#cgpt-nav.disabled button {
+  pointer-events: none !important; /* クリックもホバーも無効化 */
+  opacity: 0.5 !important;         /* 半透明にして「効かない」感を出す */
+  filter: grayscale(100%) !important; /* 色を抜く */
+}
+
 /* === 統一ヘッダー === */
 .cgtn-unified-header {
   background: #000;
@@ -588,56 +600,6 @@ input:checked + .slider:before {
             window.CGTN_LOGIC.renderList(true);
         }
     }
-    /*
-    function applyLang() {
-      const box = document.getElementById("cgpt-nav");
-      if (!box) return;
-  
-      box.querySelectorAll("[data-i18n]").forEach((el) => {
-        const key = el.getAttribute("data-i18n");
-        const txt = T(key);
-        if (key && txt) {
-          el.textContent = txt;
-          // ここを削除ですね
-          //        if (el instanceof HTMLElement) {
-          //          el.title = txt;
-          //        }
-        }
-      });
-  
-      //　ここから
-      const dragHeader = box.querySelector("#cgpt-drag");
-      if (dragHeader instanceof HTMLElement) dragHeader.title = T("headerDrag");
-  
-      const cb = box.querySelector("#cgtn-power-toggle");
-      if (cb instanceof HTMLInputElement) updateSwitchTooltip(cb);
-      //　ここは、どうしましょうか？
-  
-      // プレビュータイトル
-      const h = document.querySelector("#cgtn-preview-title");
-      if (h) h.textContent = T("preview");
-  
-      // リストパネルのロールフィルタも言語を反映 '25.11.20
-      // ----------------------------------------------------
-      // 2. Logic側のテキスト更新
-      // ----------------------------------------------------
-      try {
-        // フィルタボタンと言語の更新
-        window.CGTN_LOGIC?.applyListFilterLang?.();
-        // リストパネルのフッターも言語を反映 '25.11.20
-        window.CGTN_LOGIC?.updateListFooterInfo?.();
-        // リストパネルのタイトル
-        window.CGTN_LOGIC?.updateListChatTitle?.();
-      } catch (e) {
-        console.warn("List panel lang update failed", e);
-      }
-      // ----------------------------------------------------
-      // 3. ★ここが整理のポイント！
-      // ツールチップは「Shared」に一括更新させる
-      // ----------------------------------------------------
-      window.CGTN_SHARED?.updateTooltips?.();
-    }
-  */
     function applyLang() {
         const box = document.getElementById("cgpt-nav");
         if (!box)
