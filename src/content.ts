@@ -172,6 +172,7 @@
   // =================================================================
   //  rebuildAndRenderSafely (爆速FastScan優先版)
   // =================================================================
+  /*
   let __buildGen = 0;
   async function rebuildAndRenderSafely(
     { forceList = false } = {},
@@ -239,6 +240,87 @@
 
         // ★ダメ押しリトライ（0件対策）
         // ChatGPTの描画が遅れていて0件だった場合、1.2秒後にもう一度だけスキャンする
+        setTimeout(() => {
+          if (myGen !== __buildGen) return;
+          const total = LG.ST?.all?.length || 0;
+          if (total === 0) {
+            if (typeof LG.runFastUniversalScan === "function")
+              LG.runFastUniversalScan();
+            LG.rebuild?.();
+            LG.updateStatus?.();
+          }
+        }, 1200);
+      }
+    }
+  }
+*/
+  // src/content.ts (Rebuild Fix)
+
+  // =================================================================
+  // 修正: rebuildAndRenderSafely (待機順序の適正化)
+  // =================================================================
+
+  let __buildGen = 0;
+  async function rebuildAndRenderSafely(
+    { forceList = false } = {},
+    oldSig: string | null = null,
+  ) {
+    const LG = window.CGTN_LOGIC;
+    const SH = window.CGTN_SHARED;
+
+    const myGen = ++__buildGen;
+
+    // 1. まず Loading... にする
+    // (前のチャットの数字が残ったまま待機すると、フリーズしたように見えるため)
+    setUiBusy(true, "Loading...");
+
+    // 2. 待機フェーズ (Navigation時のみ)
+    // oldSig がある = URL切り替え時。この場合は「前の画面と違う指紋」になるまで待つ
+    if (oldSig) {
+      await waitForChatSettled({ mustNotMatch: oldSig });
+      if (myGen !== __buildGen) return;
+    }
+
+    // 3. ★修正: 画面が切り替わったのを確認してから、Universalスキャン！
+    // これで「新しいチャット」の要素数を拾います。
+    if (typeof LG.runFastUniversalScan === "function") {
+      LG.runFastUniversalScan();
+    }
+
+    try {
+      // 4. 正規ロジック再構築
+      LG.rebuild?.();
+
+      // 5. リスト生成判定
+      const kind = SH.getPageInfo?.()?.kind || "other";
+      const cfg = SH.getCFG?.() || {};
+      const needList = kind === "chat" && (forceList || !!cfg.list?.enabled);
+
+      if (needList) {
+        await new Promise((r) => requestAnimationFrame(r));
+        if (myGen !== __buildGen) return;
+        await LG.renderList?.(true);
+      }
+
+      // 6. 最終更新
+      if (typeof LG.updateStatus === "function") {
+        LG.updateStatus();
+      }
+    } catch (e) {
+      console.warn("rebuild failed", e);
+      if (forceList) {
+        LG?.setListEnabled?.(false);
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) {
+          chk.checked = false;
+          chk.dispatchEvent(new Event("change"));
+        }
+      }
+    } finally {
+      if (myGen === __buildGen) {
+        setUiBusy(false);
+
+        // ダメ押しリトライ (0件対策)
         setTimeout(() => {
           if (myGen !== __buildGen) return;
           const total = LG.ST?.all?.length || 0;

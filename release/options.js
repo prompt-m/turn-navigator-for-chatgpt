@@ -584,29 +584,29 @@
     // =================================================================
     // --- Export ---
     document.getElementById("btn-export")?.addEventListener("click", async () => {
-        // ボタンを一時的にBusyにする（連打防止）
         const btn = document.getElementById("btn-export");
         setBusy(btn, true);
         try {
-            if (!SH.exportAllData) {
-                throw new Error("Export function not found in shared.js");
-            }
-            // データを生成
+            if (!SH.exportAllData)
+                throw new Error("Export function missing");
             const data = await SH.exportAllData();
             const json = JSON.stringify(data, null, 2);
             const blob = new Blob([json], { type: "application/json" });
             const url = URL.createObjectURL(blob);
-            // ダウンロード発火
             const a = document.createElement("a");
             a.href = url;
-            // ファイル名: turn-navigator-backup-YYYY-MM-DD.json
-            const date = new Date().toISOString().slice(0, 10);
-            a.download = `turn-navigator-backup-${date}.json`;
+            // ★修正: ローカル時間で日付文字列を作る
+            // (new Date().toISOString() はUTCなので、日本だと9時間遅れて前日になりがち)
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            const day = String(now.getDate()).padStart(2, "0");
+            const dateStr = `${year}-${month}-${day}`;
+            a.download = `turn-navigator-backup-${dateStr}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            // 成功メッセージ（ボタンの近くにポワン）
             toastNearPointer(T("opts.exportSuccess") || "Exported!");
         }
         catch (e) {

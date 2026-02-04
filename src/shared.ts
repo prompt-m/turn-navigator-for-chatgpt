@@ -1013,47 +1013,69 @@
     }
   };
 
-  // src/shared.ts に追加
+  // =================================================================
+  // Data Migration & Backup (Optimized)
+  // =================================================================
+  // src/shared.ts (修正版: TypeScriptエラー解消 & 構造最適化)
 
   // =================================================================
-  // Data Migration & Backup (v1 -> v2)
+  // Data Migration & Backup (Optimized)
   // =================================================================
 
-  // v1データをv2へ変換する「通訳」関数
+  // v1データをv2へ変換・正規化する関数
   function migrateV1toV2(raw: any) {
-    // すでに v2 ならそのまま返す
-    if (raw.meta && raw.meta.version >= 2) {
-      return raw;
-    }
+    // データ読み出し（cgNavSettings 内 or 直下）
+    let rootSettings = raw.cgNavSettings
+      ? { ...raw.cgNavSettings }
+      : { ...raw };
 
-    console.log("[Migrate] Converting v1 -> v2...", raw);
+    // バージョンチェック
+    // const ver = rootSettings.version || raw.meta?.version || 0;
 
-    // 1. 設定(settings) と ピンデータ(pinsByChat) を分離する
-    const newSettings = { ...raw };
+    // settingsオブジェクトの整備
     const newPinsByChat: Record<string, any> = {};
 
-    // v1の構造: raw.list.pinsByChat だったり、raw.pinsByChat だったりする可能性を網羅
-    // (もし v1.0.1 で pinsByChat がルートにあった場合も考慮)
-    if (raw.pinsByChat) {
-      Object.assign(newPinsByChat, raw.pinsByChat);
-      delete newSettings.pinsByChat;
-    }
-    if (raw.list && raw.list.pinsByChat) {
-      Object.assign(newPinsByChat, raw.list.pinsByChat);
-      // 設定側からは削除（容量節約）
-      // ※注: JSのオブジェクト参照の問題を避けるため deep copy 推奨ですが簡易的に delete
+    // 1. 旧形式 (list.pinsByChat) から救出
+    if (rootSettings.list && rootSettings.list.pinsByChat) {
+      Object.assign(newPinsByChat, rootSettings.list.pinsByChat);
       try {
-        delete newSettings.list.pinsByChat;
+        delete rootSettings.list.pinsByChat;
       } catch {}
     }
 
-    // 不要なメタデータを設定から消す
-    delete newSettings.meta;
+    // 2. raw 直下に pinsByChat があった場合 (一時的なゴミなど)
+    if (raw.pinsByChat) {
+      Object.assign(newPinsByChat, raw.pinsByChat);
+    }
+
+    // 3. 新形式 (cgtnPins::) がストレージに混ざっていたら回収
+    Object.keys(raw).forEach((k) => {
+      if (k.startsWith("cgtnPins::")) {
+        const cid = k.replace("cgtnPins::", "");
+        newPinsByChat[cid] = raw[k];
+      }
+    });
+
+    // ★ゴミ掃除
+    if (rootSettings.pins) {
+      try {
+        delete rootSettings.pins;
+      } catch {}
+    }
+    // 元々 meta があったら設定内からは消す（versionとして統合するため）
+    if (rootSettings.meta) {
+      try {
+        delete rootSettings.meta;
+      } catch {}
+    }
+
+    // ★バージョンを設定内に注入 (cgNavSettings.version = 2)
+    rootSettings.version = 2;
 
     return {
-      meta: { version: 2 },
-      settings: newSettings,
+      settings: rootSettings, // ここに version:2 が入っています
       pinsByChat: newPinsByChat,
+      // meta は返しません
     };
   }
 
@@ -1062,36 +1084,41 @@
     return new Promise<void>((resolve) => {
       chrome.storage.sync.get(null, (raw: any) => {
         if (!raw || Object.keys(raw).length === 0) {
-          // データがない（新規インストール）なら何もしない
           resolve();
           return;
         }
 
-        // バージョンチェック
-        const ver = raw.meta?.version || 0;
-        if (ver >= 2) {
-          // 最新なので何もしない
+        // バージョンチェック (cgNavSettings.version を優先確認)
+        const currentVer = raw.cgNavSettings?.version || raw.meta?.version || 0;
+
+        // ゴミチェック（ルートに meta や pinsByChat があるか）
+        const hasGarbage =
+          raw.meta !== undefined || raw.pinsByChat !== undefined;
+
+        // v2以上で、かつゴミもなければ終了
+        if (currentVer >= 2 && !hasGarbage) {
           resolve();
           return;
         }
 
-        // v1 -> v2 変換実行
-        console.log(`[AutoMigrate] Found v${ver} data. Upgrading to v2...`);
+        console.log(`[AutoMigrate] Optimizing storage (v${currentVer})...`);
         const v2Data = migrateV1toV2(raw);
 
-        // 保存（フラットに展開して保存）
-        const toSave = {
-          meta: v2Data.meta,
-          ...v2Data.settings, // list, showViz 等を展開
-          pinsByChat: v2Data.pinsByChat,
+        // ★保存用オブジェクトの構築
+        // v2Data.meta は存在しないので参照しません
+        const toSave: Record<string, any> = {
+          cgNavSettings: v2Data.settings, // ここに version:2 が含まれる
         };
 
-        // 一度クリアしてから保存（ゴミ掃除のため）
-        // ※「拡張機能のコンテキスト無効化」エラーが出ても、
-        // 次回の起動でまたここを通るので整合性は保たれます。
+        // ピンをバラして追加
+        for (const [cid, val] of Object.entries(v2Data.pinsByChat || {})) {
+          toSave[`cgtnPins::${cid}`] = val;
+        }
+
+        // 全クリアして保存（これでルートの meta や pinsByChat は消える）
         chrome.storage.sync.clear(() => {
           chrome.storage.sync.set(toSave, () => {
-            console.log("[AutoMigrate] Done.");
+            console.log("[AutoMigrate] Done. Storage optimized.");
             resolve();
           });
         });
@@ -1099,12 +1126,13 @@
     });
   };
 
-  // ★ エクスポート機能（JSON生成）
+  // ★ エクスポート機能
   SH.exportAllData = async function () {
     const raw = await new Promise<any>((r) => chrome.storage.sync.get(null, r));
-
-    // エクスポート前に必ずマイグレーションを通す（常に最新形式で出力）
     const v2Data = migrateV1toV2(raw);
+
+    // ファイル出力用に、設定内の version を meta にコピーしてあげる（親切設計）
+    // ※ settings.version はそのままでもOK
 
     return {
       meta: {
@@ -1113,29 +1141,31 @@
         exportedAt: Date.now(),
       },
       data: {
-        settings: v2Data.settings,
-        pinsByChat: v2Data.pinsByChat,
+        settings: v2Data.settings, // cgNavSettings に相当
+        pinsByChat: v2Data.pinsByChat, // 全ピンを含む (Import時にまたバラされる)
       },
     };
   };
 
-  // ★ インポート機能（JSON読込）
+  // ★ インポート機能
   SH.importData = async function (jsonObj: any) {
     if (!jsonObj) throw new Error("Empty data");
 
-    // 構造チェック
-    let candidate = jsonObj.data || jsonObj; // {data: ...} ラッパーがあってもなくても対応
+    let candidate = jsonObj.data || jsonObj;
 
-    // 読み込んだデータもマイグレーションを通す（古いバックアップでも対応可能に）
     const v2Data = migrateV1toV2(candidate);
 
-    const toSave = {
-      meta: v2Data.meta,
-      ...v2Data.settings,
-      pinsByChat: v2Data.pinsByChat,
+    const toSave: Record<string, any> = {
+      cgNavSettings: v2Data.settings, // version:2 込み
     };
 
-    // 保存実行
+    const pinsMap = v2Data.pinsByChat || {};
+    for (const [cid, val] of Object.entries(pinsMap)) {
+      if (cid && val) {
+        toSave[`cgtnPins::${cid}`] = val;
+      }
+    }
+
     await new Promise<void>((resolve, reject) => {
       chrome.storage.sync.clear(() => {
         chrome.storage.sync.set(toSave, () => {
@@ -1145,7 +1175,6 @@
       });
     });
 
-    // メモリ上の設定もリロード
     await SH.loadSettings();
     return true;
   };

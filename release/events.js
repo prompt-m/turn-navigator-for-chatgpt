@@ -148,7 +148,8 @@
         });
     }
     // ★追加: 隠し機能「ターン数をダブルクリックでログ表示」 2026.02.03
-    const statusLabel = document.getElementById("cgpt-nav-status"); // 数字が出ている場所
+    //  const statusLabel = document.getElementById("cgpt-nav-status"); // 数字が出ている場所
+    const statusLabel = document.getElementById("cgtn-status-monitor"); // 数字が出ている場所
     if (statusLabel) {
         statusLabel.addEventListener("dblclick", (e) => {
             e.preventDefault();
