@@ -65,7 +65,7 @@
       "options.thOps": "操作",
       "options.delBtn": "削除",
       "options.delConfirm":
-        "このチャットの付箋データを削除します。よろしいですか？",
+        "このチャットの付箋データを削除します。よろしいですか？\n(この操作は取り消せません)",
       "options.deleted": "削除しました",
       "options.emptyPinsTitle": "付箋データはまだありません",
       "options.emptyPinsDesc":
@@ -109,6 +109,9 @@
       "opts.btnImport": "インポート",
       "opts.backupDesc":
         "付箋データをJSONファイルにエクスポートまたはバックアップから復元します。",
+      "opts.importConfirm":
+        "現在のデータを上書きしてインポートしますか？\n(この操作は取り消せません)",
+      "opts.importSuccess": "インポート完了！ページをリロードします。",
       "options.refreshTitles": "再計算",
       "options.openChatAndRefresh":
         "チャット名を表示するには、ChatGPT画面を開いて［最新にする］を押してください。",
@@ -191,7 +194,8 @@
       "options.thUpdated": "Updated",
       "options.thOps": "Operation",
       "options.delBtn": "Delete",
-      "options.delConfirm": "Delete pin data for this chat. Are you sure?",
+      "options.delConfirm":
+        "Delete pin data for this chat. Are you sure?\n(This action cannot be undone.)",
       "options.deleted": "Deleted",
       "options.emptyPinsTitle": "No pinned data yet",
       "options.emptyPinsDesc":
@@ -241,6 +245,9 @@
       "opts.btnImport": "Import",
       "opts.backupDesc":
         "Export your pins and settings to a JSON file, or restore from a backup.",
+      "opts.importConfirm":
+        "Do you want to overwrite current data and import?\n(This action cannot be undone.)",
+      "opts.importSuccess": "Import complete! Reloading page...",
       // ===== Tooltips =====
       "nav.top": "Go to top",
       "nav.bottom": "Go to bottom",

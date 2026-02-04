@@ -19,21 +19,8 @@
   SH.getCFG = getCFG;
   SH.setCFG = setCFG;
 
-  // === loadSettings（単一の実装に統一：await 可能）===
-  /* !!!!
-  async function loadSettings(cb){
-    const all = await new Promise(res => chrome.storage.sync.get(null, res));
-    const fileCfg = (all && all.cgNavSettings) ? all.cgNavSettings : {};
-    // ここで既定値とマージ（DEFAULTS はこの時点で定義済み）
-    CFG = Object.assign(structuredClone(DEFAULTS), fileCfg);
-    try { cb && cb(CFG); } catch {}
-    try { SH.markLoaded?.(); } catch {}
-    return CFG;
- }
-*/
   type StorageAll = { cgNavSettings?: any } & Record<string, any>;
 
-  //async function loadSettings(cb?: () => void) { !!!!
   async function loadSettings(cb?: (cfg: any) => void) {
     const all = await new Promise<StorageAll>((resolve) =>
       chrome.storage.sync.get(null, resolve),
@@ -53,10 +40,6 @@
 
   // --- boot loaded gate ---
   let _loaded = false;
-  //  const _onLoadedResolvers = [];
-  // 読み込み完了を待つ（完了済みなら即解決）
-  //  SH.whenLoaded = () => _loaded ? Promise.resolve() : new Promise(r => _onLoadedResolvers.push(r));
-  // ---- load 完了の通知仕組み ----
   const _resolves: Array<() => void> = [];
   SH.whenLoaded = (): Promise<void> =>
     _loaded ? Promise.resolve() : new Promise<void>((r) => _resolves.push(r));
@@ -691,7 +674,7 @@
       return { ok: false, err: e };
     }
   };
-
+  /*
   SH.deletePinsForChat = async function (chatId) {
     console.log("付箋データ削除deletePinsForChat chatId:", chatId);
     try {
@@ -708,6 +691,37 @@
       console.warn("[deletePinsForChat] failed:", err);
       return false;
     }
+  };
+*/
+
+  // src/shared.ts
+
+  // ピン削除関数（修正版: TypeScriptエラー対応）
+  SH.deletePinsForChat = async function (chatId) {
+    if (!chatId) return false;
+
+    // 1. cgtnPins:: キーを削除
+    const key = `cgtnPins::${chatId}`;
+
+    // ★修正1: resolve を直接渡さず、アロー関数で包む
+    await new Promise<void>((resolve) => {
+      chrome.storage.sync.remove(key, () => resolve());
+    });
+
+    // 2. cgNavSettings 内の chatIndex からも削除
+    const cfg = SH.getCFG(); // (getCFGは同期関数なので await は外してもOKです)
+
+    if (cfg.chatIndex && cfg.chatIndex.map && cfg.chatIndex.map[chatId]) {
+      delete cfg.chatIndex.map[chatId];
+
+      // 保存 (cgNavSettings全体を更新)
+      // ★修正2: ここも同様にアロー関数で包む
+      await new Promise<void>((resolve) => {
+        chrome.storage.sync.set({ cgNavSettings: cfg }, () => resolve());
+      });
+    }
+
+    return true;
   };
 
   SH.deletePinsForChatAsync = async function deletePinsForChatAsync(chatId) {
@@ -1014,41 +1028,45 @@
   };
 
   // =================================================================
-  // Data Migration & Backup (Optimized)
-  // =================================================================
-  // src/shared.ts (修正版: TypeScriptエラー解消 & 構造最適化)
-
-  // =================================================================
-  // Data Migration & Backup (Optimized)
+  // Data Migration & Backup (Fix: Nested Settings & Cleanup)
   // =================================================================
 
   // v1データをv2へ変換・正規化する関数
   function migrateV1toV2(raw: any) {
-    // データ読み出し（cgNavSettings 内 or 直下）
-    let rootSettings = raw.cgNavSettings
-      ? { ...raw.cgNavSettings }
-      : { ...raw };
+    // 1. 設定データの取り出し（入れ子対策）
+    let rootSettings: any = {};
 
-    // バージョンチェック
-    // const ver = rootSettings.version || raw.meta?.version || 0;
+    if (raw.cgNavSettings) {
+      // 既に cgNavSettings がある場合
+      if (raw.cgNavSettings.settings) {
+        // ★修正: 二重ネスト (cgNavSettings.settings) になっていたら中身を取り出す
+        rootSettings = { ...raw.cgNavSettings.settings };
+      } else {
+        rootSettings = { ...raw.cgNavSettings };
+      }
+    } else if (raw.settings) {
+      // エクスポートデータ (data.settings) からの場合
+      rootSettings = { ...raw.settings };
+    } else {
+      // v1 (直下) の場合
+      rootSettings = { ...raw };
+    }
 
-    // settingsオブジェクトの整備
     const newPinsByChat: Record<string, any> = {};
 
-    // 1. 旧形式 (list.pinsByChat) から救出
+    // 2. ピンデータの回収
+    // (A) pinsByChat (Exportデータ由来 or 直下)
+    if (raw.pinsByChat) {
+      Object.assign(newPinsByChat, raw.pinsByChat);
+    }
+    // (B) list.pinsByChat (v1由来)
     if (rootSettings.list && rootSettings.list.pinsByChat) {
       Object.assign(newPinsByChat, rootSettings.list.pinsByChat);
       try {
         delete rootSettings.list.pinsByChat;
       } catch {}
     }
-
-    // 2. raw 直下に pinsByChat があった場合 (一時的なゴミなど)
-    if (raw.pinsByChat) {
-      Object.assign(newPinsByChat, raw.pinsByChat);
-    }
-
-    // 3. 新形式 (cgtnPins::) がストレージに混ざっていたら回収
+    // (C) cgtnPins:: (Storage由来)
     Object.keys(raw).forEach((k) => {
       if (k.startsWith("cgtnPins::")) {
         const cid = k.replace("cgtnPins::", "");
@@ -1056,28 +1074,60 @@
       }
     });
 
-    // ★ゴミ掃除
-    if (rootSettings.pins) {
-      try {
-        delete rootSettings.pins;
-      } catch {}
-    }
-    // 元々 meta があったら設定内からは消す（versionとして統合するため）
-    if (rootSettings.meta) {
-      try {
-        delete rootSettings.meta;
-      } catch {}
-    }
+    // 3. ゴミ掃除
+    // 設定オブジェクトの中に pinsByChat や pins が紛れ込んでいたら消す
+    delete rootSettings.pinsByChat;
+    delete rootSettings.pins;
+    delete rootSettings.meta; // versionは下記で注入するので消す
 
-    // ★バージョンを設定内に注入 (cgNavSettings.version = 2)
+    // ★バージョン注入
     rootSettings.version = 2;
 
     return {
-      settings: rootSettings, // ここに version:2 が入っています
+      settings: rootSettings,
       pinsByChat: newPinsByChat,
-      // meta は返しません
     };
   }
+
+  // ★ インポート機能（修正版）
+  SH.importData = async function (jsonObj: any) {
+    if (!jsonObj) throw new Error("Empty data");
+
+    // dataラッパーを剥がす
+    let candidate = jsonObj.data || jsonObj;
+
+    const v2Data = migrateV1toV2(candidate);
+
+    // 保存用オブジェクト
+    const toSave: Record<string, any> = {
+      cgNavSettings: v2Data.settings, // ここがフラットな設定オブジェクトになる
+    };
+
+    // ピンを展開
+    const pinsMap = v2Data.pinsByChat || {};
+    for (const [cid, val] of Object.entries(pinsMap)) {
+      if (cid && val) {
+        // ★修正: pins配列を 0/1 に統一して保存（容量節約）
+        if (val.pins && Array.isArray(val.pins)) {
+          val.pins = val.pins.map((p) => (p ? 1 : 0));
+        }
+        toSave[`cgtnPins::${cid}`] = val;
+      }
+    }
+
+    // 全クリアして保存
+    await new Promise<void>((resolve, reject) => {
+      chrome.storage.sync.clear(() => {
+        chrome.storage.sync.set(toSave, () => {
+          if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+          else resolve();
+        });
+      });
+    });
+
+    await SH.loadSettings();
+    return true;
+  };
 
   // ★ 自動マイグレーション（起動時にチェック）
   SH.migrateStorageIfNeeded = async function () {

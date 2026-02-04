@@ -1,0 +1,25 @@
+{
+  "cgNavSettings": {
+    "centerBias": 0.4,
+    "eps": 20,
+    "headerPx": 0,
+    "list": {
+      "enabled": false,
+      "fontSize": 12,
+      "h": null,
+      "maxChars": 40,
+      "maxItems": 30,
+      "pinOnly": false,
+      "w": null,
+      "x": null,
+      "y": null
+    },
+    "lockMs": 700,
+    "panel": {
+      "x": null,
+      "y": null
+    },
+    "pins": {},
+    "showViz": false
+  }
+}

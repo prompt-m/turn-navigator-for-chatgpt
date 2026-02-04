@@ -1081,4 +1081,21 @@
       location.reload();
     }
   });
+
+  // Copyボタン
+  document
+    .getElementById("btn-debug-copy")
+    ?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const text = document.getElementById("debug-output")?.textContent || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        const btn = e.target as HTMLButtonElement;
+        const original = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => (btn.textContent = original), 1000);
+      } catch (err) {
+        console.error("Copy failed", err);
+      }
+    });
 })();

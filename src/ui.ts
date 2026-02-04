@@ -83,7 +83,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .cgtn-brand-group {
   display: flex;
@@ -160,9 +160,10 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   justify-content: center; /* 枠全体を中央に */
-  pointer-events: none;
+  pointer-events: auto!important;;
   flex: 1;
   margin-left: 2px;
+  cursor: text;
 }
 
 .digital-screen .screen-value {
@@ -203,6 +204,19 @@ input:checked + .slider:before {
 }
 .digital-screen .off-text { 
   color: #aaa; font-size: 12px; font-weight: 600; 
+}
+
+/* ★修正1: モニター枠自体をクリック可能にする */
+#cgtn-status-monitor {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-top: 2px;
+        
+        /* ここを追加！ */
+        pointer-events: auto !important; 
+        cursor: pointer; /* マウスを乗せたら指マークにする */
 }
 
 /* === ボディ === */

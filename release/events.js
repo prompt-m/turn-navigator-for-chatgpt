@@ -146,25 +146,30 @@
                 }
             }
         });
-    }
-    // ★追加: 隠し機能「ターン数をダブルクリックでログ表示」 2026.02.03
-    //  const statusLabel = document.getElementById("cgpt-nav-status"); // 数字が出ている場所
-    const statusLabel = document.getElementById("cgtn-status-monitor"); // 数字が出ている場所
-    if (statusLabel) {
-        statusLabel.addEventListener("dblclick", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // logic.ts にある showLogs を呼び出す
-            const LG = window.CGTN_LOGIC;
-            if (typeof LG.showLogs === "function") {
-                LG.showLogs();
-            }
-            else {
-                alert("Log viewer is not available.");
+        // ★ここに追加: 隠し機能「ターン数をダブルクリックでログ表示」
+        // ナビパネルが後から描画されても確実に動くように、bodyで待ち受けます
+        document.body.addEventListener("dblclick", (e) => {
+            const target = e.target;
+            console.log("double-clicked target:", target);
+            // クリックされた場所が「モニター(数字部分)」の内側かどうか判定
+            //const monitor = target.closest("#cgtn-status-monitor");
+            // 修正: ターゲットを「モニター」から「その他ラベル」に変更
+            // "others" という i18n属性を持つ要素を探す
+            const trigger = target.closest('[data-i18n="others"]');
+            if (trigger) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("trigger double-clicked!"); // デバッグ用ログ
+                // logic.ts の showLogs を呼び出す
+                const LG = window.CGTN_LOGIC;
+                if (typeof LG.showLogs === "function") {
+                    LG.showLogs();
+                }
+                else {
+                    alert("Log viewer is not available.");
+                }
             }
         });
-        // ユーザーに「ここ押せるよ」と教えないために cursor: pointer はあえて付けません
-        statusLabel.title = "Double-click to view logs"; // ヒントだけこっそり
     }
     // ============================================================
     // ★追加: Universal版ロジックの移植 (簡易高速スキャン) 2026.01.30
