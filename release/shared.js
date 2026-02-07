@@ -1,8 +1,43 @@
-// shared.js — 設定の既定値/保存、基準線API、グローバル公開
+// shared.ts — 設定の既定値/保存、基準線API、グローバル公開
 (() => {
+    "use strict";
+    // 公開用オブジェクト
+    const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
+    // =================================================================
+    // ★追加: 共通ログシステム (Flight Recorder)
+    // =================================================================
+    const MAX_LOGS = 100;
+    const logs = []; // ローカル変数としても保持
+    SH.logs = logs; // 公開
+    /**
+     * ログ追加 (どこからでも SH.addLog(...) で呼べます)
+     */
+    SH.addLog = function (msg, level = "INFO") {
+        const now = new Date();
+        const time = now.toLocaleTimeString("ja-JP", { hour12: false }) +
+            "." +
+            String(now.getMilliseconds()).padStart(3, "0");
+        // コンソール出力
+        if (level === "ERROR")
+            console.error(`[CGTN] ${msg}`);
+        else if (level === "WARN")
+            console.warn(`[CGTN] ${msg}`);
+        else
+            console.log(`[CGTN] ${msg}`);
+        // 保存
+        const prefix = level === "ERROR"
+            ? "❌ [ERROR]"
+            : level === "WARN"
+                ? "⚠️ [WARN]"
+                : `[${level}]`;
+        const entry = `[${time}] ${prefix} ${msg}`;
+        SH.logs.push(entry);
+        if (SH.logs.length > MAX_LOGS) {
+            SH.logs.shift();
+        }
+    };
     const t = (key) => window.CGTN_I18N?.t?.(key) || key;
     window.CGTN_SHARED = Object.assign(window.CGTN_SHARED || {}, { t });
-    const SH = (window.CGTN_SHARED = window.CGTN_SHARED || {});
     // メモリCFG
     let CFG = window.CGTN_SHARED?._BOOT_CFG || {};
     // 公開アクセサ
@@ -80,7 +115,7 @@
             x: null,
             y: null,
         },
-        pins: {}, // ← 付箋（key: true）
+        /*    pins: {}, // ← 付箋（key: true）*/
     });
     // ---- storage util（拡張リロード中ガード）----
     async function syncGet(keys) {
@@ -574,12 +609,15 @@
         const key = pinKeyOf(chatId);
         try {
             //      await syncSet({ [key]: { pins: arr } });
+            // ★安全策: 受け取った配列を必ず 0/1 に整形する
+            // (logic.ts が修正されていれば不要ですが、保険として残します)
+            const pins = Array.isArray(arr) ? arr.map((v) => (v ? 1 : 0)) : [];
             const title = await SH.resolveTitleFor(chatId);
-            await syncSet({ [key]: { pins: arr, updatedAt: Date.now(), title } });
+            await syncSet({ [key]: { pins: pins, updatedAt: Date.now(), title } });
             // インデックスの件数も更新
             const cfg = SH.getCFG() || {};
             const map = { ...(cfg.chatIndex?.map || {}) };
-            const cnt = (arr || []).filter(Boolean).length;
+            const cnt = (arr || []).filter(Boolean).length; // 1の数をカウント
             map[chatId] = {
                 ...(map[chatId] || {}),
                 pinCount: cnt,
@@ -638,13 +676,24 @@
         }
         return true;
     };
+    // ★修正: 新仕様に対応した削除関数 2026.02.07
     SH.deletePinsForChatAsync = async function deletePinsForChatAsync(chatId) {
-        const map = await SH.loadPinsMapAsync();
-        if (map[chatId]) {
-            delete map[chatId];
-            await SH.savePinsMapAsync(map);
-        }
-        return true;
+        if (!chatId)
+            return false;
+        // 古い map 形式ではなく、直接キーを指定して消す！
+        const key = `cgtnPins::${chatId}`;
+        return new Promise((resolve) => {
+            chrome.storage.sync.remove(key, () => {
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    console.warn("deletePinsForChatAsync failed", err);
+                    resolve(false);
+                }
+                else {
+                    resolve(true);
+                }
+            });
+        });
     };
     // トグル（1始まり）付箋データ更新
     SH.togglePinByIndex = async function togglePinByIndex(index1, chatId = SH.getChatId?.()) {
@@ -1075,34 +1124,126 @@
             },
         };
     };
-    // ★ インポート機能
-    SH.importData = async function (jsonObj) {
-        if (!jsonObj)
-            throw new Error("Empty data");
-        let candidate = jsonObj.data || jsonObj;
-        const v2Data = migrateV1toV2(candidate);
-        const toSave = {
-            cgNavSettings: v2Data.settings, // version:2 込み
-        };
-        const pinsMap = v2Data.pinsByChat || {};
-        for (const [cid, val] of Object.entries(pinsMap)) {
-            if (cid && val) {
-                toSave[`cgtnPins::${cid}`] = val;
-            }
+    // =================================================================
+    // Log Viewer (Data source: Shared.ts)
+    // =================================================================
+    // ★注意: ここで logs = [] や addLog を定義する必要はありません。
+    // すべて window.CGTN_SHARED (SH) にあるものを使います。
+    /**
+     * エラーログ用ショートカット (UI連携)
+     */
+    SH.logError = function (msg, err) {
+        const text = err ? String(err.message || err) : "";
+        const stack = err && err.stack ? `\nStack: ${err.stack}` : "";
+        // 自分自身(SH)のレコーダーに記録
+        if (SH.addLog) {
+            SH.addLog(`${msg} ${text}${stack}`, "ERROR");
         }
-        await new Promise((resolve, reject) => {
-            chrome.storage.sync.clear(() => {
-                chrome.storage.sync.set(toSave, () => {
-                    if (chrome.runtime.lastError)
-                        reject(chrome.runtime.lastError);
-                    else
-                        resolve();
-                });
-            });
-        });
-        await SH.loadSettings();
-        return true;
+        else {
+            SH.logError(msg, err);
+        }
+        // トースト通知 (UIモジュールがいれば)
+        window.CGTN_UI?.toast?.(`Error: ${msg}`, "error");
     };
+    /**
+     * ログビューア表示
+     */
+    SH.showLogs = function () {
+        // ログ配列を取得
+        const currentLogs = SH.logs ? SH.logs : [];
+        const old = document.getElementById("cgtn-log-viewer");
+        if (old)
+            old.remove();
+        const box = document.createElement("div");
+        box.id = "cgtn-log-viewer";
+        Object.assign(box.style, {
+            position: "fixed",
+            inset: "40px",
+            zIndex: "2147483647",
+            background: "rgba(0,0,0,0.95)",
+            color: "#0f0",
+            fontFamily: "Consolas, Menlo, monospace",
+            fontSize: "13px",
+            padding: "16px",
+            borderRadius: "8px",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 0 30px rgba(0,0,0,0.8)",
+            backdropFilter: "blur(4px)",
+        });
+        const header = document.createElement("div");
+        Object.assign(header.style, {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "10px",
+            borderBottom: "1px solid #333",
+            paddingBottom: "8px",
+        });
+        // ★変更: Clearボタンを追加し、タイトルにID(cgtn-log-title)を付与（更新用）
+        header.innerHTML = `
+      <div id="cgtn-log-title" style="font-weight:bold; font-size:14px;">
+        ✈️ Flight Recorder (Last ${currentLogs.length})
+      </div>
+      <div>
+        <button id="cgtn-log-copy" style="cursor:pointer; margin-right:8px; padding:4px 12px; background:#333; color:#fff; border:1px solid #555;">Copy</button>
+        <button id="cgtn-log-clear" style="cursor:pointer; margin-right:8px; padding:4px 12px; background:#333; color:#fff; border:1px solid #555;">Clear</button>
+        <button id="cgtn-log-close" style="cursor:pointer; padding:4px 12px; background:#c33; color:#fff; border:1px solid #555;">Close</button>
+      </div>
+    `;
+        box.appendChild(header);
+        const ta = document.createElement("textarea");
+        ta.readOnly = true;
+        ta.value = currentLogs.join("\n");
+        Object.assign(ta.style, {
+            flex: "1",
+            background: "transparent",
+            color: "#0f0",
+            border: "none",
+            resize: "none",
+            outline: "none",
+            lineHeight: "1.4",
+            whiteSpace: "pre",
+        });
+        box.appendChild(ta);
+        document.body.appendChild(box);
+        // --- イベント設定 ---
+        // Close
+        box
+            .querySelector("#cgtn-log-close")
+            .addEventListener("click", () => box.remove());
+        // Copy
+        box.querySelector("#cgtn-log-copy").addEventListener("click", async (e) => {
+            const btn = e.target;
+            try {
+                await navigator.clipboard.writeText(ta.value);
+                const originalText = btn.textContent;
+                btn.textContent = "Copied!";
+                setTimeout(() => (btn.textContent = originalText), 1000);
+            }
+            catch (err) {
+                alert("Copy failed");
+            }
+        });
+        // ★追加: Clear
+        box.querySelector("#cgtn-log-clear").addEventListener("click", () => {
+            if (confirm("Clear all logs?")) {
+                // 配列を空にする
+                if (SH.logs)
+                    SH.logs.length = 0;
+                // "Logs cleared" だけ記録して表示
+                SH.addLog("Logs cleared manually.", "INFO");
+                ta.value = SH.logs.join("\n");
+                // タイトルの件数も更新
+                const titleEl = box.querySelector("#cgtn-log-title");
+                if (titleEl)
+                    titleEl.textContent = `✈️ Flight Recorder (Last ${SH.logs.length})`;
+            }
+        });
+        ta.scrollTop = ta.scrollHeight;
+    };
+    // 初期化ログ
+    SH.addLog("Shared module initialized.");
     SH.DEFAULTS = DEFAULTS;
     SH.loadSettings = loadSettings;
     SH.computeAnchor = computeAnchor;

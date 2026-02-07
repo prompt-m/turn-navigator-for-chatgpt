@@ -1,4 +1,4 @@
-// logic.js
+// logic.ts
 (() => {
     //  const UI = window.CGTN_UI;
     const SH = window.CGTN_SHARED;
@@ -954,8 +954,7 @@
         }
         return targets;
     }
-    // --- 付箋一括 ON / OFF --- '25.12.3
-    // mode: 'on' | 'off' | true | false
+    // --- 付箋一括 ON / OFF ---
     // 1) ST.* に基づいて pinsArr を更新
     // 2) DOM(.row) 側の data-pin / 🔖 を同期
     async function bulkSetPins(mode) {
@@ -965,7 +964,11 @@
         if (!cid)
             return;
         // true / 'on' → ALL ON, false / 'off' → ALL OFF
-        const doPinOn = mode === "on" || mode === true;
+        //    const doPinOn = mode === "on" || mode === true;
+        // ★修正: ここで明確に 1 か 0 に変換しておく 2026.02.07
+        // true / 'on' → 1,  false / 'off' → 0
+        const val = mode === "on" || mode === true ? 1 : 0;
+        const doPinOn = !!val; // DOM操作用には boolean も持っておく
         // --- 現在ロール（全体 / ユーザー / アシスタント） ---
         let role = NS.viewRole || "all";
         try {
@@ -996,7 +999,9 @@
         if (pinsArr.length < maxIdx) {
             const oldLen = pinsArr.length;
             pinsArr.length = maxIdx;
-            pinsArr.fill(false, oldLen);
+            //      pinsArr.fill(false, oldLen);
+            // ★修正: false ではなく 0 で埋める 2026.02.07
+            pinsArr.fill(0, oldLen);
         }
         for (const idx1 of targets) {
             const idx0 = idx1 - 1;
@@ -2622,8 +2627,9 @@
         const width = Math.max(minW, Math.min(maxW, Math.round(charsPerLine * charW + padding)));
         panel.style.width = width + "px";
     };
+    // (2055行目付近)
     // ★追加: 行のイベント委譲から呼ばれるピン留め実行関数
-    // 2026.02.01
+    // 2026.02.01 -> 2026.02.07 修正
     NS.togglePin = async function (article) {
         if (!article)
             return;
@@ -2635,14 +2641,27 @@
         const idx1 = Number(String(key).replace("turn:", ""));
         if (!idx1)
             return;
-        // ストレージ上のピン状態をトグル
-        const ret = await SH.togglePinByIndex?.(idx1, cid);
-        let nextState = !!ret;
-        if (ret && typeof ret === "object" && "pinned" in ret) {
-            nextState = !!ret.pinned;
+        // --- 修正ここから ---
+        // 1. 現在のデータ配列を取得
+        const arr = await SH.getPinsArrAsync(cid);
+        // 2. 配列長を「現在の画面上の全ターン数」に合わせる (足りない分は0埋め)
+        //    これで "途中の行" をピン留めしても、末尾までデータが確保されます
+        const totalTurns = NS.ST?.all?.length || 0;
+        if (arr.length < totalTurns) {
+            const oldLen = arr.length;
+            arr.length = totalTurns;
+            arr.fill(0, oldLen); // 新しく増えた部分を0で埋める
         }
+        // 3. トグル処理 (0 <=> 1)
+        // idx1 は 1始まりなので -1 してアクセス
+        const current = arr[idx1 - 1] ? 1 : 0;
+        const next = current ? 0 : 1;
+        arr[idx1 - 1] = next;
+        // 4. 保存 (shared側で 0/1 化が入っていますが、ここでも数値になっています)
+        const { ok } = await SH.savePinsArrAsync(arr, cid);
+        const nextState = !!next; // UI反映用に boolean 化
+        // --- 修正ここまで (以降はUI反映処理) ---
         // UI反映（同じターンの行すべて）
-        // ※ rowsByTurn は内部関数なので、ここで再取得するか、ロジックを流用
         const body = document.getElementById("cgpt-list-body");
         if (body) {
             const rows = body.querySelectorAll(`.row[data-idx="${idx1}"]`);
@@ -2652,7 +2671,6 @@
                     row.dataset.pin = "1";
                 else
                     row.removeAttribute("data-pin");
-                // 既存の paintPinRow があれば使う、なければ手動でクラス操作
                 const clip = row.querySelector(".cgtn-clip-pin");
                 if (clip) {
                     clip.setAttribute("aria-pressed", String(nextState));
@@ -2813,58 +2831,6 @@
         catch (e) {
             console.warn("[auto-sync] observe failed", e);
         }
-    };
-    // ============================================================
-    // ★追加: 簡易デバッグロガー
-    // ============================================================
-    NS.logs = [];
-    // ログ追加
-    NS.logError = function (msg, err) {
-        const time = new Date().toLocaleTimeString();
-        const text = err ? String(err.message || err) : "";
-        const stack = err ? String(err.stack || "") : "";
-        const logLine = `[${time}] ${msg}\n${text}\n${stack}\n----------------\n`;
-        console.error("[CGTN]", msg, err); // コンソールにも出す
-        NS.logs.push(logLine);
-        // エラー時はトーストも出す
-        window.CGTN_UI?.toast?.(`Error: ${msg}`, "error");
-    };
-    // ログ表示（簡易モーダル）
-    NS.showLogs = function () {
-        let box = document.getElementById("cgtn-log-viewer");
-        if (!box) {
-            box = document.createElement("div");
-            box.id = "cgtn-log-viewer";
-            // 黒背景のログ画面スタイル
-            box.style.cssText =
-                "position:fixed;inset:20px;z-index:999999;background:rgba(0,0,0,0.95);color:#0f0;font-family:monospace;padding:10px;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 0 20px #000;";
-            box.innerHTML = `
-        <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px;">
-          <strong style="color:#fff">Debug Logs</strong>
-          <div>
-            <button id="cgtn-log-copy" style="margin-right:10px;cursor:pointer;">Copy</button>
-            <button id="cgtn-log-close" style="cursor:pointer;">Close</button>
-          </div>
-        </div>
-        <textarea id="cgtn-log-body" style="flex:1;background:transparent;color:#0f0;border:none;resize:none;font-size:12px;outline:none;" readonly></textarea>
-      `;
-            document.body.appendChild(box);
-            box.querySelector("#cgtn-log-close").addEventListener("click", () => {
-                box.style.display = "none";
-            });
-            box.querySelector("#cgtn-log-copy").addEventListener("click", () => {
-                const ta = document.getElementById("cgtn-log-body");
-                if (ta) {
-                    ta.select();
-                    document.execCommand("copy");
-                    window.CGTN_UI?.toast?.("Copied!", "success");
-                }
-            });
-        }
-        const ta = document.getElementById("cgtn-log-body");
-        if (ta)
-            ta.value = NS.logs.join("") || "(No errors)";
-        box.style.display = "flex";
     };
     // --- expose ---
     NS.ensureTurnsReady = ensureTurnsReady;

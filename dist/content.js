@@ -941,13 +941,24 @@
                 }
                 return true;
             }
+            // 設定画面でピン削除 付箋データ削除　メッセージ受信
             if (msg.type === "cgtn:pins-deleted") {
+                SH.logError("msg.type === cgtn:pins-deleted"); //log
                 const cid = SH.getChatId?.();
                 if (!cid || (msg.chatId && msg.chatId !== cid))
                     return;
                 LG.hydratePinsCache?.(cid);
-                if (SH.isListOpen?.())
+                if (SH.isListOpen?.()) {
                     window.CGTN_LOGIC?.renderList?.(false);
+                }
+                // ★追加: 削除通知を受け取ったら、バッジとタイトルも即座に更新する
+                try {
+                    window.CGTN_LOGIC?.updatePinOnlyBadge?.();
+                    window.CGTN_LOGIC?.updateListChatTitle?.();
+                }
+                catch (e) {
+                    SH.logError("[cgtn:pins-deleted] badge update failed", e); //log
+                }
             }
             if (msg.type === "cgtn:viz-toggle") {
                 const on = !!msg.on;
@@ -1111,24 +1122,6 @@
                 LG?.updateListChatTitle?.();
             }
             catch { }
-            /*
-            try {
-              const enabled =
-                RUN.prevListEnabled !== null
-                  ? RUN.prevListEnabled
-                  : !!SH?.getCFG?.()?.list?.enabled;
-      
-              LG?.setListEnabled?.(enabled);
-      
-              const chk = document.getElementById("cgpt-list-toggle");
-              if (chk instanceof HTMLInputElement) chk.checked = enabled;
-            } catch {}
-      
-            try {
-              LG?.updatePinOnlyBadge?.();
-              LG?.updateListChatTitle?.();
-            } catch {}
-      */
         }
         catch (e) {
             console.warn("[cgtn] start failed", reason, e);

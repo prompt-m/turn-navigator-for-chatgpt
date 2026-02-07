@@ -1,4 +1,4 @@
-// inject_url_hook.js
+// inject_url_hook.ts
 (function () {
   if (window.__CGTN_URL_HOOKED__) return;
   window.__CGTN_URL_HOOKED__ = true;

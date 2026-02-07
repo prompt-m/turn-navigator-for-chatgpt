@@ -6,7 +6,6 @@
     const $ = (id) => document.getElementById(id);
     const exists = (id) => !!$(id);
     const clamp = (n, lo, hi) => Math.min(Math.max(Number(n), lo), hi);
-    // !!!! ヘルパ追加
     const $inp = (id) => document.getElementById(id);
     const val = (id) => $inp(id)?.value ?? "";
     const num = (id) => Number(val(id) || 0);
@@ -40,7 +39,6 @@
             const getBytes = () => new Promise((res) => chrome.storage.sync.getBytesInUse(null, (b) => res(b || 0)));
             const getAll = () => new Promise((res) => chrome.storage.sync.get(null, (obj) => res(obj || {})));
             const [bytesInUse, allItems] = await Promise.all([getBytes(), getAll()]);
-            // const usedKB = (bytesInUse / 1024).toFixed(1); !!!!
             const bytes = typeof bytesInUse === "number" ? bytesInUse : 0;
             const usedKB = (bytes / 1024).toFixed(1);
             const totalKB = 100; // sync 全体上限=約100KB
@@ -425,30 +423,46 @@
         </tr>`;
         })
             .join("");
-        const pinsDelBound = new WeakSet(); // !!!!
+        /*    const pinsDelBound = new WeakSet<HTMLElement>();*/
         tbody.innerHTML = rowHtml;
         // ← box 未定義対策＋スクロール
         const box = document.getElementById("pins-table");
         const wrap = box?.parentElement;
         if (wrap)
             wrap.classList.add("cgtn-pins-scroll");
+        /*
         // 削除（tbody に委譲） — 二重バインド防止
         if (!pinsDelBound.has(tbody)) {
-            pinsDelBound.add(tbody);
-            tbody.addEventListener("click", async (e) => {
-                const target = e.target;
-                if (!(target instanceof Element))
-                    return;
-                const btn = target.closest("button.del");
-                if (!btn)
-                    return;
-                const cid = btn.getAttribute("data-cid");
-                if (!cid)
-                    return;
-                // 共通の通知/再描画ロジックへ一本化
-                deletePinsFromOptions(cid);
-            });
+          pinsDelBound.add(tbody);
+    
+          tbody.addEventListener("click", async (e) => {
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+    
+            const btn = target.closest("button.del") as HTMLButtonElement | null;
+            if (!btn) return;
+    
+            const cid = btn.getAttribute("data-cid");
+            if (!cid) return;
+    
+            // 共通の通知/再描画ロジックへ一本化
+            deletePinsFromOptions(cid);
+          });
         }
+    */
+        // ここでボタンにイベントを割り当て (これなら重複しません)
+        const delButtons = tbody.querySelectorAll("button.del");
+        delButtons.forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                // バブリング防止 (念のため)
+                e.stopPropagation();
+                const target = e.currentTarget; // button自身
+                const cid = target.getAttribute("data-cid");
+                if (cid) {
+                    deletePinsFromOptions(cid);
+                }
+            });
+        });
         // 「最新にします」（id=pins-refresh）
         const refreshBtn = document.getElementById("pins-refresh");
         if (refreshBtn) {
@@ -501,7 +515,6 @@
     document.getElementById("lang-ja")?.addEventListener("click", () => {
         SH.setLang?.("ja"); // i18n.js にある setter を想定（無ければ自前で保持）
         applyI18N();
-        // applyToUI(); !!!!
         applyToUI({});
         renderPinsManager();
         try {
@@ -512,7 +525,6 @@
     document.getElementById("lang-en")?.addEventListener("click", () => {
         SH.setLang?.("en");
         applyI18N();
-        // applyToUI(); !!!!
         applyToUI({});
         renderPinsManager();
         try {

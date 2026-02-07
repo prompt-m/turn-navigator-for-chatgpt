@@ -9,7 +9,6 @@
   const exists = (id) => !!$(id);
   const clamp = (n, lo, hi) => Math.min(Math.max(Number(n), lo), hi);
 
-  // !!!! ヘルパ追加
   const $inp = (id: string) =>
     document.getElementById(id) as HTMLInputElement | null;
 
@@ -55,7 +54,6 @@
 
       const [bytesInUse, allItems] = await Promise.all([getBytes(), getAll()]);
 
-      // const usedKB = (bytesInUse / 1024).toFixed(1); !!!!
       const bytes = typeof bytesInUse === "number" ? bytesInUse : 0;
       const usedKB = (bytes / 1024).toFixed(1);
 
@@ -514,7 +512,7 @@
       })
       .join("");
 
-    const pinsDelBound = new WeakSet<HTMLElement>(); // !!!!
+    /*    const pinsDelBound = new WeakSet<HTMLElement>();*/
     tbody.innerHTML = rowHtml;
 
     // ← box 未定義対策＋スクロール
@@ -522,6 +520,7 @@
     const wrap = box?.parentElement;
     if (wrap) wrap.classList.add("cgtn-pins-scroll");
 
+    /*
     // 削除（tbody に委譲） — 二重バインド防止
     if (!pinsDelBound.has(tbody)) {
       pinsDelBound.add(tbody);
@@ -540,6 +539,22 @@
         deletePinsFromOptions(cid);
       });
     }
+*/
+    // ここでボタンにイベントを割り当て (これなら重複しません)
+    const delButtons = tbody.querySelectorAll("button.del");
+    delButtons.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        // バブリング防止 (念のため)
+        e.stopPropagation();
+
+        const target = e.currentTarget as HTMLButtonElement; // button自身
+        const cid = target.getAttribute("data-cid");
+
+        if (cid) {
+          deletePinsFromOptions(cid);
+        }
+      });
+    });
 
     // 「最新にします」（id=pins-refresh）
     const refreshBtn = document.getElementById(
@@ -608,7 +623,6 @@
   document.getElementById("lang-ja")?.addEventListener("click", () => {
     SH.setLang?.("ja"); // i18n.js にある setter を想定（無ければ自前で保持）
     applyI18N();
-    // applyToUI(); !!!!
     applyToUI({});
     renderPinsManager();
     try {
@@ -618,7 +632,6 @@
   document.getElementById("lang-en")?.addEventListener("click", () => {
     SH.setLang?.("en");
     applyI18N();
-    // applyToUI(); !!!!
     applyToUI({});
     renderPinsManager();
     try {

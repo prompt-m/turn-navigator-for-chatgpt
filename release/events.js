@@ -1,4 +1,4 @@
-// events.js
+// events.ts
 (() => {
     "use strict";
     const SH = window.CGTN_SHARED || {};
@@ -160,10 +160,10 @@
                 e.preventDefault();
                 e.stopPropagation();
                 console.log("trigger double-clicked!"); // デバッグ用ログ
-                // logic.ts の showLogs を呼び出す
-                const LG = window.CGTN_LOGIC;
-                if (typeof LG.showLogs === "function") {
-                    LG.showLogs();
+                // shared.ts の showLogs を呼び出す
+                const SH = window.CGTN_SHARED;
+                if (typeof SH.showLogs === "function") {
+                    SH.showLogs();
                 }
                 else {
                     alert("Log viewer is not available.");

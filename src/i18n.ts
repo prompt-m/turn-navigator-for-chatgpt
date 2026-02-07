@@ -1,4 +1,4 @@
-// i18n.js
+// i18n.ts
 (() => {
   // const NS = (window.CGTN_I18N = {}); !!!!
   const NS: any = (window.CGTN_I18N = {});
