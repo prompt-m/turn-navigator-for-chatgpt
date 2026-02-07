@@ -908,6 +908,8 @@
     // === options.html からの即時反映メッセージを受ける ===
     try {
         chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+            SH.logError("onMessage");
+            console.log("onMessage msg:", msg, "msg.type:", msg.type);
             if (!msg || !msg.type)
                 return;
             if (msg.type === "cgtn:get-chat-meta") {
@@ -970,7 +972,9 @@
             }
         });
     }
-    catch { }
+    catch {
+        SH.logError("onMessage catch error ");
+    }
     // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
     function injectUrlChangeHook() {
         try {
