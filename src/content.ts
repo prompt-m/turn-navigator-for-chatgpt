@@ -168,94 +168,6 @@
     });
   }
 
-  // 一覧がOFFなら、リスト生成（renderList）をスキップする処理を追加 2026.01.29
-  // =================================================================
-  //  rebuildAndRenderSafely (爆速FastScan優先版)
-  // =================================================================
-  /*
-  let __buildGen = 0;
-  async function rebuildAndRenderSafely(
-    { forceList = false } = {},
-    oldSig: string | null = null,
-  ) {
-    const LG = window.CGTN_LOGIC;
-    const SH = window.CGTN_SHARED;
-    // const UI = window.CGTN_UI;
-
-    const myGen = ++__buildGen;
-    // console.log("rebuildAndRenderSafely myGen:", myGen);
-
-    // 1. Loading... を出すが、FastScanですぐ上書きされること前提
-    setUiBusy(true, "Loading...");
-
-    // ★ここが変更点: 待機よりも先に、まずFastScanで数字を出す！
-    // これにより、ユーザーは瞬時に「345 / 345」を目にすることができます。
-    let fastDone = false;
-    if (typeof LG.runFastUniversalScan === "function") {
-      fastDone = LG.runFastUniversalScan();
-    }
-
-    // 2. 待機フェーズ（前の指紋と違う画面になるまで待つ）
-    // FastScanが成功していれば、すでに新しい画面なので待つ必要はありません。
-    // 失敗（まだDOMがない）場合のみ、しっかりと待ちます。
-    if (!fastDone && oldSig) {
-      await waitForChatSettled({ mustNotMatch: oldSig });
-      if (myGen !== __buildGen) return;
-    }
-
-    try {
-      // 3. 正規ロジック再構築（内部データの確定）
-      LG.rebuild?.();
-
-      // 4. リストを作るかどうか判定
-      const kind = SH.getPageInfo?.()?.kind || "other";
-      const cfg = SH.getCFG?.() || {};
-      const needList = kind === "chat" && (forceList || !!cfg.list?.enabled);
-
-      if (needList) {
-        // console.log("Render List...");
-        await new Promise((r) => requestAnimationFrame(r));
-        if (myGen !== __buildGen) return;
-        await LG.renderList?.(true);
-      }
-
-      // 5. 最終更新（リスト作成等でズレた表示を補正）
-      if (typeof LG.updateStatus === "function") {
-        LG.updateStatus();
-      }
-    } catch (e) {
-      console.warn("List load failed", e);
-      // エラー時のフォールバック
-      if (forceList) {
-        LG?.setListEnabled?.(false);
-        const chk = document.getElementById("cgpt-list-toggle");
-        if (chk instanceof HTMLInputElement) {
-          chk.checked = false;
-          chk.dispatchEvent(new Event("change"));
-        }
-      }
-    } finally {
-      if (myGen === __buildGen) {
-        setUiBusy(false);
-
-        // ★ダメ押しリトライ（0件対策）
-        // ChatGPTの描画が遅れていて0件だった場合、1.2秒後にもう一度だけスキャンする
-        setTimeout(() => {
-          if (myGen !== __buildGen) return;
-          const total = LG.ST?.all?.length || 0;
-          if (total === 0) {
-            if (typeof LG.runFastUniversalScan === "function")
-              LG.runFastUniversalScan();
-            LG.rebuild?.();
-            LG.updateStatus?.();
-          }
-        }, 1200);
-      }
-    }
-  }
-*/
-  // src/content.ts (Rebuild Fix)
-
   // =================================================================
   // 修正: rebuildAndRenderSafely (待機順序の適正化)
   // =================================================================
@@ -386,11 +298,9 @@
           if (d.type === "url-change") {
             try {
               window.CGTN_PREVIEW?.hide?.("url-change");
-            } catch {}
-
-            console.log(
-              "d.type === url-change catch setUiBusy(true,Loding...)",
-            );
+            } catch (e) {
+              SH.logError(" window.CGTN_PREVIEW.hide url-change ", e); //log
+            }
             setUiBusy(true, "Loading...");
 
             // ★追加: リストが開いているかチェック
@@ -996,9 +906,10 @@
   // === options.html からの即時反映メッセージを受ける ===
   try {
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-      SH.logError("onMessage");
-      console.log("onMessage msg:", msg, "msg.type:", msg.type);
+      //      SH.addLog("onMessage addlog", "DEBUG"); //log
+      //      console.log("onMessage msg:", msg, "msg.type:", msg.type);
       if (!msg || !msg.type) return;
+      //      console.log("onMessage2 msg:", msg, "msg.type:", msg.type);
 
       if (msg.type === "cgtn:get-chat-meta") {
         try {
@@ -1037,6 +948,7 @@
 
           sendResponse({ ok: true, chatId, turns, uploads, downloads });
         } catch (e) {
+          SH.logError("catch ", e); //log
           sendResponse({ ok: false, error: String(e) });
         }
         return true;
@@ -1044,7 +956,8 @@
 
       // 設定画面でピン削除 付箋データ削除　メッセージ受信
       if (msg.type === "cgtn:pins-deleted") {
-        SH.logError("msg.type === cgtn:pins-deleted"); //log
+        //        console.log("onMessage4 msg:", msg, "msg.type:", msg.type);
+        //        SH.addLog("cgtn:pins-deleted addlog", "DEBUG"); //log
 
         const cid = SH.getChatId?.();
         if (!cid || (msg.chatId && msg.chatId !== cid)) return;
@@ -1060,10 +973,14 @@
           window.CGTN_LOGIC?.updatePinOnlyBadge?.();
           window.CGTN_LOGIC?.updateListChatTitle?.();
         } catch (e) {
-          SH.logError("[cgtn:pins-deleted] badge update failed", e); //log
+          SH.logError("catch cgtn:pins-deleted バッジとタイトル", e); //log
         }
+        return true;
       }
+
       if (msg.type === "cgtn:viz-toggle") {
+        //        console.log("onMessage3 msg:", msg, "msg.type:", msg.type);
+        //        SH.addLog(":viz-toggle addlog", "DEBUG"); //log
         const on = !!msg.on;
         SH.toggleViz?.(on);
         const cb = document.querySelector(
@@ -1073,8 +990,9 @@
         SH.saveSettingsPatch?.({ showViz: on });
       }
     });
-  } catch {
-    SH.logError("onMessage catch error ");
+  } catch (e) {
+    //    console.log("catch chrome.runtime.onMessage", e);
+    SH.logError("catch chrome.runtime.onMessage", e);
   }
 
   // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========

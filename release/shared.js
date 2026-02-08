@@ -22,6 +22,8 @@
             console.error(`[CGTN] ${msg}`);
         else if (level === "WARN")
             console.warn(`[CGTN] ${msg}`);
+        else if (level === "DEBUG")
+            console.debug(`[CGTN] ${msg}`); // ★追加: debug出力
         else
             console.log(`[CGTN] ${msg}`);
         // 保存
@@ -29,10 +31,13 @@
             ? "❌ [ERROR]"
             : level === "WARN"
                 ? "⚠️ [WARN]"
-                : `[${level}]`;
+                : level === "DEBUG"
+                    ? "🐛 [DEBUG]" // ★追加: デバッグ用アイコン
+                    : `[${level}]`;
         const entry = `[${time}] ${prefix} ${msg}`;
         SH.logs.push(entry);
-        if (SH.logs.length > MAX_LOGS) {
+        // MAX_LOGS は shared.ts 内で定義されている前提です
+        if (SH.logs.length > (typeof MAX_LOGS !== "undefined" ? MAX_LOGS : 200)) {
             SH.logs.shift();
         }
     };
