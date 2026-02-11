@@ -30,7 +30,7 @@
       "nav.sendKeyInfo": "入力設定：",
       "nav.sk_enter": "[Enter]",
       "nav.sk_ctrl": "[Ctrl+Enter]",
-      "nav.sk_shift": "[Shift+Enter]",
+      "nav.sk_alt": "[Alt+Enter]",
       // === リスト／プレビュー関連 ===
       image: "（image）",
       video: "（video）",
@@ -94,7 +94,7 @@
       "options.sendKeyLabel": "入力設定：",
       "options.sk_enter": "Enterで送信 (標準)",
       "options.sk_ctrl": "Ctrl + Enterで送信",
-      "options.sk_shift": "Shift + Enterで送信",
+      "options.sk_alt": "Alt + Enterで送信",
       "options.saveBtn": "保存",
       "options.resetBtn": "規定に戻す",
       "options.refreshTimeout": "更新が時間内に終わりませんでした",
@@ -170,7 +170,7 @@
       "nav.sendKeyInfo": "Input:",
       "nav.sk_enter": "[Enter]",
       "nav.sk_ctrl": "[Ctrl+Enter]",
-      "nav.sk_shift": "[Shift+Enter]",
+      "nav.sk_alt": "[Alt+Enter]",
       // === List / Preview ===
       image: "(image)",
       video: "(video)",
@@ -233,9 +233,9 @@
       "options.lockMs": "Scroll lock (ms)",
       // 入力設定 2026.02.11
       "options.sendKeyLabel": "Send Key:",
-      "options.sk_enter": "Enter to send (Default)",
+      "options.sk_enter": "Enter to send(Default)",
       "options.sk_ctrl": "Ctrl + Enter to send",
-      "options.sk_shift": "Shift + Enter to send",
+      "options.sk_alt": "Alt + Enter to send",
       "options.saveBtn": "Save",
       "options.resetBtn": "Reset",
       "options.refreshTitles": "Refresh",

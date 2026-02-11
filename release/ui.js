@@ -597,8 +597,8 @@ input:checked + .slider:before {
         let valText = "";
         if (method === "ctrl_enter")
             valText = T("nav.sk_ctrl"); // "[Ctrl+Enter]"
-        else if (method === "shift_enter")
-            valText = T("nav.sk_shift"); // "[Shift+Enter]"
+        else if (method === "alt_enter")
+            valText = T("nav.sk_alt"); // "[Alt+Enter]"
         else
             valText = T("nav.sk_enter"); // "[Enter]"
         // HTMLで2行にする
@@ -675,8 +675,8 @@ input:checked + .slider:before {
             let key = "nav.sk_enter";
             if (method === "ctrl_enter")
                 key = "nav.sk_ctrl";
-            else if (method === "shift_enter")
-                key = "nav.sk_shift";
+            else if (method === "alt_enter")
+                key = "nav.sk_alt";
             // 翻訳してセット
             skVal.textContent = T(key);
         }

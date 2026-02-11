@@ -1076,55 +1076,125 @@
   }
 
   // =================================================================
-  // ★追加: Enterキー送信制御 (3モード対応)
+  // ★修正: Enterキー送信制御 (物理改行挿入版)
+  // =================================================================
+  // =================================================================
+  // ★デバッグ版: Enterキー送信制御
   // =================================================================
   function enableEnterKeyGuard() {
     if (window.__CGTN_ENTER_GUARD__) return;
     window.__CGTN_ENTER_GUARD__ = true;
+    console.log("[CGTN] EnterGuard: Listener attached.");
 
     window.addEventListener(
       "keydown",
       (e) => {
+        // 設定取得ログ
         const cfg = SH.getCFG?.() || {};
         const method = cfg.sendKeyMethod || "enter";
 
-        // "enter" (標準) なら何もしない
-        if (method === "enter") return;
-
-        // 入力欄チェック (textarea または contenteditable)
-        const target = e.target as HTMLElement;
-        const isInput = target.matches('textarea, [contenteditable="true"]');
-        if (!isInput) return;
-
-        // IME入力中は除外
-        if (e.isComposing) return;
-
-        // Enterキーが押されたか？
+        // Enterキー以外は無視（ログも出さない）
         if (e.key !== "Enter") return;
 
-        let allow = false;
+        // IME入力中は無視
+        if (e.isComposing) {
+          console.debug("[CGTN] EnterGuard: Ignored (IME composing)");
+          return;
+        }
 
-        // モード別の許可条件チェック
+        console.log(
+          `[CGTN] KeyDown: Enter | Method: ${method} | Shift: ${e.shiftKey} | Ctrl: ${e.ctrlKey} | Alt: ${e.altKey}`,
+        );
+
+        // 1. 設定チェック
+        if (method === "enter") {
+          console.log("[CGTN] EnterGuard: Skipped (Method is 'enter')");
+          return;
+        }
+
+        // 2. ターゲットチェック
+        const target = e.target as HTMLElement;
+        const inputEl = target.closest('textarea, [contenteditable="true"]');
+        console.log("[CGTN] Target:", target.tagName, "IsInput:", !!inputEl);
+
+        if (!inputEl) {
+          console.log("[CGTN] EnterGuard: Skipped (Not input element)");
+          return;
+        }
+
+        // --- 送信判定ロジック ---
+        let isSend = false;
+
         if (method === "ctrl_enter") {
-          // Ctrl(Meta)が押されていればOK
-          if (e.ctrlKey || e.metaKey) allow = true;
-        } else if (method === "shift_enter") {
-          // Shiftが押されていればOK
-          if (e.shiftKey) allow = true;
+          if (e.ctrlKey || e.metaKey) isSend = true;
+        } else if (method === "alt_enter") {
+          if (e.altKey) isSend = true;
         }
 
-        // 許可条件を満たさないEnter（ただのEnterなど）は、送信処理を止める
-        if (!allow) {
-          // ★重要: stopPropagation でサイト側の送信ハンドラ(React等)に届かせない
-          e.stopPropagation();
-          e.stopImmediatePropagation();
+        console.log(
+          `[CGTN] Decision: ${isSend ? "SEND (Pass through)" : "NEWLINE (Block & Insert)"}`,
+        );
 
-          // preventDefault は「しない」ことで、改行動作（標準のEnter）を生かす
-          // console.debug(`[CGTN] Enter send blocked (Mode: ${method})`);
-        }
+        // 送信キーならスルー
+        if (isSend) return;
+
+        // --- 改行処理 ---
+        console.log("[CGTN] Action: Blocking default behavior...");
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        console.log("[CGTN] Action: Inserting newline...");
+        insertNewline(inputEl as HTMLElement);
       },
       { capture: true },
-    ); // ★最重要: サイト側より先に横取り
+    ); // ★最重要: capture: true
+  }
+
+  // ★復活: 改行挿入ヘルパー
+  function insertNewline(el: HTMLElement) {
+    // 1. Textareaの場合
+    if (el.tagName === "TEXTAREA") {
+      const ta = el as HTMLTextAreaElement;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const val = ta.value;
+
+      // 文字列操作で改行を挟む
+      ta.value = val.substring(0, start) + "\n" + val.substring(end);
+
+      // カーソル位置を進める
+      ta.selectionStart = ta.selectionEnd = start + 1;
+
+      // React等に値の変更を通知する
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+      ta.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    // 2. Contenteditable (div) の場合 (ChatGPT/Gemini等はこちら)
+    else {
+      // focusがないと動作しないことがあるため念のためフォーカス
+      el.focus();
+
+      // execCommandは非推奨ですが、contenteditable内の改行挿入には
+      // 最も互換性が高く確実な方法です。
+      const result = document.execCommand("insertLineBreak");
+
+      // もしexecCommandが効かなかった場合のフォールバック
+      if (!result) {
+        document.execCommand("insertText", false, "\n");
+      }
+    }
+
+    // 画面位置調整（カーソル位置へスクロール）
+    try {
+      const sel = window.getSelection();
+      if (sel?.rangeCount) {
+        sel
+          .getRangeAt(0)
+          .startContainer.parentElement?.scrollIntoView({ block: "nearest" });
+      }
+    } catch {}
   }
 
   // =================================================================
