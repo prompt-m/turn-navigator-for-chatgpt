@@ -580,6 +580,42 @@ input:checked + .slider:before {
                 window.CGTN_UI.openSettingsModal?.();
             });
         }
+        // =========================================================
+        // ★追加: 入力設定の表示 (幅対策版: 2行表示) 2026.02.11
+        // =========================================================
+        const sendKeyDiv = document.createElement("div");
+        sendKeyDiv.id = "cgpt-sendkey-info"; //
+        sendKeyDiv.style.marginTop = "8px";
+        sendKeyDiv.style.fontSize = "10px";
+        sendKeyDiv.style.color = "#888";
+        sendKeyDiv.style.lineHeight = "1.3";
+        sendKeyDiv.style.textAlign = "center"; //
+        const cfg = SH.getCFG?.() || {};
+        const method = cfg.sendKeyMethod || "enter";
+        // 短縮文言を取得
+        const label = T("nav.sendKeyInfo"); // "入力設定："
+        let valText = "";
+        if (method === "ctrl_enter")
+            valText = T("nav.sk_ctrl"); // "[Ctrl+Enter]"
+        else if (method === "shift_enter")
+            valText = T("nav.sk_shift"); // "[Shift+Enter]"
+        else
+            valText = T("nav.sk_enter"); // "[Enter]"
+        // HTMLで2行にする
+        // (SH.titleEscape がなければそのまま label/valText を使います)
+        const safeLabel = SH.titleEscape ? SH.titleEscape(label) : label;
+        const safeVal = SH.titleEscape ? SH.titleEscape(valText) : valText;
+        // ★修正: HTML構造
+        // ラベルにもIDを振り、値部分も中央揃えで見やすく調整
+        sendKeyDiv.innerHTML = `
+      <div data-i18n="nav.sendKeyInfo">${T("nav.sendKeyInfo")}</div>
+      <div id="cgpt-sendkey-val" style="font-weight:bold; color:#ccc; margin-top:2px;">${SH.titleEscape ? SH.titleEscape(valText) : valText}</div>
+    `;
+        // その他グループ(data-role="others")に追加
+        const grpOthers = box.querySelector('.cgpt-nav-group[data-role="others"]');
+        if (grpOthers)
+            grpOthers.appendChild(sendKeyDiv);
+        // =========================================================
         // ツールチップ
         window.CGTN_SHARED?.applyTooltips?.({
             '#cgpt-nav [data-role="user"] [data-act="top"]': "nav.top",
@@ -628,6 +664,23 @@ input:checked + .slider:before {
                 // el.title = txt; // ← ★削除OK！
             }
         });
+        // =========================================================
+        // ★追加: [Enter] などの値部分を現在の言語と設定で更新
+        // =========================================================
+        const skVal = document.getElementById("cgpt-sendkey-val");
+        if (skVal) {
+            const cfg = SH.getCFG?.() || {};
+            const method = cfg.sendKeyMethod || "enter";
+            // 設定値に合わせてキーを選び直す
+            let key = "nav.sk_enter";
+            if (method === "ctrl_enter")
+                key = "nav.sk_ctrl";
+            else if (method === "shift_enter")
+                key = "nav.sk_shift";
+            // 翻訳してセット
+            skVal.textContent = T(key);
+        }
+        // =========================================================
         // 2. ドラッグヘッダー
         // ★ installUI の applyTooltips リストに "#cgpt-drag": "headerDrag" を追加して、
         //    ここの手動更新は削除してしまうのが一番スマートです。

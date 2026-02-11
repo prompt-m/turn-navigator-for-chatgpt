@@ -70,6 +70,8 @@
             headerPx: clamp(raw?.headerPx ?? base.headerPx, 0, 2000),
             eps: clamp(raw?.eps ?? base.eps, 0, 120),
             lockMs: clamp(raw?.lockMs ?? base.lockMs, 0, 3000),
+            // ★追加 入力設定 2026.02.11
+            sendKeyMethod: raw?.sendKeyMethod || base.sendKeyMethod,
             showViz: !!raw?.showViz,
             panel: raw?.panel || base.panel,
             list: {
@@ -157,6 +159,8 @@
             setVal("headerPx", v.headerPx);
             setVal("eps", v.eps);
             setVal("lockMs", v.lockMs);
+            // ★追加: 入力設定プルダウンへの反映 2026.02.11
+            setVal("sendKeyMethod", v.sendKeyMethod || "enter");
             setChk("showViz", v.showViz);
             setChk("listEnabled", v.list?.enabled);
             setChk("pinOnly", v.list?.pinOnly);
@@ -430,26 +434,6 @@
         const wrap = box?.parentElement;
         if (wrap)
             wrap.classList.add("cgtn-pins-scroll");
-        /*
-        // 削除（tbody に委譲） — 二重バインド防止
-        if (!pinsDelBound.has(tbody)) {
-          pinsDelBound.add(tbody);
-    
-          tbody.addEventListener("click", async (e) => {
-            const target = e.target;
-            if (!(target instanceof Element)) return;
-    
-            const btn = target.closest("button.del") as HTMLButtonElement | null;
-            if (!btn) return;
-    
-            const cid = btn.getAttribute("data-cid");
-            if (!cid) return;
-    
-            // 共通の通知/再描画ロジックへ一本化
-            deletePinsFromOptions(cid);
-          });
-        }
-    */
         // ここでボタンにイベントを割り当て (これなら重複しません)
         const delButtons = tbody.querySelectorAll("button.del");
         delButtons.forEach((btn) => {
@@ -552,6 +536,32 @@
             });
         });
     });
+    // ========================================================
+    // ★追加: 入力設定の即時反映 (changeイベント) 2026.02.11
+    // ========================================================
+    document.getElementById("sendKeyMethod")?.addEventListener("change", (ev) => {
+        const target = ev.target;
+        const val = target.value;
+        // 1. パッチデータ作成
+        const patch = { sendKeyMethod: val };
+        // 2. ストレージへ保存
+        SH.saveSettingsPatch?.(patch, () => {
+            // 3. UIの「保存しました」メッセージを表示
+            flashMsgInline("msg-adv", "options.saved");
+            // 4. 開いているChatGPTタブへ即座に通知
+            chrome.tabs.query({ url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] }, (tabs) => {
+                tabs.forEach((tab) => {
+                    if (tab.id) {
+                        chrome.tabs.sendMessage(tab.id, {
+                            type: "cgtn:settings-updated", // 汎用的な更新通知
+                            patch: patch,
+                        });
+                    }
+                });
+            });
+        });
+    });
+    // ========================================================
     // 付箋データ削除
     async function deletePinsFromOptions(chatId) {
         const yes = confirm(T("options.delConfirm") || "Delete pins for this chat?");
@@ -591,6 +601,32 @@
             catch (_) { }
         }
     }
+    // ========================================================
+    // ★追加: 入力設定の即時反映 (changeイベント)
+    // ========================================================
+    document.getElementById("sendKeyMethod")?.addEventListener("change", (ev) => {
+        const target = ev.target;
+        const val = target.value;
+        // 1. パッチデータ作成
+        const patch = { sendKeyMethod: val };
+        // 2. ストレージへ保存
+        SH.saveSettingsPatch?.(patch, () => {
+            // 3. UIの「保存しました」メッセージを表示
+            flashMsgInline("msg-adv", "options.saved");
+            // 4. 開いているChatGPTタブへ即座に通知
+            chrome.tabs.query({ url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] }, (tabs) => {
+                tabs.forEach((tab) => {
+                    if (tab.id) {
+                        chrome.tabs.sendMessage(tab.id, {
+                            type: "cgtn:settings-updated", // 汎用的な更新通知
+                            patch: patch,
+                        });
+                    }
+                });
+            });
+        });
+    });
+    // ========================================================
     // =================================================================
     // ★追加: エクスポート・インポート (Backup / Restore)
     // =================================================================
@@ -808,6 +844,8 @@
                     centerBias: num("centerBias"),
                     eps: num("eps"),
                     lockMs: num("lockMs"),
+                    // ★追加 入力設定 2026.02.11
+                    sendKeyMethod: val("sendKeyMethod"),
                 };
                 SH.saveSettingsPatch?.(patch, () => {
                     try {
@@ -831,6 +869,10 @@
                 const lm = $inp("lockMs");
                 if (lm)
                     lm.value = String(DEF.lockMs);
+                // ★追加 入力設定 2026.02.11
+                const sk = $inp("sendKeyMethod");
+                if (sk)
+                    sk.value = String(DEF.sendKeyMethod || "enter");
                 const patch = {
                     showViz: !!DEF.showViz,
                     centerBias: DEF.centerBias,

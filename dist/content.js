@@ -890,6 +890,30 @@
                     cb.checked = on;
                 SH.saveSettingsPatch?.({ showViz: on });
             }
+            // ========================================================
+            // ★追加: 設定変更の受信処理 2026.02.11
+            // ========================================================
+            if (msg.type === "cgtn:settings-updated") {
+                // 1. 受け取ったパッチでメモリ内の設定(CFG)を即時更新
+                if (msg.patch && SH.setCFG) {
+                    const cur = SH.getCFG() || {};
+                    // 簡易マージ（deepMergeがあればそれを使っても良いですが、ここではシンプルに）
+                    const next = { ...cur, ...msg.patch };
+                    SH.setCFG(next);
+                }
+                else {
+                    // パッチがなければストレージから読み直す
+                    SH.reloadFromSync?.();
+                }
+                // 2. ナビパネルの表示を更新
+                // (ui.tsのapplyLangが、現在の設定値を見て [Enter] などを書き換えます)
+                window.CGTN_UI?.applyLang?.();
+                // 3. 基準線の再描画なども念のため
+                if (msg.patch && typeof msg.patch.showViz !== "undefined") {
+                    SH.toggleViz?.(!!msg.patch.showViz);
+                }
+            }
+            // ========================================================
         });
     }
     catch (e) {
@@ -948,6 +972,52 @@
         }
     }
     // =================================================================
+    // ★追加: Enterキー送信制御 (3モード対応)
+    // =================================================================
+    function enableEnterKeyGuard() {
+        if (window.__CGTN_ENTER_GUARD__)
+            return;
+        window.__CGTN_ENTER_GUARD__ = true;
+        window.addEventListener("keydown", (e) => {
+            const cfg = SH.getCFG?.() || {};
+            const method = cfg.sendKeyMethod || "enter";
+            // "enter" (標準) なら何もしない
+            if (method === "enter")
+                return;
+            // 入力欄チェック (textarea または contenteditable)
+            const target = e.target;
+            const isInput = target.matches('textarea, [contenteditable="true"]');
+            if (!isInput)
+                return;
+            // IME入力中は除外
+            if (e.isComposing)
+                return;
+            // Enterキーが押されたか？
+            if (e.key !== "Enter")
+                return;
+            let allow = false;
+            // モード別の許可条件チェック
+            if (method === "ctrl_enter") {
+                // Ctrl(Meta)が押されていればOK
+                if (e.ctrlKey || e.metaKey)
+                    allow = true;
+            }
+            else if (method === "shift_enter") {
+                // Shiftが押されていればOK
+                if (e.shiftKey)
+                    allow = true;
+            }
+            // 許可条件を満たさないEnter（ただのEnterなど）は、送信処理を止める
+            if (!allow) {
+                // ★重要: stopPropagation でサイト側の送信ハンドラ(React等)に届かせない
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                // preventDefault は「しない」ことで、改行動作（標準のEnter）を生かす
+                // console.debug(`[CGTN] Enter send blocked (Mode: ${method})`);
+            }
+        }, { capture: true }); // ★最重要: サイト側より先に横取り
+    }
+    // =================================================================
     // 修正後: initialize (起動遅延を極限まで短縮)
     // =================================================================
     async function initialize() {
@@ -966,6 +1036,8 @@
             await SH.migratePinsStorageOnce?.();
         }
         catch { }
+        // 入力設定 2026.02.11
+        enableEnterKeyGuard();
         UI.installUI();
         ensureFocusPark();
         installFocusStealGuard();

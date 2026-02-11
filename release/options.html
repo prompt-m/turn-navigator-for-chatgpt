@@ -544,7 +544,7 @@
           <div class="settings">
             <label for="centerBias"
               ><b id="lbl-centerBias" data-i18n="options.centerBias"
-                >判定位置</b
+                >表示位置の基準</b
               ></label
             >
             <div>
@@ -566,7 +566,7 @@
 
           <div class="settings">
             <label for="eps"
-              ><b id="lbl-eps" data-i18n="options.eps">吸着範囲</b></label
+              ><b id="lbl-eps" data-i18n="options.eps">ゆらぎ幅</b></label
             >
             <div>
               <input
@@ -584,7 +584,7 @@
           <div class="settings">
             <label for="lockMs"
               ><b id="lbl-lockMs" data-i18n="options.lockMs"
-                >ロック時間</b
+                >スクロールロック</b
               ></label
             >
             <input
@@ -595,6 +595,36 @@
               min="0"
               max="3000"
             />
+          </div>
+
+          <div class="settings">
+            <label for="sendKeyMethod"
+              ><b id="lbl-sendKeyMethod" data-i18n="options.sendKeyLabel"
+                >送信キー設定</b
+              ></label
+            >
+            <select
+              id="sendKeyMethod"
+              name="sendKeyMethod"
+              style="
+                width: 242px;
+                max-width: 100%;
+                padding: 8px 10px;
+                border-radius: 10px;
+                border: 1px solid var(--bd);
+                background: var(--bg);
+                color: var(--fg);
+                font-size: 14px;
+              "
+            >
+              <option value="enter" data-i18n="options.sk_enter">Enter</option>
+              <option value="ctrl_enter" data-i18n="options.sk_ctrl">
+                Ctrl+Enter
+              </option>
+              <option value="shift_enter" data-i18n="options.sk_shift">
+                Shift+Enter
+              </option>
+            </select>
           </div>
 
           <div class="section-actions">

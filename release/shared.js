@@ -120,7 +120,10 @@
             x: null,
             y: null,
         },
-        /*    pins: {}, // ← 付箋（key: true）*/
+        //    pins: {}, // ← 付箋（key: true）
+        // 入力設定表示 2026.02.11
+        // "enter" | "ctrl_enter" | "shift_enter"
+        sendKeyMethod: "enter",
     });
     // ---- storage util（拡張リロード中ガード）----
     async function syncGet(keys) {
