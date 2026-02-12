@@ -171,7 +171,7 @@
   // =================================================================
   // 修正: rebuildAndRenderSafely (待機順序の適正化)
   // =================================================================
-
+  /*
   let __buildGen = 0;
   async function rebuildAndRenderSafely(
     { forceList = false } = {},
@@ -246,8 +246,97 @@
       }
     }
   }
+*/
+
+  // =================================================================
+  // 修正版: rebuildAndRenderSafely (確実性重視)
+  // =================================================================
+
+  let __buildGen = 0;
+  async function rebuildAndRenderSafely(
+    { forceList = false } = {},
+    oldSig: string | null = null,
+  ) {
+    const LG = window.CGTN_LOGIC;
+    const SH = window.CGTN_SHARED;
+
+    const myGen = ++__buildGen;
+
+    // 1. Loading開始
+    setUiBusy(true, "Loading...");
+
+    // 2. ★修正: ここでナビパネルの数字を一旦「---」やクリア状態にする
+    // これにより、前のチャットの数字「14/14」などが残るのを防ぎます
+    UI?.updateStatusDisplay?.("");
+
+    // 3. 待機フェーズ
+    if (oldSig) {
+      await waitForChatSettled({ mustNotMatch: oldSig });
+      if (myGen !== __buildGen) return;
+    }
+
+    // ★削除: 犯人だった runFastUniversalScan を削除！
+    // if (typeof LG.runFastUniversalScan === "function") {
+    //   LG.runFastUniversalScan();
+    // }
+
+    try {
+      // 4. 正規ロジック再構築
+      LG.rebuild?.();
+
+      // 5. リスト生成判定
+      const kind = SH.getPageInfo?.()?.kind || "other";
+      const cfg = SH.getCFG?.() || {};
+      const needList = kind === "chat" && (forceList || !!cfg.list?.enabled);
+
+      if (needList) {
+        await new Promise((r) => requestAnimationFrame(r));
+        if (myGen !== __buildGen) return;
+        await LG.renderList?.(true);
+      }
+
+      // 6. 最終更新 (ここで Loading... が数字に変わるはず)
+      if (typeof LG.updateStatus === "function") {
+        LG.updateStatus();
+      }
+    } catch (e) {
+      console.warn("rebuild failed", e);
+      // エラー時はリストOFF同期など
+      if (forceList) {
+        LG?.setListEnabled?.(false);
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) {
+          chk.checked = false;
+          chk.dispatchEvent(new Event("change"));
+        }
+      }
+    } finally {
+      if (myGen === __buildGen) {
+        setUiBusy(false);
+
+        // ★修正: Loading... で止まらないための保険
+        // 処理が終わったのにまだ Loading 表示なら、強制的にステータス更新を掛ける
+        setTimeout(() => {
+          if (myGen !== __buildGen) return;
+
+          // 現在の表示テキストを取得
+          const screen = document.getElementById("cgtn-status-monitor");
+          const text = screen?.textContent || "";
+
+          // まだ "Loading..." だったら
+          if (text.includes("Loading")) {
+            console.log("[cgtn] Force status update (stuck detected)");
+            // 再スキャンして更新
+            LG.rebuild?.();
+            LG.updateStatus?.();
+          }
+        }, 500); // 0.5秒後にチェック
+      }
+    }
+  }
 
   // URL切替はインジェクト方式で受ける（コンテンツ側ポーリング無効化）
+  /*
   (function bindCgtnMessageOnce() {
     if (window.__CGTN_MSG_BOUND__) return;
     window.__CGTN_MSG_BOUND__ = true;
@@ -398,7 +487,134 @@
       window.__CGTN_MSG_BOUND__ = false;
     });
   })();
+*/
+  // =================================================================
+  // 修正版: onMessage (ちらつき防止・起動ロジック)
+  // =================================================================
+  (function bindCgtnMessageOnce() {
+    if (window.__CGTN_MSG_BOUND__) return;
+    window.__CGTN_MSG_BOUND__ = true;
 
+    let __lastCid: string | null = null;
+    let __debTo = 0;
+    let __gen = 0;
+    let __pageInfo = { kind: "other", cid: "", hasTurns: false };
+
+    const onMessage = (ev: MessageEvent) => {
+      (async () => {
+        const d = ev && ev.data;
+        if (!d || d.source !== "cgtn") return;
+
+        const SH = window.CGTN_SHARED,
+          LG = window.CGTN_LOGIC;
+        const kind = d.kind || "other";
+        const cidNow = d.cid || SH?.getChatId?.();
+
+        __pageInfo = { kind, cid: cidNow || "", hasTurns: !!d.hasTurns };
+        try {
+          SH.setPageInfo?.(__pageInfo);
+        } catch {}
+
+        if (["home", "project", "other", "new"].includes(kind)) {
+          LG?.clearListPanelUI?.();
+          UI?.updateStatusDisplay?.("OFF");
+          __lastCid = null;
+          __gen++;
+          return;
+        }
+
+        if (d.type === "url-change" || d.type === "turn-added") {
+          const prev = __lastCid;
+          __lastCid = cidNow;
+          const myGen = ++__gen;
+          const currentSig = getDomSignature();
+
+          // A. URL変更
+          if (d.type === "url-change") {
+            const shouldActivate =
+              RUN.running ||
+              (!RUN.idle && (kind === "chat" || kind === "project"));
+
+            if (shouldActivate) {
+              if (!RUN.running) startApp("auto-start");
+
+              // ★追加: 何よりも先にスクロール監視を止める！
+              // これで「前の数字」が亡霊のように復活するのを防ぎます
+              LG.stopScrollSpy?.();
+
+              try {
+                window.CGTN_PREVIEW?.hide?.("url-change");
+              } catch (e) {}
+
+              setUiBusy(true, "Loading...");
+
+              // ★重要: ここではリストを消さず(clearListPanelUI削除)、
+              // 代わりにナビの数字だけクリアして「前の数字」が出ないようにする
+              UI?.updateStatusDisplay?.("Loading...");
+
+              const panel = document.getElementById("cgpt-list-panel");
+              const wasListOpen =
+                panel &&
+                panel.style.display !== "none" &&
+                !panel.classList.contains("collapsed");
+
+              clearTimeout(__debTo);
+              __debTo = window.setTimeout(() => {
+                requestAnimationFrame(() => {
+                  (async () => {
+                    if (myGen !== __gen) return;
+                    await rebuildAndRenderSafely(
+                      { forceList: !!wasListOpen },
+                      currentSig,
+                    );
+                  })().catch((err) =>
+                    console.warn("[cgtn] rebuild error:", err),
+                  );
+                });
+              }, 80);
+            } else {
+              // Idle時のサイレント更新
+              waitForChatSettled({ maxMs: 5000 })
+                .then(() => LG.updateFooterOnly?.())
+                .catch(() => {});
+            }
+          }
+          // B. 会話追加
+          else {
+            if (RUN.running) {
+              // 会話中は Loading 表示にしない（スムーズに追従）
+              // setUiBusy(true, "Sync...");
+
+              clearTimeout(__debTo);
+              __debTo = window.setTimeout(() => {
+                requestAnimationFrame(() => {
+                  (async () => {
+                    if (myGen !== __gen) return;
+                    await rebuildAndRenderSafely({});
+                  })().catch((err) =>
+                    console.warn("[cgtn] turn-added error:", err),
+                  );
+                });
+              }, 80);
+            } else {
+              LG.updateFooterOnly?.();
+            }
+          }
+        }
+      })();
+    };
+    window.addEventListener("message", onMessage, true);
+
+    RUN.bag.add(() => {
+      try {
+        if (__debTo) window.clearTimeout(__debTo);
+      } catch {}
+      try {
+        window.removeEventListener("message", onMessage, true);
+      } catch {}
+      window.__CGTN_MSG_BOUND__ = false;
+    });
+  })();
   const USE_INJECT_URL_HOOK = true;
 
   // ========= 1) フォーカス系 =========

@@ -141,16 +141,6 @@
         const sc = getTrueScroller();
         if (!sc)
             return;
-        /*
-        const handler = () => {
-          // 負荷軽減のため描画フレームに合わせて間引く
-          if (NS._spyRaf) return;
-          NS._spyRaf = requestAnimationFrame(() => {
-            NS._spyRaf = null;
-            NS.updateStatus();
-          });
-        };
-    */
         // 2026.2.1
         const handler = () => {
             // rAFではなく setTimeout で 200ms 程度に間引く
@@ -174,6 +164,24 @@
             NS._scrollSpy = { el: sc, fn: handler };
         }
     }
+    // =================================================================
+    // ★スクロール監視を強制停止 (チャット切替時の誤表示防止) 2026.02.12
+    // =================================================================
+    NS.stopScrollSpy = function () {
+        // リスナー解除
+        if (NS._scrollSpy) {
+            try {
+                NS._scrollSpy.el.removeEventListener("scroll", NS._scrollSpy.fn);
+            }
+            catch { }
+            NS._scrollSpy = null;
+        }
+        // 待機中の更新タイマーもキャンセル
+        if (NS._spyTimer) {
+            clearTimeout(NS._spyTimer);
+            NS._spyTimer = null;
+        }
+    };
     // ★チャット別ピン・キャッシュ
     let _pinsCache = null; // { [turnId]: true }
     NS._pinsCache = _pinsCache; // デバッグ用
