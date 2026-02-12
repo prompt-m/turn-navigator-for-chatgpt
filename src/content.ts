@@ -256,7 +256,9 @@
     let __debTo = 0;
     let __gen = 0;
     let __pageInfo = { kind: "other", cid: "", hasTurns: false };
-
+    // =================================================================
+    // ★仕上げ: ちらつき防止 & Loading安全装置付き onMessage
+    // =================================================================
     const onMessage = (ev: MessageEvent) => {
       (async () => {
         const d = ev && ev.data;
@@ -273,94 +275,117 @@
         } catch {}
 
         // ホーム画面などへの遷移ならリセット
-        if (
-          kind === "home" ||
-          kind === "project" ||
-          kind === "other" ||
-          kind === "new"
-        ) {
+        if (["home", "project", "other", "new"].includes(kind)) {
           LG?.clearListPanelUI?.();
-          UI?.updateStatusDisplay?.("OFF"); // ここもOFFなどに
+          UI?.updateStatusDisplay?.("OFF");
           __lastCid = null;
           __gen++;
           return;
         }
 
+        // URL変更 または 会話追加
         if (d.type === "url-change" || d.type === "turn-added") {
           const prev = __lastCid;
           __lastCid = cidNow;
           const myGen = ++__gen;
 
-          // ★追加: 処理開始前の「指紋」を取得 2026.02.02
           const currentSig = getDomSignature();
 
-          // ★追加: URLが変わったら、処理開始前に即座に「Loading...」にする
+          // =========================================================
+          // A. URLが変わった場合
+          // =========================================================
           if (d.type === "url-change") {
-            try {
-              window.CGTN_PREVIEW?.hide?.("url-change");
-            } catch (e) {
-              SH.logError(" window.CGTN_PREVIEW.hide url-change ", e); //log
-            }
-            setUiBusy(true, "Loading...");
+            // 起動判定
+            const shouldActivate =
+              RUN.running ||
+              (!RUN.idle && (kind === "chat" || kind === "project"));
 
-            // ★追加: リストが開いているかチェック
-            const panel = document.getElementById("cgpt-list-panel");
-            const wasListOpen =
-              panel &&
-              panel.style.display !== "none" &&
-              !panel.classList.contains("collapsed");
+            if (shouldActivate) {
+              if (!RUN.running) startApp("auto-start");
 
-            LG?.clearListPanelUI?.();
+              try {
+                window.CGTN_PREVIEW?.hide?.("url-change");
+              } catch (e) {}
 
-            clearTimeout(__debTo);
-            __debTo = window.setTimeout(() => {
-              requestAnimationFrame(() => {
-                (async () => {
-                  if (myGen !== __gen) return;
-                  // ★修正: wasListOpen と currentSig を渡す！
-                  await rebuildAndRenderSafely(
-                    { forceList: !!wasListOpen },
-                    currentSig,
-                  );
-                })()
-                  .catch((err) => console.warn("[cgtn] rebuild error:", err))
-                  .finally(() => {
-                    // (中略)
-                  });
-              });
-            }, 80); // 80ms待機（微調整通知を待つため）
-          } else {
-            // turn-added（会話が増えただけ）の場合は、操作不能にせず裏で更新したいなら
-            // setUiBusy(true) は呼ばなくても良いですが、
-            // 確実に同期させたいなら呼んでもOKです。今回はLoading表示させます。
-            console.log(
-              "d.type === url-change else  setUiBusy(true,Loding...)",
-            );
-            setUiBusy(true, "Loading...");
-          }
+              setUiBusy(true, "Loading...");
 
-          clearTimeout(__debTo);
-          __debTo = window.setTimeout(() => {
-            requestAnimationFrame(() => {
-              (async () => {
-                if (myGen !== __gen) return;
-                await rebuildAndRenderSafely({});
-              })()
-                .catch((err) => console.warn("[cgtn] rebuild error:", err))
-                .finally(() => {
-                  try {
-                    // 処理が終わったらLoading解除（数字表示に戻る）
-                    console.log(
-                      "rebuildAndRenderSafely finally setUiBusy(false)",
+              // ★対策2: Loading安全装置 (万が一止まったら10秒後に強制解除)
+              setTimeout(() => {
+                if (
+                  myGen === __gen &&
+                  document.querySelector(".cgtn-ui-busy")
+                ) {
+                  setUiBusy(false);
+                }
+              }, 10000);
+
+              const panel = document.getElementById("cgpt-list-panel");
+              const wasListOpen =
+                panel &&
+                panel.style.display !== "none" &&
+                !panel.classList.contains("collapsed");
+
+              // ★対策1: ここでの clearListPanelUI() を削除！
+              // LG?.clearListPanelUI?.(); // ← これがチラつきの原因でした
+
+              clearTimeout(__debTo);
+              __debTo = window.setTimeout(() => {
+                requestAnimationFrame(() => {
+                  (async () => {
+                    if (myGen !== __gen) return;
+
+                    // リスト更新処理
+                    await rebuildAndRenderSafely(
+                      { forceList: !!wasListOpen },
+                      currentSig,
                     );
-                    setUiBusy(false);
-                  } catch {}
+                  })()
+                    .catch((err) => console.warn("[cgtn] rebuild error:", err))
+                    .finally(() => {
+                      // 処理完了でLoading解除
+                      setUiBusy(false);
+                    });
                 });
-            });
-          }, 80);
+              }, 80);
+            } else {
+              // Idleモード (サイレント更新)
+              waitForChatSettled({ maxMs: 5000 })
+                .then(() => LG.updateFooterOnly?.())
+                .catch(() => {});
+            }
+          }
+          // =========================================================
+          // B. 会話が増えただけの場合 (turn-added)
+          // =========================================================
+          else {
+            if (RUN.running) {
+              // ここは会話中の更新なのでLoading表示しなくても良いですが、
+              // 確実に同期させるなら一瞬出します（お好みで外してもOK）
+              setUiBusy(true, "Syncing...");
+
+              clearTimeout(__debTo);
+              __debTo = window.setTimeout(() => {
+                requestAnimationFrame(() => {
+                  (async () => {
+                    if (myGen !== __gen) return;
+                    await rebuildAndRenderSafely({}, currentSig);
+                  })()
+                    .catch((err) =>
+                      console.warn("[cgtn] turn-added error:", err),
+                    )
+                    .finally(() => {
+                      setUiBusy(false);
+                    });
+                });
+              }, 80);
+            } else {
+              LG.updateFooterOnly?.();
+            }
+          }
         }
       })();
     };
+
     window.addEventListener("message", onMessage, true);
 
     RUN.bag.add(() => {
@@ -1076,125 +1101,76 @@
   }
 
   // =================================================================
-  // ★修正: Enterキー送信制御 (物理改行挿入版)
-  // =================================================================
-  // =================================================================
-  // ★デバッグ版: Enterキー送信制御
+  // ★決定版: Enterキー送信制御 (送信・改行ともにイベント変換方式)
   // =================================================================
   function enableEnterKeyGuard() {
     if (window.__CGTN_ENTER_GUARD__) return;
     window.__CGTN_ENTER_GUARD__ = true;
-    console.log("[CGTN] EnterGuard: Listener attached.");
 
     window.addEventListener(
       "keydown",
       (e) => {
-        // 設定取得ログ
+        // 1. 拡張機能が発行した「偽のイベント」は無視（無限ループ防止）
+        if (!e.isTrusted) return;
+
         const cfg = SH.getCFG?.() || {};
         const method = cfg.sendKeyMethod || "enter";
 
-        // Enterキー以外は無視（ログも出さない）
+        // Enter送信(標準)モードなら何もしない
+        if (method === "enter") return;
+        if (e.isComposing) return;
         if (e.key !== "Enter") return;
 
-        // IME入力中は無視
-        if (e.isComposing) {
-          console.debug("[CGTN] EnterGuard: Ignored (IME composing)");
-          return;
-        }
-
-        console.log(
-          `[CGTN] KeyDown: Enter | Method: ${method} | Shift: ${e.shiftKey} | Ctrl: ${e.ctrlKey} | Alt: ${e.altKey}`,
-        );
-
-        // 1. 設定チェック
-        if (method === "enter") {
-          console.log("[CGTN] EnterGuard: Skipped (Method is 'enter')");
-          return;
-        }
-
-        // 2. ターゲットチェック
         const target = e.target as HTMLElement;
-        const inputEl = target.closest('textarea, [contenteditable="true"]');
-        console.log("[CGTN] Target:", target.tagName, "IsInput:", !!inputEl);
+        if (!target.closest('textarea, [contenteditable="true"]')) return;
 
-        if (!inputEl) {
-          console.log("[CGTN] EnterGuard: Skipped (Not input element)");
-          return;
-        }
+        // 2. Shift+Enter は「改行」として通す (サイト標準)
+        if (e.shiftKey) return;
 
-        // --- 送信判定ロジック ---
-        let isSend = false;
-
+        // 3. 送信キーかどうかの判定
+        let isSendKey = false;
         if (method === "ctrl_enter") {
-          if (e.ctrlKey || e.metaKey) isSend = true;
+          if (e.ctrlKey || e.metaKey) isSendKey = true;
         } else if (method === "alt_enter") {
-          if (e.altKey) isSend = true;
+          if (e.altKey) isSendKey = true;
         }
 
-        console.log(
-          `[CGTN] Decision: ${isSend ? "SEND (Pass through)" : "NEWLINE (Block & Insert)"}`,
-        );
-
-        // 送信キーならスルー
-        if (isSend) return;
-
-        // --- 改行処理 ---
-        console.log("[CGTN] Action: Blocking default behavior...");
-
+        // 4. アクション実行
+        // どのような場合でも、元のイベントはいったん消します
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        console.log("[CGTN] Action: Inserting newline...");
-        insertNewline(inputEl as HTMLElement);
+        if (isSendKey) {
+          // ★送信アクション
+          // Alt+Enterなどはサイトが理解できないので、「修飾キーなしのEnter」に変換して送信させる
+          dispatchFakeEnter(target, false);
+        } else {
+          // ★改行アクション
+          // ただのEnterなどをブロックしたので、「Shift+Enter」に変換して改行させる
+          dispatchFakeEnter(target, true);
+        }
       },
       { capture: true },
-    ); // ★最重要: capture: true
+    );
   }
 
-  // ★復活: 改行挿入ヘルパー
-  function insertNewline(el: HTMLElement) {
-    // 1. Textareaの場合
-    if (el.tagName === "TEXTAREA") {
-      const ta = el as HTMLTextAreaElement;
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      const val = ta.value;
-
-      // 文字列操作で改行を挟む
-      ta.value = val.substring(0, start) + "\n" + val.substring(end);
-
-      // カーソル位置を進める
-      ta.selectionStart = ta.selectionEnd = start + 1;
-
-      // React等に値の変更を通知する
-      ta.dispatchEvent(new Event("input", { bubbles: true }));
-      ta.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    // 2. Contenteditable (div) の場合 (ChatGPT/Gemini等はこちら)
-    else {
-      // focusがないと動作しないことがあるため念のためフォーカス
-      el.focus();
-
-      // execCommandは非推奨ですが、contenteditable内の改行挿入には
-      // 最も互換性が高く確実な方法です。
-      const result = document.execCommand("insertLineBreak");
-
-      // もしexecCommandが効かなかった場合のフォールバック
-      if (!result) {
-        document.execCommand("insertText", false, "\n");
-      }
-    }
-
-    // 画面位置調整（カーソル位置へスクロール）
-    try {
-      const sel = window.getSelection();
-      if (sel?.rangeCount) {
-        sel
-          .getRangeAt(0)
-          .startContainer.parentElement?.scrollIntoView({ block: "nearest" });
-      }
-    } catch {}
+  // イベント発行ヘルパー
+  function dispatchFakeEnter(target: HTMLElement, asNewline: boolean) {
+    const event = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      cancelable: true,
+      // trueならShift+Enter(改行)、falseならEnter(送信)として振る舞う
+      shiftKey: asNewline,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+    });
+    target.dispatchEvent(event);
   }
 
   // =================================================================

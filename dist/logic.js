@@ -2567,6 +2567,53 @@
         catch { }
     }
     NS.updateListFooterInfo = updateListFooterInfo;
+    // ファイルの末尾や適当な場所に追加
+    // =================================================================
+    // ★追加: Idle時用サイレント更新 (UIを出さずに集計だけ行う)
+    // =================================================================
+    NS.updateFooterOnly = async function () {
+        // 1. DOM要素スキャン (fast scan)
+        const articles = document.querySelectorAll(TURN_SEL);
+        const total = articles.length;
+        if (total === 0)
+            return;
+        // 2. ピン情報をロード
+        const cid = SH.getChatId?.();
+        let pins = [];
+        if (cid) {
+            pins = await SH.getPinsArrAsync(cid);
+        }
+        // 3. 集計
+        let userCount = 0;
+        let aiCount = 0;
+        let pinCount = 0;
+        articles.forEach((art, idx) => {
+            // role判定 (簡易版)
+            const isUser = art.getAttribute("data-message-author-role") === "user";
+            if (isUser)
+                userCount++;
+            else
+                aiCount++;
+            // pin判定
+            if (pins[idx] === 1)
+                pinCount++;
+        });
+        // 4. ナビパネルの表示更新
+        // (通常モードの updateListFooterInfo のロジックを部分的に利用)
+        // ここではナビパネル上のバッジやステータス表示を更新する関数を呼ぶか、直接更新します。
+        // もし updateListFooterInfo が UI依存している場合は、
+        // 以下のように専用の更新処理を書きます。
+        // ナビパネルのステータス更新 (例: "User: 5 / AI: 5")
+        if (typeof NS.updateStatusDisplay === "function") {
+            // 簡易表示
+            // UI.updateStatusDisplay(`${userCount}/${aiCount} (📌${pinCount})`);
+            // または既存の updateListFooterInfo を流用できるなら呼ぶ
+            // NS.updateListFooterInfo(); // ※これがパネル依存してないか確認が必要
+        }
+        // もし既存の updateListFooterInfo がパネル(#cgpt-list-panel)がないと動かない場合は
+        // ↓この関数を使ってナビパネル側の数字だけ更新してください
+        NS.updateNavStats?.(userCount, aiCount, pinCount);
+    };
     //付箋バッジ/チャット名更新
     document.addEventListener("cgtn:pins-updated", () => {
         try {

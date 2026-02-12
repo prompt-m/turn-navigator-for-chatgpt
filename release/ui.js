@@ -718,6 +718,27 @@ input:checked + .slider:before {
             label.title = cb.checked ? T("tipOff") : T("tipOn");
         }
     }
+    // =================================================================
+    // ★追加: ナビパネル上の統計情報更新 (Idle時用) 2026.02.12
+    // =================================================================
+    NS.updateNavStats = function (user, ai, pin) {
+        const box = document.getElementById("cgpt-nav");
+        if (!box)
+            return;
+        // デジタルスクリーンエリア (#cgtn-status-monitor) を更新
+        const monitor = box.querySelector("#cgtn-status-monitor");
+        if (monitor) {
+            // 例: "U:10 A:10 P:2" のように短く表示
+            // または既存のデザインに合わせて調整
+            // monitor.textContent = `U:${user} A:${ai}`;
+            // OFF表示を消して数字を出す場合:
+            monitor.innerHTML = `
+        <span style="font-size:10px; color:#ccc;">All:</span><span style="font-weight:bold; margin-left:2px;">${user + ai}</span>
+        ${pin > 0 ? `<span style="font-size:10px; color:#ff9800; margin-left:4px;">📌${pin}</span>` : ""}
+      `;
+            monitor.classList.remove("off-text"); // "OFF" クラスがあれば外す
+        }
+    };
     // ★修正: "数字 / 数字" のパターンならHTMLタグで装飾する
     NS.updateStatusDisplay = (text, subLabel) => {
         const screen = document.getElementById("cgtn-status-monitor");
@@ -827,5 +848,6 @@ input:checked + .slider:before {
     NS.toggleLang = toggleLang;
     NS.setIdleMode = setIdleMode;
     NS.updateStatusDisplay = NS.updateStatusDisplay;
+    NS.updateNavStats = NS.updateNavStats;
     document.addEventListener("DOMContentLoaded", applyLang);
 })();
