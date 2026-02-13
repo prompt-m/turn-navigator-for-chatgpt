@@ -704,7 +704,7 @@ input:checked + .slider:before {
             window.CGTN_LOGIC?.updateListChatTitle?.();
         }
         catch (e) {
-            console.warn("List panel lang update failed", e);
+            SH.logError("List panel lang update failed", e);
         }
         // 6. ツールチップ一括更新 (Sharedにお任せ)
         // これがリストパネル内のツールチップも含めて全部書き換えてくれます

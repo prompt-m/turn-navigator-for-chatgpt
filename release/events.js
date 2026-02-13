@@ -103,7 +103,7 @@
             if (el.id === "cgpt-navi-refresh") {
                 e.preventDefault();
                 // 1. "Refresh..." と表示
-                console.log(" updateStatusDisplay Refresh...");
+                //console.log(" updateStatusDisplay Refresh...");
                 UI.updateStatusDisplay?.("Refresh...");
                 // 2. UI描画をブロックしないよう少し待ってから処理開始
                 setTimeout(async () => {
@@ -150,7 +150,6 @@
         // ナビパネルが後から描画されても確実に動くように、bodyで待ち受けます
         document.body.addEventListener("dblclick", (e) => {
             const target = e.target;
-            console.log("double-clicked target:", target);
             // クリックされた場所が「モニター(数字部分)」の内側かどうか判定
             //const monitor = target.closest("#cgtn-status-monitor");
             // 修正: ターゲットを「モニター」から「その他ラベル」に変更
@@ -159,7 +158,6 @@
             if (trigger) {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log("trigger double-clicked!"); // デバッグ用ログ
                 // shared.ts の showLogs を呼び出す
                 const SH = window.CGTN_SHARED;
                 if (typeof SH.showLogs === "function") {

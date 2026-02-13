@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ChatGPT Turn Navigator 設定</title>
+    <title>Turn Navigator for ChatGPT 設定</title>
     <style>
       :root {
         --fg: #111;
@@ -47,7 +47,6 @@
       }
       .desc {
         color: var(--muted);
-        margin: 0 0 5px;
       }
 
       /* card */
@@ -164,6 +163,54 @@
       .settings + .settings {
         margin-top: 10px;
       }
+
+      /* NEWバッジのスタイル */
+      .badge-new {
+        display: inline-block;
+        background-color: #ff5252; /* 明るい赤 */
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-left: 8px;
+        vertical-align: middle;
+        transform: translateY(-1px); /* 微調整 */
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+
+        /* お好みで: ふわふわ動かすアニメーション */
+        animation: pulse-badge 2s infinite;
+      }
+
+      @keyframes pulse-badge {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 0.9;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      /* ボタンとバッジをまとめるグループ */
+      .btn-group {
+        display: inline-flex; /* 横並びにする */
+        align-items: center; /* 上下の中心を揃える（これで縦伸びを防ぐ！） */
+        margin-right: 16px; /* 次のグループとの間隔 */
+      }
+
+      /* グループ内のバッジの微調整 */
+      .btn-group .badge-new {
+        margin-left: 6px; /* ボタンとの隙間 */
+        transform: none; /* 上下位置は align-items に任せるのでリセット */
+        white-space: nowrap; /* 改行させない */
+      }
+
       label {
         font-weight: 600;
       }
@@ -405,14 +452,24 @@
 
           <div class="data-toolbar">
             <div class="data-actions-left">
-              <button id="btn-export" class="cgtn-btn" type="button">
-                <span style="font-size: 1.1em; margin-right: 4px">📤</span>
-                <span data-i18n="opts.btnExport">Export</span>
-              </button>
-              <button id="btn-import" class="cgtn-btn secondary" type="button">
-                <span style="font-size: 1.1em; margin-right: 4px">📥</span>
-                <span data-i18n="opts.btnImport">Import</span>
-              </button>
+              <div class="btn-group">
+                <button id="btn-export" class="cgtn-btn" type="button">
+                  <span style="font-size: 1.1em; margin-right: 4px">📤</span>
+                  <span data-i18n="opts.btnExport">Export</span>
+                </button>
+                <span class="badge-new">NEW!</span>
+              </div>
+              <div class="btn-group">
+                <button
+                  id="btn-import"
+                  class="cgtn-btn secondary"
+                  type="button"
+                >
+                  <span style="font-size: 1.1em; margin-right: 4px">📥</span>
+                  <span data-i18n="opts.btnImport">Import</span>
+                </button>
+                <span class="badge-new">NEW!</span>
+              </div>
               <input
                 type="file"
                 id="inp-import-file"
@@ -515,6 +572,36 @@
           <div class="section-title" data-i18n="options.detailTitle">
             詳細設定
           </div>
+          <div class="settings">
+            <label for="sendKeyMethod"
+              ><b id="lbl-sendKeyMethod" data-i18n="options.sendKeyLabel"
+                >送信キー設定</b
+              >
+              <span class="badge-new">NEW!</span>
+            </label>
+            <select
+              id="sendKeyMethod"
+              name="sendKeyMethod"
+              style="
+                width: 242px;
+                max-width: 100%;
+                padding: 8px 10px;
+                border-radius: 10px;
+                border: 1px solid var(--bd);
+                background: var(--bg);
+                color: var(--fg);
+                font-size: 14px;
+              "
+            >
+              <option value="enter" data-i18n="options.sk_enter">Enter</option>
+              <option value="ctrl_enter" data-i18n="options.sk_ctrl">
+                Ctrl+Enter
+              </option>
+              <option value="alt_enter" data-i18n="options.sk_alt">
+                Alt+Enter
+              </option>
+            </select>
+          </div>
 
           <div class="settings">
             <label for="showViz"
@@ -595,36 +682,6 @@
               min="0"
               max="3000"
             />
-          </div>
-
-          <div class="settings">
-            <label for="sendKeyMethod"
-              ><b id="lbl-sendKeyMethod" data-i18n="options.sendKeyLabel"
-                >送信キー設定</b
-              ></label
-            >
-            <select
-              id="sendKeyMethod"
-              name="sendKeyMethod"
-              style="
-                width: 242px;
-                max-width: 100%;
-                padding: 8px 10px;
-                border-radius: 10px;
-                border: 1px solid var(--bd);
-                background: var(--bg);
-                color: var(--fg);
-                font-size: 14px;
-              "
-            >
-              <option value="enter" data-i18n="options.sk_enter">Enter</option>
-              <option value="ctrl_enter" data-i18n="options.sk_ctrl">
-                Ctrl+Enter
-              </option>
-              <option value="alt_enter" data-i18n="options.sk_alt">
-                Alt+Enter
-              </option>
-            </select>
           </div>
 
           <div class="section-actions">

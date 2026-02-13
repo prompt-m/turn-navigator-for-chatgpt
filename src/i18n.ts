@@ -103,8 +103,7 @@
       "options.syncUsage": "sync使用量",
       "options.itemsLabel": "付箋付きチャット数",
       "opts.title": "ChatGPT Turn Navigator 設定",
-      "opts.tips":
-        "よく使うのは「付箋データ管理」と「一覧パネルの表示設定」です。その他の数値や基準線は詳細設定にまとめました。",
+      "opts.tips": "ナビゲーションの動作や表示設定、データの管理を行えます。",
       "opts.lang.ja": "日本語",
       "opts.lang.en": "English",
       "opts.pins.section": "付箋データ管理",
@@ -250,7 +249,7 @@
       "options.itemsLabel": "Pinned chats",
       "opts.title": "ChatGPT Turn Navigator Settings",
       "opts.tips":
-        "You’ll mostly use “Pin Data Manager” and “List Panel Display Settings.” Other numbers and the baseline live under Advanced.",
+        "Configure navigation behavior, display settings, and manage data.",
       "opts.lang.ja": "日本語",
       "opts.lang.en": "English",
       "opts.pins.section": "Pin Data Manager",

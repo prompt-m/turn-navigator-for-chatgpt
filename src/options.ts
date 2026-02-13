@@ -81,7 +81,7 @@
       el.textContent = `${usageLabel} ${usedKB}KB / ${totalKB}KB ・ ${itemsLabel} ${pinChats} / ${itemsMax}`;
     } catch (e) {
       // 取れない場合は静かにスキップ
-      console.warn("updateSyncUsageLabel failed", e);
+      SH.logError("updateSyncUsageLabel failed", e);
     }
   }
 
@@ -202,7 +202,7 @@
       setVal("listMaxChars", v.list?.maxChars);
       setVal("listFontSize", v.list?.fontSize);
     } catch (e) {
-      console.warn("applyToUI failed", e);
+      SH.logError("applyToUI failed", e);
     }
   }
   /*
@@ -408,7 +408,7 @@
           // 新方式のマップからも削除
           await SH.deletePinsForChatAsync?.(chatId);
         } catch (e) {
-          console.warn(
+          SH.logError(
             "[renderPinsManager] cleanup zero pins failed",
             chatId,
             e,
@@ -579,7 +579,7 @@
 
           flashMsgInline?.("pins-msg", "options.refreshed");
         } catch (e) {
-          console.warn(e);
+          SH.logError(e);
           flashMsgInline?.("pins-msg", "options.refreshFailed");
         } finally {
           setBusy(refreshBtn, false);
@@ -791,7 +791,7 @@
 
       toastNearPointer(T("opts.exportSuccess") || "Exported!");
     } catch (e) {
-      console.error(e);
+      SH.logError("[option btn-export]export failed", e);
       alert("Export failed: " + e);
     } finally {
       setBusy(btn, false);
@@ -843,7 +843,7 @@
         );
         location.reload();
       } catch (err) {
-        console.error(err);
+        SH.logError("[option btn-import]import failed", e);
         alert("Import Error: " + err);
         setBusy(btn, false);
       }
@@ -938,7 +938,7 @@
             flashMsgInline("msg-adv", "options.saved");
           }
         } catch (e) {
-          console.warn("input handler failed", e);
+          SH.logError("input handler failed", e);
         }
       });
 
@@ -1052,7 +1052,7 @@
         const info = document.getElementById("buildInfo");
         if (info) info.textContent = ver;
       } catch (e) {
-        console.warn("buildInfo failed", e);
+        SH.logError("buildInfo failed", e);
       }
 
       const devFlashTimers = new WeakMap<HTMLElement, number>();
@@ -1089,7 +1089,7 @@
         ?.addEventListener("click", () => devFlash("msg-adv", msgReset));
       //      });
     } catch (e) {
-      console.error("options init failed", e);
+      SH.logError("options init failed", e);
     }
   });
 
@@ -1162,7 +1162,7 @@
         btn.textContent = "Copied!";
         setTimeout(() => (btn.textContent = original), 1000);
       } catch (err) {
-        console.error("Copy failed", err);
+        SH.logError("Copy failed", err);
       }
     });
 })();

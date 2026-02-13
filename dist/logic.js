@@ -30,28 +30,6 @@
         return ((nav && (node === nav || nav.contains(node))) ||
             (list && (node === list || list.contains(node))));
     }
-    // ★追加: ステータス更新 (現在地 / 総数) 2026.01.27
-    /*
-    NS.updateStatus = function () {
-      const total = NS.ST?.all?.length || 0;
-      // ★ここを修正: 使う瞬間に window.CGTN_UI を参照する
-      const ui = window.CGTN_UI;
-      if (total === 0) {
-        // 0件または停止中は状態に応じた表示
-        const isRunning = (window as any).CGTN_APP?.isRunning?.();
-        ui?.updateStatusDisplay?.(isRunning ? "Loading..." : "OFF");
-        console.log("updateStatus2 isrunning:", isRunning);
-        return;
-      }
-  
-      // 現在のターン位置を計算して表示 (例: "5 / 12")
-      const sc = getTrueScroller();
-      const current = calcCurrentTurnIndex(sc);
-      ui?.updateStatusDisplay?.(`${current} / ${total}`);
-      console.log("updateStatus3 current:", current, " total:", total);
-    };
-    */
-    // src/logic.ts
     // ★修正: 「0件でもチャット画面なら操作許可」にする
     NS.updateStatus = function updateStatus() {
         const SH = window.CGTN_SHARED;
@@ -474,7 +452,7 @@
             return "";
         }
         catch (e) {
-            console.warn("getAttachmentTailMessage failed", e);
+            SH.logError("getAttachmentTailMessage failed", e);
             return "";
         }
     }
@@ -845,7 +823,7 @@
                 });
             }
             catch (e) {
-                console.warn("[bindDelegatedClipPinHandler] sync data-pin failed", e);
+                SH.logError("[bindDelegatedClipPinHandler] sync data-pin failed", e);
             }
             // 付箋数とフッターの同期もここで安全側更新
             try {
@@ -1019,11 +997,11 @@
         try {
             const ret = await SH.savePinsArrAsync?.(pinsArr, cid);
             if (!ret?.ok) {
-                console.warn("[bulkSetPins] savePinsArrAsync failed", ret);
+                SH.logError("[bulkSetPins] savePinsArrAsync failed", ret);
             }
         }
         catch (e) {
-            console.warn("[bulkSetPins] savePinsArrAsync error", e);
+            SH.logError("[bulkSetPins] savePinsArrAsync error", e);
         }
         try {
             const body = qListBody();
@@ -1051,7 +1029,7 @@
             }
         }
         catch (e) {
-            console.warn("[bulkSetPins] sync DOM failed", e);
+            SH.logError("[bulkSetPins] sync DOM failed", e);
         }
         // --- バッジ・フッター更新 ---
         NS.pinsCount = pinsCount;
@@ -1239,7 +1217,7 @@
                 allRaw = pickAllTurns().filter(isRealTurn);
             }
             catch (e) {
-                console.warn("pickAllTurns temporary error", e);
+                SH.logError("pickAllTurns temporary error", e);
             }
             nextST.all = sortByY(allRaw);
             // 0件の場合はクリア処理
@@ -1274,11 +1252,10 @@
         }
         catch (err) {
             // ★ ここが重要！ エラーが起きても死なずにリトライ予約をする
-            console.error("[rebuild] crashed, retrying...", err);
+            SH.logError("[rebuild] crashed, retrying...", err);
             setTimeout(() => {
                 // まだデータが取れていなければ再挑戦
                 if (!NS.ST.all.length) {
-                    console.log("Retry rebuild...");
                     NS.rebuild?.(); // 自分をもう一度呼ぶ
                     // 必要なら renderList も呼ぶ
                     // NS.renderList?.(true);
@@ -1355,7 +1332,7 @@
             catch { }
         }
         catch (e) {
-            console.warn("[clearListPanelUI] failed", e);
+            SH.logError("[clearListPanelUI] failed", e);
         }
         // 状態も空に
         try {
@@ -1567,7 +1544,7 @@
                         NS.bulkSetPins?.(true);
                     }
                     catch (e) {
-                        console.warn("[bulkPins on]", e);
+                        SH.logError("[bulkPins on]", e);
                     }
                 });
             }
@@ -1579,7 +1556,7 @@
                         NS.bulkSetPins?.(false);
                     }
                     catch (e) {
-                        console.warn("[bulkPins off]", e);
+                        SH.logError("[bulkPins off]", e);
                     }
                 });
             }
@@ -1691,7 +1668,7 @@
                         }
                     }
                     catch (e) {
-                        console.warn("show-all click failed", e);
+                        SH.logError("show-all click failed", e);
                     }
                     return;
                 }
@@ -1932,7 +1909,7 @@
                 sPin.textContent = T("list.pinonly"); // 付箋
         }
         catch (e) {
-            console.warn("[applyListFilterLang] failed", e);
+            SH.logError("[applyListFilterLang] failed", e);
         }
     };
     // 行右端🗒️のイベントを二重で拾い、誤クリック防止
@@ -2216,7 +2193,7 @@
                 NS.renderList?.(true, { pinOnlyOverride: false });
                 NS.updateListFooterInfo?.();
               } catch (e) {
-                console.warn("show-all click failed", e);
+                SH.logError("show-all click failed", e);
               }
             });
       */
@@ -2262,7 +2239,6 @@
             _pendingListGen = null;
         }
         if (on) {
-            console.log("setListEnabled on");
             // --- ON処理 ---
             const nextList = { ...curList, enabled: true, pinOnly: false };
             SHX.saveSettingsPatch?.({ list: nextList });
@@ -2303,7 +2279,7 @@
                         resolve(true); // 成功
                     }
                     catch (e) {
-                        console.warn("[setListEnabled] failed", e);
+                        SH.logError("[setListEnabled] failed", e);
                         resolve(false);
                     }
                 }, 180);
@@ -2312,7 +2288,6 @@
             });
         }
         else {
-            console.log("setListEnabled off");
             // --- OFF処理 ---
             const nextList = { ...curList, enabled: false, pinOnly: false };
             SHX.saveSettingsPatch?.({ list: nextList });
@@ -2389,7 +2364,7 @@
             btn.classList.toggle("active", pinOnly);
         }
         catch (e) {
-            console.warn("updatePinOnlyBadge failed", e);
+            SH.logError("updatePinOnlyBadge failed", e);
         }
     }
     NS.updatePinOnlyBadge = updatePinOnlyBadge;
@@ -2411,7 +2386,7 @@
             }
         }
         catch (e) {
-            console.warn("[updateBulkPinButtonsState]", e);
+            SH.logError("[updateBulkPinButtonsState]", e);
         }
     }
     NS.updateBulkPinButtonsState = updateBulkPinButtonsState;
@@ -2464,7 +2439,7 @@
             }
         }
         catch (e) {
-            console.warn("[updateListFooterInfo] role detection failed", e);
+            SH.logError("[updateListFooterInfo] role detection failed", e);
         }
         NS.viewRole = role;
         // ---- DOM から「ロール別 / 付箋別」の件数を数える ----
@@ -2494,7 +2469,7 @@
             }
         }
         catch (e) {
-            console.warn("[updateListFooterInfo] visible count failed", e);
+            SH.logError("[updateListFooterInfo] visible count failed", e);
         }
         // ---- 会話数（分母）の決め方 ----
         const totalByRole = {
@@ -2884,7 +2859,7 @@
             _observedRoot = root;
         }
         catch (e) {
-            console.warn("[auto-sync] observe failed", e);
+            SH.logError("[auto-sync] observe failed", e);
         }
     };
     // --- expose ---

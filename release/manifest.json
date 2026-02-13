@@ -3,8 +3,8 @@
   "default_locale": "en",
   "name": "__MSG_appName__",
   "description": "__MSG_appDesc__",
-  "version": "1.1.0",
-  "version_name": "1.1.0 (2026-02-12)",
+  "version": "1.0.2",
+  "version_name": "1.0.2 (2026-02-13)",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",
@@ -15,7 +15,6 @@
     {
       "resources": [
         "inject_url_hook.js",
-        "assets/*.cur",
         "assets/*.png"
       ],
       "matches": [
@@ -45,9 +44,6 @@
         "ui.js",
         "events.js",
         "content.js"
-      ],
-      "css": [
-        "ui.css"
       ],
       "run_at": "document_idle"
     }

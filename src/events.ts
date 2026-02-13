@@ -102,7 +102,7 @@
         e.preventDefault();
 
         // 1. "Refresh..." と表示
-        console.log(" updateStatusDisplay Refresh...");
+        //console.log(" updateStatusDisplay Refresh...");
         UI.updateStatusDisplay?.("Refresh...");
 
         // 2. UI描画をブロックしないよう少し待ってから処理開始
@@ -150,7 +150,6 @@
     // ナビパネルが後から描画されても確実に動くように、bodyで待ち受けます
     document.body.addEventListener("dblclick", (e) => {
       const target = e.target as HTMLElement;
-      console.log("double-clicked target:", target);
 
       // クリックされた場所が「モニター(数字部分)」の内側かどうか判定
       //const monitor = target.closest("#cgtn-status-monitor");
@@ -161,8 +160,6 @@
       if (trigger) {
         e.preventDefault();
         e.stopPropagation();
-
-        console.log("trigger double-clicked!"); // デバッグ用ログ
 
         // shared.ts の showLogs を呼び出す
         const SH = window.CGTN_SHARED;

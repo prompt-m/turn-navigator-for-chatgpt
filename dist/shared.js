@@ -309,7 +309,7 @@
             return docTitle;
         }
         catch (e) {
-            console.warn("[getChatTitle] error", e);
+            SH.logError("[getChatTitle] error", e);
             return "";
         }
     };
@@ -460,7 +460,7 @@
                     fn();
                 }
                 catch (e) {
-                    console.warn("onLangChange hook failed", e);
+                    SH.logError("onLangChange hook failed", e);
                 }
             });
         }
@@ -547,7 +547,7 @@
         return true;
     };
     SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr) {
-        console.log("◎setPinsArrAsync◎ :chatId", chatId, " pinsArr:", pinsArr);
+        //console.log("◎setPinsArrAsync◎ :chatId", chatId, " pinsArr:", pinsArr);
         const map = await SH.loadPinsMapAsync();
         if (pinsArr && pinsArr.length)
             map[chatId] = pinsArr;
@@ -559,7 +559,7 @@
     // 読み出しは同期しても良いけど、呼び元の都合上 sync版も提供
     SH.getPinsArr = function getPinsArr(chatId = SH.getChatId?.()) {
         // 非同期を使えない箇所のためのフォールバック（空配列）
-        console.warn("[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync");
+        SH.logError("[getPinsArr] sync path returns empty if not cached; prefer getPinsArrAsync");
         return [];
     };
     SH.getPinsArrAsync = async function (chatId = SH.getChatId?.()) {
@@ -606,7 +606,7 @@
             return { ok: true };
         }
         catch (err) {
-            console.warn("[savePinsArr] failed:", err);
+            SH.logError("[savePinsArr] failed:", err);
             return { ok: false, err };
         }
     };
@@ -638,30 +638,10 @@
         }
         catch (e) {
             // 拡張リロード中などは失敗しても致命ではない
-            console.warn("[savePinsArrAsync] failed:", e?.message || e);
+            SH.logError("[savePinsArrAsync] failed:", e?.message || e);
             return { ok: false, err: e };
         }
     };
-    /*
-    SH.deletePinsForChat = async function (chatId) {
-      console.log("付箋データ削除deletePinsForChat chatId:", chatId);
-      try {
-        await syncRemoveAsync(pinKeyOf(chatId));
-        // インデックスを 0 件に
-        const cfg = SH.getCFG() || {};
-        const idx =
-          cfg.chatIndex?.map || (cfg.chatIndex = { ids: [], map: {} }).map;
-        if (idx[chatId])
-          idx[chatId] = { ...idx[chatId], pinCount: 0, updated: Date.now() };
-        await syncSet({ cgNavSettings: cfg });
-        return true;
-      } catch (err) {
-        console.warn("[deletePinsForChat] failed:", err);
-        return false;
-      }
-    };
-  */
-    // src/shared.ts
     // ピン削除関数（修正版: TypeScriptエラー対応）
     SH.deletePinsForChat = async function (chatId) {
         if (!chatId)
@@ -694,7 +674,7 @@
             chrome.storage.sync.remove(key, () => {
                 const err = chrome.runtime.lastError;
                 if (err) {
-                    console.warn("deletePinsForChatAsync failed", err);
+                    SH.logError("deletePinsForChatAsync failed", err);
                     resolve(false);
                 }
                 else {
@@ -773,7 +753,7 @@
             return arr.filter(Boolean).length;
         }
         catch (e) {
-            console.warn("[getPinsCountByChat] failed", e);
+            SH.logError("[getPinsCountByChat] failed", e);
             return 0;
         }
     };
@@ -800,7 +780,7 @@
             return { ok: true, cfg: merged };
         }
         catch (err) {
-            console.warn("[saveSettingsPatch] failed:", err?.message || err);
+            SH.logError("[saveSettingsPatch] failed:", err?.message || err);
             try {
                 SH.setCFG?.(before);
             }
@@ -907,23 +887,18 @@
             const cb = document.getElementById("cgpt-list-toggle");
             if (cb instanceof HTMLInputElement) {
                 ret = !!cb.checked;
-                console.log("isListOpen1", ret);
                 return ret;
             }
             ret = !!SH.getCFG?.()?.list?.enabled;
             if (window.CGTN_LOGIC &&
                 typeof window.CGTN_LOGIC._panelOpen === "boolean") {
                 ret = !!window.CGTN_LOGIC._panelOpen;
-                console.log("isListOpen2", ret);
-                return ret;
             }
-            console.log("isListOpen3", ret);
-            return ret;
         }
         catch {
-            console.log("isListOpen4", ret);
             return ret;
         }
+        return ret;
     };
     // タイトル解決（副作用なし / DOM非依存）
     SH.resolveTitleFor = async function resolveTitleFor(chatId, fallback = "") {
@@ -1093,7 +1068,7 @@
                     resolve();
                     return;
                 }
-                console.log(`[AutoMigrate] Optimizing storage (v${currentVer})...`);
+                //        console.log(`[AutoMigrate] Optimizing storage (v${currentVer})...`);
                 const v2Data = migrateV1toV2(raw);
                 // ★保存用オブジェクトの構築
                 // v2Data.meta は存在しないので参照しません
@@ -1107,7 +1082,7 @@
                 // 全クリアして保存（これでルートの meta や pinsByChat は消える）
                 chrome.storage.sync.clear(() => {
                     chrome.storage.sync.set(toSave, () => {
-                        console.log("[AutoMigrate] Done. Storage optimized.");
+                        //console.log("[AutoMigrate] Done. Storage optimized.");
                         resolve();
                     });
                 });

@@ -60,7 +60,7 @@
         }
         catch (e) {
             // 取れない場合は静かにスキップ
-            console.warn("updateSyncUsageLabel failed", e);
+            SH.logError("updateSyncUsageLabel failed", e);
         }
     }
     function sanitize(raw) {
@@ -169,7 +169,7 @@
             setVal("listFontSize", v.list?.fontSize);
         }
         catch (e) {
-            console.warn("applyToUI failed", e);
+            SH.logError("applyToUI failed", e);
         }
     }
     /*
@@ -346,7 +346,7 @@
                     await SH.deletePinsForChatAsync?.(chatId);
                 }
                 catch (e) {
-                    console.warn("[renderPinsManager] cleanup zero pins failed", chatId, e);
+                    SH.logError("[renderPinsManager] cleanup zero pins failed", chatId, e);
                 }
                 continue; // 一覧にも出さない
             }
@@ -477,7 +477,7 @@
                     flashMsgInline?.("pins-msg", "options.refreshed");
                 }
                 catch (e) {
-                    console.warn(e);
+                    SH.logError(e);
                     flashMsgInline?.("pins-msg", "options.refreshFailed");
                 }
                 finally {
@@ -658,7 +658,7 @@
             toastNearPointer(T("opts.exportSuccess") || "Exported!");
         }
         catch (e) {
-            console.error(e);
+            SH.logError("[option btn-export]export failed", e);
             alert("Export failed: " + e);
         }
         finally {
@@ -700,7 +700,7 @@
                 location.reload();
             }
             catch (err) {
-                console.error(err);
+                SH.logError("[option btn-import]import failed", e);
                 alert("Import Error: " + err);
                 setBusy(btn, false);
             }
@@ -793,7 +793,7 @@
                     }
                 }
                 catch (e) {
-                    console.warn("input handler failed", e);
+                    SH.logError("input handler failed", e);
                 }
             });
             // タブ復帰で再描画
@@ -897,7 +897,7 @@
                     info.textContent = ver;
             }
             catch (e) {
-                console.warn("buildInfo failed", e);
+                SH.logError("buildInfo failed", e);
             }
             const devFlashTimers = new WeakMap();
             function devFlash(id, txt) {
@@ -932,7 +932,7 @@
             //      });
         }
         catch (e) {
-            console.error("options init failed", e);
+            SH.logError("options init failed", e);
         }
     });
     // src/options.ts に追加
@@ -998,7 +998,7 @@
             setTimeout(() => (btn.textContent = original), 1000);
         }
         catch (err) {
-            console.error("Copy failed", err);
+            SH.logError("Copy failed", err);
         }
     });
 })();
