@@ -102,7 +102,7 @@
       "options.refreshFailed": "更新に失敗しました",
       "options.syncUsage": "sync使用量",
       "options.itemsLabel": "付箋付きチャット数",
-      "opts.title": "ChatGPT Turn Navigator 設定",
+      "opts.title": "Turn Navigator for ChatGPT 設定",
       "opts.tips": "ナビゲーションの動作や表示設定、データの管理を行えます。",
       "opts.subtips":
         "送信キーの設定変更や、エクスポート／インポートによるバックアップにも対応しています。",
@@ -249,7 +249,7 @@
       "options.refreshFailed": "Refresh failed",
       "options.syncUsage": "sync usage",
       "options.itemsLabel": "Pinned chats",
-      "opts.title": "ChatGPT Turn Navigator Settings",
+      "opts.title": "Turn Navigator for ChatGPT Settings",
       "opts.tips":
         "Configure navigation behavior, display settings, and manage data.",
       "opts.subtips":
