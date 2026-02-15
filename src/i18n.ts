@@ -92,9 +92,9 @@
       "options.lockMs": "スクロールロック (ms)",
       // 入力設定 2026.02.11
       "options.sendKeyLabel": "送信キー設定",
-      "options.sk_enter": "Enterで送信 (標準)",
-      "options.sk_ctrl": "Ctrl + Enterで送信",
-      "options.sk_alt": "Alt + Enterで送信",
+      "options.sk_enter": "Enter (標準)",
+      "options.sk_ctrl": "Ctrl + Enter",
+      "options.sk_alt": "Alt + Enter",
       "options.saveBtn": "保存",
       "options.resetBtn": "規定に戻す",
       "options.refreshTimeout": "更新が時間内に終わりませんでした",
@@ -102,8 +102,8 @@
       "options.refreshFailed": "更新に失敗しました",
       "options.syncUsage": "sync使用量",
       "options.itemsLabel": "付箋付きチャット数",
-      "opts.title": "Turn Navigator for ChatGPT 設定",
-      "opts.tips": "ナビゲーションの動作や表示設定、データの管理を行えます。",
+      "opts.title": "Turn Navigator for ChatGPT — 設定",
+      "opts.tips": "ナビゲーション、表示設定、データ管理を行えます。",
       "opts.subtips":
         "送信キーの設定変更や、エクスポート／インポートによるバックアップにも対応しています。",
       "opts.lang.ja": "日本語",
@@ -114,8 +114,7 @@
       "opts.pins.col.updated": "更新",
       "opts.pins.col.action": "操作",
       "opts.pins.btn.delete": "削除",
-      "opts.pins.note":
-        "各チャットの付箋を一覧。不要になった付箋データは削除できます。",
+      "opts.pins.note": "チャットごとの付箋データを管理できます。",
       "opts.btnExport": "エクスポート",
       "opts.btnImport": "インポート",
       "opts.backupDesc":
@@ -229,14 +228,14 @@
       "options.centerBias": "Center Bias",
       "options.centerBiasHint": "0=top / 0.5=center (0.40–0.55)",
       "options.eps": "EPS Hysteresis",
-      "options.epsHint": "Small=sensitive / Large=stable (5–50)",
+      "options.epsHint": "Small-sensitive / Large=stable (5–50)",
       "options.headerPx": "Header offset (px)",
       "options.lockMs": "Scroll lock (ms)",
       // 入力設定 2026.02.11
       "options.sendKeyLabel": "Send Key",
-      "options.sk_enter": "Enter to send(Default)",
-      "options.sk_ctrl": "Ctrl + Enter to send",
-      "options.sk_alt": "Alt + Enter to send",
+      "options.sk_enter": "Enter (Default)",
+      "options.sk_ctrl": "Ctrl + Enter",
+      "options.sk_alt": "Alt + Enter",
       "options.saveBtn": "Save",
       "options.resetBtn": "Reset",
       "options.refreshTitles": "Refresh",
@@ -249,9 +248,9 @@
       "options.refreshFailed": "Refresh failed",
       "options.syncUsage": "sync usage",
       "options.itemsLabel": "Pinned chats",
-      "opts.title": "Turn Navigator for ChatGPT Settings",
+      "opts.title": "Turn Navigator for ChatGPT — Settings",
       "opts.tips":
-        "Configure navigation behavior, display settings, and manage data.",
+        "Configure navigation, display preferences, and data management.",
       "opts.subtips":
         "Supports export/import backup and customizable send key settings.",
       "opts.lang.ja": "日本語",
@@ -262,8 +261,7 @@
       "opts.pins.col.updated": "Updated",
       "opts.pins.col.action": "Action",
       "opts.pins.btn.delete": "Delete",
-      "opts.pins.note":
-        "Displays pinned data per chat. You can delete unneeded pin data.",
+      "opts.pins.note": "View and manage pinned data by chat.",
       "opts.btnExport": "Export",
       "opts.btnImport": "Import",
       "opts.backupDesc":
