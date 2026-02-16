@@ -102,6 +102,8 @@
     SH.getPageInfo = () => __PAGE_INFO;
     // === 既定値（options / content と完全一致） ===
     const DEFAULTS = Object.freeze({
+        // ★追加: Navigate機能のON/OFF記憶 (true=ON)
+        navEnabled: true,
         centerBias: 0.4,
         headerPx: 0,
         eps: 20,

@@ -57,12 +57,34 @@
 #cgpt-nav.disabled {
   cursor: not-allowed !important; /* 全体に進入禁止マーク */
 }
-#cgpt-nav.disabled .cgpt-nav-group,
-#cgpt-nav.disabled label,
+
+/* 1. パネル全体を操作禁止にする */
+#cgpt-nav.disabled .cgtn-body,
+#cgpt-nav.disabled .cgtn-unified-header .cgtn-ver,
+#cgpt-nav.disabled .cgtn-title-main,
+#cgpt-nav.disabled .cgtn-title-sub,
 #cgpt-nav.disabled button {
-  pointer-events: none !important; /* クリックもホバーも無効化 */
-  opacity: 0.5 !important;         /* 半透明にして「効かない」感を出す */
-  filter: grayscale(100%) !important; /* 色を抜く */
+  pointer-events: none !important;
+  opacity: 0.5;
+  filter: grayscale(100%);
+}
+
+/* OFF時はボディを完全に隠す */
+#cgpt-nav.disabled .cgtn-body {
+  display: none !important;
+}
+
+/* 2. ★救出ルール: 電源スイッチのラッパー(cgtn-power-wrapper)だけは操作可能にする */
+#cgpt-nav.disabled .cgtn-power-wrapper {
+  pointer-events: auto !important; /* クリック復活 */
+  opacity: 1 !important;           /* 明るさ維持 */
+  filter: none !important;         /* グレー解除 */
+  cursor: pointer !important;      /* 指カーソル */
+}
+
+/* 内部のinputも念のため許可 */
+#cgpt-nav.disabled #cgtn-power-toggle {
+  pointer-events: auto !important;
 }
 
 /* === 統一ヘッダー === */
@@ -268,8 +290,9 @@ input:checked + .slider:before {
 .cgpt-nav-group[data-role="tools"] {.cgpt-nav-label{color:#fff;}} 
 .cgpt-nav-group[data-role="others"] {.cgpt-nav-label{color:#fff;}} 
 
-.cgpt-nav-group[data-role="user"] {.cgtn-pill-btn:hover{background:#4E95D9;}} 
-.cgpt-nav-group[data-role="assistant"] {.cgtn-pill-btn:hover{background:#F59599;}} 
+.cgpt-nav-group[data-role="user"] {.cgtn-pill-btn:hover{background:#C8D5E2;color:#000;}}
+.cgpt-nav-group[data-role="assistant"] {.cgtn-pill-btn:hover{background:#C5FFE5;color:#000;}}
+
 .cgpt-nav-group[data-role="all"] {.cgtn-pill-btn:hover{background:#FF4343;}} 
 .cgpt-nav-group[data-role="tools"] {#cgpt-list-btn:hover{background:#EDEDED;color:#000;}} 
 .cgpt-nav-group[data-role="others"] {.cgtn-pill-btn:hover{background:#EDEDED;color:#000;}} 
@@ -315,6 +338,11 @@ input:checked + .slider:before {
 /* Idle モード */
 #cgpt-nav.cgtn-idle .cgtn-body {
   display: none;
+}
+
+/* Standby時はボディを隠す */
+#cgpt-nav.cgtn-standby .cgpt-nav-body {
+  display: none !important;
 }
 
 /* フォーカスリング消し */
@@ -538,7 +566,7 @@ input:checked + .slider:before {
       if (v) v.textContent = "v" + (mf.version || "1.0");
     } catch {}
 
-    // Power Toggle
+    /*
     const cb = box.querySelector("#cgtn-power-toggle");
     if (cb instanceof HTMLInputElement) {
       const idle = (window as any).CGTN_APP?.isIdle?.() ?? false;
@@ -550,6 +578,33 @@ input:checked + .slider:before {
           (window as any).CGTN_APP?.start?.("ui-power-on");
         } else {
           (window as any).CGTN_APP?.stop?.("ui-power-off");
+        }
+      });
+    }
+*/
+    // Power Toggle 2026.02.16
+    const cb = box.querySelector("#cgtn-power-toggle");
+    if (cb instanceof HTMLInputElement) {
+      // ★変更: 初期状態は「現在アプリがIdleかどうか」で決める
+      const app = (window as any).CGTN_APP;
+      // RUN.idle が true なら OFF(checked=false)
+      // RUN.idle が false (undefined含む) なら ON(checked=true)
+      const isIdle = app?.isIdle?.() ?? false;
+      cb.checked = !isIdle;
+
+      // ★追加: 状態が変わったら保存する
+      cb.addEventListener("change", () => {
+        const isOn = cb.checked;
+
+        // 設定保存
+        const SH = window.CGTN_SHARED;
+        SH.saveSettingsPatch?.({ navEnabled: isOn });
+
+        // 動作切り替え
+        if (isOn) {
+          app?.start?.("ui-power-on");
+        } else {
+          app?.stop?.("ui-power-off");
         }
       });
     }

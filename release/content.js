@@ -1054,6 +1054,21 @@
             SH.logError("Migration check failed", e);
         }
         await SH.loadSettings(); // ここで v2 データが読み込まれる
+        // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+        // ★追加: 保存された設定を確認し、OFFならアイドルモードにする
+        // 2026.02.16
+        // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+        const cfg = SH.getCFG?.() || {};
+        // 設定が無い(undefined)場合は true(ON) とみなす
+        const isEnabled = cfg.navEnabled !== false;
+        if (!isEnabled) {
+            console.log("[cgtn] initialize: Starts in IDLE mode.");
+            RUN.running = false;
+            RUN.idle = true;
+            // ※この後に実行される UI.installUI() が RUN.idle を見て
+            // 自動的にスイッチをOFFにしてくれます。
+        }
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         try {
             await SH.migratePinsStorageOnce?.();
         }
@@ -1116,17 +1131,98 @@
     }
     // 2026.1.22
     // ========= App Control (Idle ⇄ Navigate) =========
+    /*
+    async function startApp(reason: string = "start") {
+      if (RUN.running) return;
+      RUN.running = true;
+      RUN.idle = false;
+  
+      try {
+        UI?.installUI?.();
+        UI?.setIdleMode?.(false);
+      } catch {}
+  
+      try {
+        await initialize();
+  
+        // 復帰時は常に一覧OFFで開始する
+        try {
+          LG?.setListEnabled?.(false); // 常にOFF
+  
+          const chk = document.getElementById("cgpt-list-toggle");
+          if (chk instanceof HTMLInputElement) chk.checked = false;
+        } catch {}
+  
+        try {
+          LG?.updatePinOnlyBadge?.();
+          LG?.updateListChatTitle?.();
+        } catch {}
+      } catch (e) {
+        SH.logError("[cgtn] start failed", reason, e);
+        // 起動失敗時も念のためOFF 2026.01.26
+        LG?.setListEnabled?.(false);
+      }
+    }
+  
+    function stopApp(reason: string = "stop") {
+      RUN.running = false;
+      RUN.idle = true;
+  
+      // ★ Idleに入る直前の一覧状態を「メモリ」に退避（storageは触らない）
+      try {
+        RUN.prevListEnabled = !!SH?.getCFG?.()?.list?.enabled;
+      } catch {
+        RUN.prevListEnabled = null;
+      }
+  
+      // ★ 実体を閉じる（表示と監視を止める）
+      try {
+        window.CGTN_PREVIEW?.hide?.("idle");
+      } catch {}
+      try {
+        LG?.setListEnabled?.(false);
+        LG?.clearListPanelUI?.();
+      } catch {}
+  
+      // ★ UIのチェックも揃える（ズレ防止）
+      try {
+        const chk = document.getElementById("cgpt-list-toggle");
+        if (chk instanceof HTMLInputElement) chk.checked = false;
+      } catch {}
+  
+      // 監視停止など
+      try {
+        LG?.detachTurnObserver?.();
+      } catch {}
+      try {
+        UI?.setIdleMode?.(true);
+      } catch {}
+  
+      RUN.bag.flush();
+    }
+  */
+    // 2026.02.16
+    // =================================================================
+    // アプリ起動 (ONにする)
+    // =================================================================
     async function startApp(reason = "start") {
         if (RUN.running)
             return;
         RUN.running = true;
         RUN.idle = false;
+        // ★追加: まず見た目をONモードにする（disabledを外す）
+        const nav = document.getElementById("cgpt-nav");
+        if (nav) {
+            nav.classList.remove("disabled");
+            nav.classList.remove("cgtn-standby");
+        }
         try {
             UI?.installUI?.();
             UI?.setIdleMode?.(false);
         }
         catch { }
         try {
+            // 初期化処理（イベントリスナー登録など）
             await initialize();
             // 復帰時は常に一覧OFFで開始する
             try {
@@ -1141,24 +1237,31 @@
                 LG?.updateListChatTitle?.();
             }
             catch { }
+            // ★追加: 復帰直後にターン数を再取得して表示させる
+            // (initialize が既に実行済みの場合、スキャンが走らないことがあるため)
+            setTimeout(() => {
+                rebuildAndRenderSafely().catch(() => { });
+            }, 50);
         }
         catch (e) {
             SH.logError("[cgtn] start failed", reason, e);
-            // 起動失敗時も念のためOFF 2026.01.26
             LG?.setListEnabled?.(false);
         }
     }
+    // =================================================================
+    // アプリ停止 (OFFにする)
+    // =================================================================
     function stopApp(reason = "stop") {
         RUN.running = false;
         RUN.idle = true;
-        // ★ Idleに入る直前の一覧状態を「メモリ」に退避（storageは触らない）
+        // ★ Idleに入る直前の一覧状態を退避
         try {
             RUN.prevListEnabled = !!SH?.getCFG?.()?.list?.enabled;
         }
         catch {
             RUN.prevListEnabled = null;
         }
-        // ★ 実体を閉じる（表示と監視を止める）
+        // ★ 実体を閉じる
         try {
             window.CGTN_PREVIEW?.hide?.("idle");
         }
@@ -1168,14 +1271,14 @@
             LG?.clearListPanelUI?.();
         }
         catch { }
-        // ★ UIのチェックも揃える（ズレ防止）
+        // ★ UIのチェックも外す
         try {
             const chk = document.getElementById("cgpt-list-toggle");
             if (chk instanceof HTMLInputElement)
                 chk.checked = false;
         }
         catch { }
-        // 監視停止など
+        // 監視停止
         try {
             LG?.detachTurnObserver?.();
         }
@@ -1184,6 +1287,12 @@
             UI?.setIdleMode?.(true);
         }
         catch { }
+        // ★追加: 確実にパネルを閉じて「OFF」表示にする
+        const nav = document.getElementById("cgpt-nav");
+        if (nav) {
+            nav.classList.add("disabled"); // これでCSSが効いてボディが消える
+        }
+        UI?.updateStatusDisplay?.("OFF");
         RUN.bag.flush();
     }
     window.CGTN_APP = {

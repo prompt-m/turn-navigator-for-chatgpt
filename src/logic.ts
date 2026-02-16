@@ -49,32 +49,45 @@
     // 1. ページ種類の判定
     const info = SH.getPageInfo?.() || {};
     const kind = info.kind || "other";
-
-    // ★変更点: 「データが空かどうか」をOFFの条件から外しました。
-    // チャット画面(chat/temporary)なら、0件でも常時ONにします。
     const isChat = kind === "chat" || kind === "temporary";
 
-    // OFFにするのは「ホーム」や「プロジェクト」などの画面だけ
-    const isOff = !isChat;
+    // -------------------------------------------------------
+    // A. チャット画面以外 (Home / Project / New) -> "Standby"
+    // -------------------------------------------------------
+    if (!isChat) {
+      if (nav) {
+        // Standby中もパネルは畳む(=disabledのCSSを利用)
+        nav.classList.add("disabled");
 
-    if (isOff) {
-      // --- OFFモード (Home / Project / New Chat 等) ---
-      UI?.updateStatusDisplay?.("OFF");
-      // パネルを薄くして操作禁止に
-      if (nav) nav.classList.add("disabled");
+        // ただしスイッチだけは押せるように救済済み
+        // (ui.tsのCSSで .cgtn-power-wrapper は auto になっている前提)
+      }
+      UI?.updateStatusDisplay?.("Standby");
       return;
     }
 
-    // --- ONモード (チャット画面) ---
-    // 禁止マスクを外す（たとえ0件でも、ボタンを押せるようにする）
-    if (nav) nav.classList.remove("disabled");
+    // -------------------------------------------------------
+    // B. チャット画面 だが アプリがOFF (Idle) -> "OFF"
+    // -------------------------------------------------------
+    const app = (window as any).CGTN_APP; // content.tsのRUN参照
+    if (app?.isIdle?.()) {
+      if (nav) nav.classList.add("disabled"); // ボディを隠す
+      UI?.updateStatusDisplay?.("OFF");
+      return;
+    }
+
+    // -------------------------------------------------------
+    // C. チャット画面 かつ アプリON (Active) -> 通常表示
+    // -------------------------------------------------------
+    if (nav) {
+      nav.classList.remove("disabled"); // ボディを表示
+      nav.classList.remove("cgtn-standby");
+    }
 
     const list = NS.ST?.all || [];
     const total = list.length;
 
     if (total === 0) {
-      // 0件の場合は「0 / 0」と表示して終了
-      // (ここで終わりでも、下の計算を通しても結果は同じですが、明示的に)
       UI?.updateStatusDisplay?.("0 / 0");
       return;
     }
