@@ -39,7 +39,7 @@
       (list && (node === list || list.contains(node)))
     );
   }
-
+  /*
   // ★修正: 「0件でもチャット画面なら操作許可」にする
   NS.updateStatus = function updateStatus() {
     const SH = window.CGTN_SHARED;
@@ -117,7 +117,90 @@
     // 表示更新
     UI?.updateStatusDisplay?.(`${current} / ${total}`);
   };
+*/
 
+  // src/logic.ts
+
+  NS.updateStatus = function updateStatus() {
+    const SH = window.CGTN_SHARED;
+    const UI = window.CGTN_UI;
+    const nav = document.getElementById("cgpt-nav");
+    const app = (window as any).CGTN_APP; // content.tsのRUN参照
+
+    // 1. アプリの状態 (ON/OFF)
+    const isIdle = app?.isIdle?.();
+
+    // 2. ページ情報の取得
+    const info = SH.getPageInfo?.() || {};
+    const kind = info.kind || "other";
+    const isChat = kind === "chat" || kind === "temporary";
+
+    // -------------------------------------------------------
+    // 【状態 ① & ③】: ナビゲートOFF
+    //  → パネル最小化 (.disabled 付与)
+    //  → 表示 "OFF"
+    // -------------------------------------------------------
+    if (isIdle) {
+      if (nav) nav.classList.add("disabled");
+      UI?.updateStatusDisplay?.("OFF");
+      return; // 処理終了
+    }
+
+    // -------------------------------------------------------
+    // 【状態 ② & ④】: ナビゲートON (ここから下は ON の世界)
+    //  → パネル最大化 (.disabled 解除)
+    // -------------------------------------------------------
+    if (nav) {
+      nav.classList.remove("disabled");
+      nav.classList.remove("cgtn-standby");
+    }
+
+    // チャット画面以外は常に Standby 扱い（②相当）
+    if (!isChat) {
+      UI?.updateStatusDisplay?.("Standby");
+      return;
+    }
+
+    const list = NS.ST?.all || [];
+    const total = list.length;
+
+    // -------------------------------------------------------
+    // 【状態 ②】: ターン無し (ON)
+    //  → 表示 "Standby"
+    // -------------------------------------------------------
+    if (total === 0) {
+      UI?.updateStatusDisplay?.("Standby");
+      return;
+    }
+
+    // -------------------------------------------------------
+    // 【状態 ④】: ターン有り (ON)
+    //  → 表示 "n / m"
+    // -------------------------------------------------------
+    // 以下、現在位置の計算ロジック（変更なし）
+    const sc =
+      NS._scroller || document.scrollingElement || document.documentElement;
+    const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
+    const yStar = (sc.scrollTop || 0) + anchorY;
+    const eps = Number(SH.getCFG?.()?.eps) || 20;
+
+    // 簡易探索（※二分探索版を入れている場合はそちらを使ってください）
+    let current = 0;
+    for (let i = 0; i < total; i++) {
+      const el = list[i];
+      const top =
+        typeof NS.articleTop === "function"
+          ? NS.articleTop(sc, el)
+          : el.offsetTop;
+      if (top <= yStar + eps) {
+        current = i + 1;
+      } else {
+        break;
+      }
+    }
+
+    UI?.updateStatusDisplay?.(`${current} / ${total}`);
+  };
   // ★最適化: 二分探索で現在地を探す（計算量 O(N) -> O(log N)） 2026.02.01
   function calcCurrentTurnIndex(sc) {
     if (!sc || !NS.ST.all.length) return 0;
@@ -230,33 +313,6 @@
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   }
-  /*
-  function getTrueScroller() {
-    if (NS._scroller && document.body.contains(NS._scroller))
-      return NS._scroller;
-    const isScrollable = (el) =>
-      el &&
-      /(auto|scroll)/.test(getComputedStyle(el).overflowY) &&
-      el.scrollHeight > el.clientHeight;
-    const first =
-      document.querySelector(TURN_SEL) ||
-      document.querySelector("[data-message-author-role]");
-    if (first) {
-      for (
-        let p = first.parentElement;
-        p && p !== document.body;
-        p = p.parentElement
-      ) {
-        if (isScrollable(p)) {
-          NS._scroller = p;
-          return p;
-        }
-      }
-    }
-    NS._scroller = document.scrollingElement || document.documentElement;
-    return NS._scroller;
-  }
-*/
   // ★差し替え: Universal版のスクロール特定ロジック
   function isScrollable(el) {
     if (!el) return false;
@@ -654,33 +710,6 @@
 
     return "";
   }
-  // ---------------------------------------------------------------------------
-
-  // 添付UIを取り除いて本文だけを要約（maxChars 指定で丸め）
-  /*
-  function extractBodySnippet(head, maxChars) {
-    if (!head) return "";
-    const clone = head.cloneNode(true);
-    clone
-      .querySelectorAll(
-        [
-          ".border.rounded-xl",
-          "a[download]",
-          "a[href]",
-          "figure",
-          "figcaption",
-          "img",
-          "picture",
-          "video",
-          "source",
-        ].join(","),
-      )
-      .forEach((n) => n.remove());
-
-    let txt = (clone.innerText || "").replace(/\s+/g, " ").trim();
-    return truncate(txt, maxChars);
-  }
-*/
 
   // ★メモリ最適化版（No Clone）: DOMコピーを作らずにテキストを抽出
   function extractBodySnippet(head, maxChars) {

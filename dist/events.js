@@ -16,6 +16,30 @@
             const t = e.target;
             if (!(t instanceof HTMLInputElement))
                 return;
+            const app = window.CGTN_APP; // content.tsで公開している実体
+            // 1. 電源スイッチ (ON/OFF)
+            if (t.id === "cgtn-power-toggle") {
+                if (t.checked) {
+                    // ONの場合
+                    if (typeof app?.start === "function") {
+                        app.start("toggle-on");
+                    }
+                    else {
+                        console.error("[CGTN] app.start not found");
+                    }
+                }
+                else {
+                    // OFFの場合
+                    if (typeof app?.stop === "function") {
+                        app.stop("toggle-off"); // ← これが呼ばれていない！
+                    }
+                    else {
+                        console.error("[CGTN] app.stop not found");
+                    }
+                }
+                return;
+            }
+            // ▲▲▲▲▲▲
             // ▼ 一覧表示トグル (#cgpt-list-toggle)
             if (t.id === "cgpt-list-toggle") {
                 const on = t.checked;

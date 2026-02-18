@@ -182,31 +182,29 @@
     const myGen = ++__buildGen;
 
     // 1. Loading開始
-    setUiBusy(true, "Loading...");
+    // アプリがONのときだけ "Loading..." にする
+    // OFFのときは "OFF" のまま変えない、あるいは Loading にしても最後に戻す
+    if (!RUN.idle) {
+      setUiBusy(true, "Loading...");
+      UI?.updateStatusDisplay?.("Loading...");
+    }
 
-    // 2. ★修正: ここでナビパネルの数字を一旦「---」やクリア状態にする
-    // これにより、前のチャットの数字「14/14」などが残るのを防ぎます
-    UI?.updateStatusDisplay?.("");
-
-    // 3. 待機フェーズ
+    // 2. 待機フェーズ
     if (oldSig) {
       await waitForChatSettled({ mustNotMatch: oldSig });
       if (myGen !== __buildGen) return;
     }
 
-    // ★削除: 犯人だった runFastUniversalScan を削除！
-    // if (typeof LG.runFastUniversalScan === "function") {
-    //   LG.runFastUniversalScan();
-    // }
-
     try {
-      // 4. 正規ロジック再構築
+      // 3. 正規ロジック再構築
       LG.rebuild?.();
 
-      // 5. リスト生成判定
       const kind = SH.getPageInfo?.()?.kind || "other";
       const cfg = SH.getCFG?.() || {};
-      const needList = kind === "chat" && (forceList || !!cfg.list?.enabled);
+
+      // アプリがONの場合のみリスト表示を検討
+      const needList =
+        !RUN.idle && kind === "chat" && (forceList || !!cfg.list?.enabled);
 
       if (needList) {
         await new Promise((r) => requestAnimationFrame(r));
@@ -214,46 +212,31 @@
         await LG.renderList?.(true);
       }
 
-      // 6. 最終更新 (ここで Loading... が数字に変わるはず)
-      if (typeof LG.updateStatus === "function") {
-        LG.updateStatus();
+      // 4. 最終更新
+      if (myGen === __buildGen) {
+        if (RUN.idle) {
+          // ★ アプリがOFFなら、計算結果に関わらず強制的に ①か③ の状態にする
+          const nav = document.getElementById("cgpt-nav");
+          if (nav) nav.classList.add("disabled");
+          UI?.updateStatusDisplay?.("OFF");
+        } else {
+          // ONなら updateStatus に任せる (②か④になる)
+          if (typeof LG.updateStatus === "function") {
+            LG.updateStatus();
+          }
+        }
       }
     } catch (e) {
       SH.logError("rebuild failed", e);
-      // エラー時はリストOFF同期など
       if (forceList) {
         LG?.setListEnabled?.(false);
-        const chk = document.getElementById("cgpt-list-toggle");
-        if (chk instanceof HTMLInputElement) {
-          chk.checked = false;
-          chk.dispatchEvent(new Event("change"));
-        }
       }
     } finally {
       if (myGen === __buildGen) {
         setUiBusy(false);
-
-        // ★修正: Loading... で止まらないための保険
-        // 処理が終わったのにまだ Loading 表示なら、強制的にステータス更新を掛ける
-        setTimeout(() => {
-          if (myGen !== __buildGen) return;
-
-          // 現在の表示テキストを取得
-          const screen = document.getElementById("cgtn-status-monitor");
-          const text = screen?.textContent || "";
-
-          // まだ "Loading..." だったら
-          if (text.includes("Loading")) {
-            //console.log("[cgtn] Force status update (stuck detected)");
-            // 再スキャンして更新
-            LG.rebuild?.();
-            LG.updateStatus?.();
-          }
-        }, 500); // 0.5秒後にチェック
       }
     }
   }
-
   // =================================================================
   // 修正版: onMessage (ちらつき防止・起動ロジック)
   // =================================================================
@@ -1254,95 +1237,20 @@
     boot();
   }
 
-  // 2026.1.22
-  // ========= App Control (Idle ⇄ Navigate) =========
-  /*
+  // ONにする
   async function startApp(reason: string = "start") {
     if (RUN.running) return;
     RUN.running = true;
     RUN.idle = false;
 
-    try {
-      UI?.installUI?.();
-      UI?.setIdleMode?.(false);
-    } catch {}
-
-    try {
-      await initialize();
-
-      // 復帰時は常に一覧OFFで開始する
-      try {
-        LG?.setListEnabled?.(false); // 常にOFF
-
-        const chk = document.getElementById("cgpt-list-toggle");
-        if (chk instanceof HTMLInputElement) chk.checked = false;
-      } catch {}
-
-      try {
-        LG?.updatePinOnlyBadge?.();
-        LG?.updateListChatTitle?.();
-      } catch {}
-    } catch (e) {
-      SH.logError("[cgtn] start failed", reason, e);
-      // 起動失敗時も念のためOFF 2026.01.26
-      LG?.setListEnabled?.(false);
-    }
-  }
-
-  function stopApp(reason: string = "stop") {
-    RUN.running = false;
-    RUN.idle = true;
-
-    // ★ Idleに入る直前の一覧状態を「メモリ」に退避（storageは触らない）
-    try {
-      RUN.prevListEnabled = !!SH?.getCFG?.()?.list?.enabled;
-    } catch {
-      RUN.prevListEnabled = null;
-    }
-
-    // ★ 実体を閉じる（表示と監視を止める）
-    try {
-      window.CGTN_PREVIEW?.hide?.("idle");
-    } catch {}
-    try {
-      LG?.setListEnabled?.(false);
-      LG?.clearListPanelUI?.();
-    } catch {}
-
-    // ★ UIのチェックも揃える（ズレ防止）
-    try {
-      const chk = document.getElementById("cgpt-list-toggle");
-      if (chk instanceof HTMLInputElement) chk.checked = false;
-    } catch {}
-
-    // 監視停止など
-    try {
-      LG?.detachTurnObserver?.();
-    } catch {}
-    try {
-      UI?.setIdleMode?.(true);
-    } catch {}
-
-    RUN.bag.flush();
-  }
-*/
-
-  // 2026.02.16
-
-  // =================================================================
-  // アプリ起動 (ONにする)
-  // =================================================================
-  async function startApp(reason: string = "start") {
-    if (RUN.running) return;
-    RUN.running = true;
-    RUN.idle = false;
-
-    // ★追加: まず見た目をONモードにする（disabledを外す）
+    // ★遷移: ②または④へ向かう
+    // まず見た目をONモード(最大化)にし、Loading表示
     const nav = document.getElementById("cgpt-nav");
     if (nav) {
       nav.classList.remove("disabled");
       nav.classList.remove("cgtn-standby");
     }
+    UI?.updateStatusDisplay?.("Loading...");
 
     try {
       UI?.installUI?.();
@@ -1350,12 +1258,11 @@
     } catch {}
 
     try {
-      // 初期化処理（イベントリスナー登録など）
       await initialize();
 
-      // 復帰時は常に一覧OFFで開始する
+      // 復帰時は常に一覧OFF
       try {
-        LG?.setListEnabled?.(false); // 常にOFF
+        LG?.setListEnabled?.(false);
         const chk = document.getElementById("cgpt-list-toggle");
         if (chk instanceof HTMLInputElement) chk.checked = false;
       } catch {}
@@ -1365,8 +1272,7 @@
         LG?.updateListChatTitle?.();
       } catch {}
 
-      // ★追加: 復帰直後にターン数を再取得して表示させる
-      // (initialize が既に実行済みの場合、スキャンが走らないことがあるため)
+      // ターン数再取得
       setTimeout(() => {
         rebuildAndRenderSafely().catch(() => {});
       }, 50);
@@ -1376,36 +1282,44 @@
     }
   }
 
-  // =================================================================
-  // アプリ停止 (OFFにする)
-  // =================================================================
+  // OFFにする
   function stopApp(reason: string = "stop") {
     RUN.running = false;
     RUN.idle = true;
 
-    // ★ Idleに入る直前の一覧状態を退避
+    const SH = window.CGTN_SHARED; // ログ用に取得
+    SH?.addLog?.(`[stopApp] Called. reason: ${reason}`, "DEBUG");
+
+    // ★ スクロール監視の停止
+    try {
+      LG?.stopScrollSpy?.();
+      SH?.addLog?.(`[stopApp] stopScrollSpy success`, "DEBUG");
+    } catch (e) {
+      SH?.logError?.("stopApp stopScrollSpy", e);
+    }
+
     try {
       RUN.prevListEnabled = !!SH?.getCFG?.()?.list?.enabled;
     } catch {
       RUN.prevListEnabled = null;
     }
 
-    // ★ 実体を閉じる
+    // ★ プレビューやリストの非表示処理
     try {
       window.CGTN_PREVIEW?.hide?.("idle");
     } catch {}
     try {
       LG?.setListEnabled?.(false);
       LG?.clearListPanelUI?.();
-    } catch {}
+    } catch (e) {
+      SH?.logError?.("stopApp clearListPanelUI", e);
+    }
 
-    // ★ UIのチェックも外す
     try {
       const chk = document.getElementById("cgpt-list-toggle");
       if (chk instanceof HTMLInputElement) chk.checked = false;
     } catch {}
 
-    // 監視停止
     try {
       LG?.detachTurnObserver?.();
     } catch {}
@@ -1413,14 +1327,24 @@
       UI?.setIdleMode?.(true);
     } catch {}
 
-    // ★追加: 確実にパネルを閉じて「OFF」表示にする
+    // ★ パネルを閉じて OFF 表示
     const nav = document.getElementById("cgpt-nav");
     if (nav) {
-      nav.classList.add("disabled"); // これでCSSが効いてボディが消える
+      nav.classList.add("disabled");
+      SH?.addLog?.(`[stopApp] Added .disabled to nav`, "DEBUG");
+    } else {
+      SH?.addLog?.(`[stopApp] nav element NOT FOUND!`, "WARN");
     }
-    UI?.updateStatusDisplay?.("OFF");
+
+    try {
+      UI?.updateStatusDisplay?.("OFF");
+      SH?.addLog?.(`[stopApp] updateStatusDisplay("OFF") success`, "DEBUG");
+    } catch (e) {
+      SH?.logError?.("stopApp updateStatusDisplay", e);
+    }
 
     RUN.bag.flush();
+    SH?.addLog?.(`[stopApp] Finished`, "DEBUG");
   }
 
   (window as any).CGTN_APP = {

@@ -30,62 +30,147 @@
         return ((nav && (node === nav || nav.contains(node))) ||
             (list && (node === list || list.contains(node))));
     }
+    /*
     // ★修正: 「0件でもチャット画面なら操作許可」にする
+    NS.updateStatus = function updateStatus() {
+      const SH = window.CGTN_SHARED;
+      const UI = window.CGTN_UI;
+      const nav = document.getElementById("cgpt-nav");
+  
+      // 1. ページ種類の判定
+      const info = SH.getPageInfo?.() || {};
+      const kind = info.kind || "other";
+      const isChat = kind === "chat" || kind === "temporary";
+  
+      // -------------------------------------------------------
+      // A. チャット画面以外 (Home / Project / New) -> "Standby"
+      // -------------------------------------------------------
+      if (!isChat) {
+        if (nav) {
+          // Standby中もパネルは畳む(=disabledのCSSを利用)
+          nav.classList.add("disabled");
+  
+          // ただしスイッチだけは押せるように救済済み
+          // (ui.tsのCSSで .cgtn-power-wrapper は auto になっている前提)
+        }
+        UI?.updateStatusDisplay?.("Standby");
+        return;
+      }
+  
+      // -------------------------------------------------------
+      // B. チャット画面 だが アプリがOFF (Idle) -> "OFF"
+      // -------------------------------------------------------
+      const app = (window as any).CGTN_APP; // content.tsのRUN参照
+      if (app?.isIdle?.()) {
+        if (nav) nav.classList.add("disabled"); // ボディを隠す
+        UI?.updateStatusDisplay?.("OFF");
+        return;
+      }
+  
+      // -------------------------------------------------------
+      // C. チャット画面 かつ アプリON (Active) -> 通常表示
+      // -------------------------------------------------------
+      if (nav) {
+        nav.classList.remove("disabled"); // ボディを表示
+        nav.classList.remove("cgtn-standby");
+      }
+  
+      const list = NS.ST?.all || [];
+      const total = list.length;
+  
+      if (total === 0) {
+        UI?.updateStatusDisplay?.("0 / 0");
+        return;
+      }
+  
+      // --- 以下、現在位置の計算（既存ロジック） ---
+      const sc =
+        NS._scroller || document.scrollingElement || document.documentElement;
+      const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
+      const yStar = (sc.scrollTop || 0) + anchorY;
+      const eps = Number(SH.getCFG?.()?.eps) || 20;
+  
+      // 簡易探索
+      let current = 0;
+      for (let i = 0; i < total; i++) {
+        const el = list[i];
+        // ※ articleTop は logic.js 内で定義されている前提
+        const top =
+          typeof articleTop === "function" ? articleTop(sc, el) : el.offsetTop;
+  
+        if (top <= yStar + eps) {
+          current = i + 1;
+        } else {
+          break;
+        }
+      }
+  
+      // 表示更新
+      UI?.updateStatusDisplay?.(`${current} / ${total}`);
+    };
+  */
+    // src/logic.ts
     NS.updateStatus = function updateStatus() {
         const SH = window.CGTN_SHARED;
         const UI = window.CGTN_UI;
         const nav = document.getElementById("cgpt-nav");
-        // 1. ページ種類の判定
+        const app = window.CGTN_APP; // content.tsのRUN参照
+        // 1. アプリの状態 (ON/OFF)
+        const isIdle = app?.isIdle?.();
+        // 2. ページ情報の取得
         const info = SH.getPageInfo?.() || {};
         const kind = info.kind || "other";
         const isChat = kind === "chat" || kind === "temporary";
         // -------------------------------------------------------
-        // A. チャット画面以外 (Home / Project / New) -> "Standby"
+        // 【状態 ① & ③】: ナビゲートOFF
+        //  → パネル最小化 (.disabled 付与)
+        //  → 表示 "OFF"
         // -------------------------------------------------------
-        if (!isChat) {
-            if (nav) {
-                // Standby中もパネルは畳む(=disabledのCSSを利用)
+        if (isIdle) {
+            if (nav)
                 nav.classList.add("disabled");
-                // ただしスイッチだけは押せるように救済済み
-                // (ui.tsのCSSで .cgtn-power-wrapper は auto になっている前提)
-            }
+            UI?.updateStatusDisplay?.("OFF");
+            return; // 処理終了
+        }
+        // -------------------------------------------------------
+        // 【状態 ② & ④】: ナビゲートON (ここから下は ON の世界)
+        //  → パネル最大化 (.disabled 解除)
+        // -------------------------------------------------------
+        if (nav) {
+            nav.classList.remove("disabled");
+            nav.classList.remove("cgtn-standby");
+        }
+        // チャット画面以外は常に Standby 扱い（②相当）
+        if (!isChat) {
+            UI?.updateStatusDisplay?.("Standby");
+            return;
+        }
+        const list = NS.ST?.all || [];
+        const total = list.length;
+        // -------------------------------------------------------
+        // 【状態 ②】: ターン無し (ON)
+        //  → 表示 "Standby"
+        // -------------------------------------------------------
+        if (total === 0) {
             UI?.updateStatusDisplay?.("Standby");
             return;
         }
         // -------------------------------------------------------
-        // B. チャット画面 だが アプリがOFF (Idle) -> "OFF"
+        // 【状態 ④】: ターン有り (ON)
+        //  → 表示 "n / m"
         // -------------------------------------------------------
-        const app = window.CGTN_APP; // content.tsのRUN参照
-        if (app?.isIdle?.()) {
-            if (nav)
-                nav.classList.add("disabled"); // ボディを隠す
-            UI?.updateStatusDisplay?.("OFF");
-            return;
-        }
-        // -------------------------------------------------------
-        // C. チャット画面 かつ アプリON (Active) -> 通常表示
-        // -------------------------------------------------------
-        if (nav) {
-            nav.classList.remove("disabled"); // ボディを表示
-            nav.classList.remove("cgtn-standby");
-        }
-        const list = NS.ST?.all || [];
-        const total = list.length;
-        if (total === 0) {
-            UI?.updateStatusDisplay?.("0 / 0");
-            return;
-        }
-        // --- 以下、現在位置の計算（既存ロジック） ---
+        // 以下、現在位置の計算ロジック（変更なし）
         const sc = NS._scroller || document.scrollingElement || document.documentElement;
         const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
         const yStar = (sc.scrollTop || 0) + anchorY;
         const eps = Number(SH.getCFG?.()?.eps) || 20;
-        // 簡易探索
+        // 簡易探索（※二分探索版を入れている場合はそちらを使ってください）
         let current = 0;
         for (let i = 0; i < total; i++) {
             const el = list[i];
-            // ※ articleTop は logic.js 内で定義されている前提
-            const top = typeof articleTop === "function" ? articleTop(sc, el) : el.offsetTop;
+            const top = typeof NS.articleTop === "function"
+                ? NS.articleTop(sc, el)
+                : el.offsetTop;
             if (top <= yStar + eps) {
                 current = i + 1;
             }
@@ -93,7 +178,6 @@
                 break;
             }
         }
-        // 表示更新
         UI?.updateStatusDisplay?.(`${current} / ${total}`);
     };
     // ★最適化: 二分探索で現在地を探す（計算量 O(N) -> O(log N)） 2026.02.01
