@@ -17,6 +17,9 @@
       const t = e.target;
       if (!(t instanceof HTMLInputElement)) return;
 
+      // ★追加: 重複イベント防止
+      e.stopImmediatePropagation();
+
       const app = (window as any).CGTN_APP; // content.tsで公開している実体
 
       // 1. 電源スイッチ (ON/OFF)
