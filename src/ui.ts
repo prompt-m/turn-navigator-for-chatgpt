@@ -556,7 +556,18 @@ input:checked + .slider:before {
         <input id="cgpt-list-toggle" type="checkbox" style="display:none">
 
       </div>`;
+    // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+    // ★修正: 画面に出す「前」にアプリの状態を確認する
+    const app = (window as any).CGTN_APP;
+    const isIdle = app?.isIdle?.() ?? false;
 
+    // もしOFFなら、画面に出る前にあらかじめ「最小化」と「文字」をセットしておく
+    if (isIdle) {
+      box.classList.add("disabled");
+      const monitor = box.querySelector("#cgtn-status-monitor");
+      if (monitor) monitor.innerHTML = `<span class="off-text">OFF</span>`;
+    }
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     document.body.appendChild(box);
 
     // バージョン取得
@@ -566,22 +577,6 @@ input:checked + .slider:before {
       if (v) v.textContent = "v" + (mf.version || "1.0");
     } catch {}
 
-    /*
-    const cb = box.querySelector("#cgtn-power-toggle");
-    if (cb instanceof HTMLInputElement) {
-      const idle = (window as any).CGTN_APP?.isIdle?.() ?? false;
-      cb.checked = !idle;
-      setIdleMode(!!idle);
-
-      cb.addEventListener("change", () => {
-        if (cb.checked) {
-          (window as any).CGTN_APP?.start?.("ui-power-on");
-        } else {
-          (window as any).CGTN_APP?.stop?.("ui-power-off");
-        }
-      });
-    }
-*/
     // Power Toggle 2026.02.16
     const cb = box.querySelector("#cgtn-power-toggle");
     if (cb instanceof HTMLInputElement) {
@@ -591,6 +586,18 @@ input:checked + .slider:before {
       // RUN.idle が false (undefined含む) なら ON(checked=true)
       const isIdle = app?.isIdle?.() ?? false;
       cb.checked = !isIdle;
+
+      // ★追加: スイッチだけでなく「パネル全体」の見た目も即座に同期する
+      if (isIdle) {
+        // Mikiさん作の関数で、パネル最小化＆「OFF」文字を即適用
+        window.CGTN_UI?.setPanelOffState?.();
+      } else {
+        // ONの場合は、とりあえず「Standby」で初期化しておく
+        // (直後に走る rebuild が、正しいターン数に上書きしてくれます)
+        if (typeof window.CGTN_UI?.updateStatusDisplay === "function") {
+          window.CGTN_UI.updateStatusDisplay("Standby");
+        }
+      }
 
       // ★追加: 状態が変わったら保存する
       cb.addEventListener("change", () => {
@@ -856,6 +863,27 @@ input:checked + .slider:before {
     const isLong = text.length > 8;
     const cls = isLong ? "screen-value loading" : "screen-value";
     screen.innerHTML = `<div class="${cls}">${content}</div>`;
+  };
+
+  // ★追加: パネルを確実にOFF状態（最小化＋OFF表示）にする専用関数
+  NS.setPanelOffState = function () {
+    const nav = document.getElementById("cgpt-nav");
+    console.log("setPanelOffState nav:", nav);
+    if (nav) {
+      nav.classList.add("disabled"); // 確実に見えなくする
+    }
+    // ==========================================
+    // ★追加: スイッチの見た目も確実にOFF（左側）にする
+    const powerToggle = document.getElementById("cgtn-power-toggle");
+    if (powerToggle instanceof HTMLInputElement) {
+      powerToggle.checked = false;
+    }
+    // ==========================================
+    // 文字も確実にOFFにする（NSの中なので自身を呼ぶ）
+    if (typeof NS.updateStatusDisplay === "function") {
+      console.log("！setPanelOffState OFF");
+      NS.updateStatusDisplay("OFF");
+    }
   };
 
   function setIdleMode(idle) {

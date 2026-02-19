@@ -30,7 +30,7 @@
         return ((nav && (node === nav || nav.contains(node))) ||
             (list && (node === list || list.contains(node))));
     }
-    // src/logic.ts の updateStatus 関数
+    // src/logic.ts の updateStatus (完全版)
     NS.updateStatus = function updateStatus() {
         const SH = window.CGTN_SHARED;
         const UI = window.CGTN_UI;
@@ -38,9 +38,8 @@
         const app = window.CGTN_APP;
         // 1. アプリ停止中 (OFF) なら即帰る
         if (app?.isIdle?.()) {
-            if (nav)
-                nav.classList.add("disabled");
-            UI?.updateStatusDisplay?.("OFF");
+            // 最小化＋OFF表示 (Mikiさん作の最強関数)
+            UI?.setPanelOffState?.();
             return;
         }
         // 2. ON確定 -> パネルを開く
@@ -48,20 +47,27 @@
             nav.classList.remove("disabled");
             nav.classList.remove("cgtn-standby");
         }
-        // ★修正: 先にリスト(ターン数)を確認する
+        // ==========================================
+        // 3. ★追加: 亡霊ガード！ チャットページ以外ならStandby
+        // ==========================================
+        const kind = SH?.getPageInfo?.()?.kind;
+        if (kind && ["home", "project", "other", "new"].includes(kind)) {
+            UI?.updateStatusDisplay?.("Standby");
+            return;
+        }
+        // ==========================================
+        // 4. リスト(ターン数)を確認する
         const list = NS.ST?.all || [];
         const total = list.length;
-        // 3. 判定ロジック
+        // 5. 判定ロジック
         // 「ターンが0」なら Standby (②)
-        // ※ ページ種別(isChat)に関わらず、ターンが無ければStandbyとする
         if (total === 0) {
             UI?.updateStatusDisplay?.("Standby");
             return;
         }
-        // 4. ターンがある (④)
+        // 6. ターンがある (④)
         // ここまで来れば「ターン有り」なので、位置計算して表示
         const sc = NS._scroller || document.scrollingElement || document.documentElement;
-        // ... (以下、既存の位置計算ロジックそのまま) ...
         const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
         const yStar = (sc.scrollTop || 0) + anchorY;
         const eps = Number(SH.getCFG?.()?.eps) || 20;
@@ -1295,6 +1301,7 @@
             NS.updateStatus();
         }
         else {
+            console.log("clearListPanelUI Loading...");
             window.CGTN_UI?.updateStatusDisplay?.("Loading...");
         }
     };

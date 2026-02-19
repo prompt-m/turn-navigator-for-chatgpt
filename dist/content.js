@@ -97,6 +97,7 @@
     // 画面操作を一時的にブロック
     // ★引数 label を追加 (デフォルトは "Loading...")
     function setUiBusy(busy = true, label = "Loading...") {
+        console.log("setUiBusy1");
         const ids = ["cgpt-nav", "cgpt-list-panel"];
         for (const id of ids) {
             const host = document.getElementById(id);
@@ -110,22 +111,30 @@
         }
         // ステータス表示
         if (busy) {
+            console.log("setUiBusy2");
             // ★修正: 引数で渡された文字を表示する
             UI?.updateStatusDisplay?.(label);
         }
         else {
+            console.log("setUiBusy3");
             if (RUN.idle) {
-                UI?.updateStatusDisplay?.("OFF");
+                console.log("setUiBusy4");
+                // 最小化＋OFF表示
+                UI?.setPanelOffState?.();
             }
             else {
+                console.log("setUiBusy5");
                 if (typeof LG.updateStatus === "function") {
+                    console.log("setUiBusy6");
                     LG.updateStatus();
                 }
                 else {
+                    console.log("setUiBusy7 Loading");
                     UI?.updateStatusDisplay?.("Loading...");
                 }
             }
         }
+        console.log("setUiBusy8");
     }
     // CSS（ローディング用スタイル）
     (function ensureBusyStyle() {
@@ -165,9 +174,6 @@
             window.addEventListener("message", onMsg, true);
         });
     }
-    // =================================================================
-    // rebuildAndRenderSafely (待機順序の適正化)
-    // =================================================================
     let __buildGen = 0;
     // =================================================================
     // 4. rebuildAndRenderSafely (非同期ガード付き)
@@ -183,11 +189,16 @@
         // ★最強のガード関数: 「計算ID」か「アプリ世代」か「現在OFF」なら中断
         const guard = () => myBuildGen !== __buildGen || myAppGen !== RUN.gen || RUN.idle;
         if (!RUN.idle) {
+            console.log("setUiBusy Loading...");
             setUiBusy(true, "Loading...");
-            UI?.updateStatusDisplay?.("Loading...");
         }
         if (oldSig) {
-            await waitForChatSettled({ mustNotMatch: oldSig });
+            // ★修正: チャットページの場合のみ待機する
+            // (チャット以外やNew Chatでは待つ必要がないため、即座に更新へ進む)
+            const kind = SH.getPageInfo?.()?.kind || "other";
+            if (kind === "chat") {
+                await waitForChatSettled({ mustNotMatch: oldSig });
+            }
             if (guard())
                 return;
         }
@@ -210,14 +221,31 @@
             if (guard())
                 return;
             if (RUN.idle) {
-                // ここに来ることは稀だが念のため
-                const nav = document.getElementById("cgpt-nav");
-                if (nav)
-                    nav.classList.add("disabled");
-                UI?.updateStatusDisplay?.("OFF");
+                // 最小化＋OFF表示
+                UI?.setPanelOffState?.();
             }
             else {
                 LG.updateStatus?.();
+                // ==========================================
+                // ★追加: 画面が最新になったこの瞬間に、監視カメラを付け直す！
+                // ==========================================
+                try {
+                    // 古いカメラを外す (こちらは detachTurnObserver で合っています)
+                    if (typeof LG.detachTurnObserver === "function")
+                        LG.detachTurnObserver();
+                    if (typeof LG.stopScrollSpy === "function")
+                        LG.stopScrollSpy();
+                    // 最新のDOMに対してカメラを設置する (★ここを修正)
+                    if (typeof LG.installAutoSyncForTurns === "function") {
+                        LG.installAutoSyncForTurns();
+                    }
+                    if (typeof LG.startScrollSpy === "function") {
+                        LG.startScrollSpy();
+                    }
+                }
+                catch (err) {
+                    SH.logError("Observer re-attach failed", err);
+                }
             }
         }
         catch (e) {
@@ -259,7 +287,22 @@
                 catch { }
                 if (["home", "project", "other", "new"].includes(kind)) {
                     LG?.clearListPanelUI?.();
-                    UI?.updateStatusDisplay?.("OFF");
+                    // ここでアプリの状態を確認する！
+                    const app = window.CGTN_APP;
+                    if (app && !app.isIdle()) {
+                        // アプリ稼働中 (ON) なら "Standby"
+                        UI?.updateStatusDisplay?.("Standby");
+                        // 念のためパネルも最大化状態に戻す
+                        const nav = document.getElementById("cgpt-nav");
+                        if (nav) {
+                            nav.classList.remove("disabled");
+                            nav.classList.remove("cgtn-standby");
+                        }
+                    }
+                    else {
+                        // 最小化＋OFF表示
+                        UI?.setPanelOffState?.();
+                    }
                     __lastCid = null;
                     __gen++;
                     return;
@@ -278,15 +321,15 @@
                                 startApp("auto-start");
                             // ★追加: 何よりも先にスクロール監視を止める！
                             // これで「前の数字」が亡霊のように復活するのを防ぎます
+                            // ★修正: スクロール監視だけでなく、ターン監視も一旦止める
                             LG.stopScrollSpy?.();
+                            LG.detachTurnObserver?.();
                             try {
                                 window.CGTN_PREVIEW?.hide?.("url-change");
                             }
                             catch (e) { }
+                            console.log("setUiBusy Loading...");
                             setUiBusy(true, "Loading...");
-                            // ★重要: ここではリストを消さず(clearListPanelUI削除)、
-                            // 代わりにナビの数字だけクリアして「前の数字」が出ないようにする
-                            UI?.updateStatusDisplay?.("Loading...");
                             const panel = document.getElementById("cgpt-list-panel");
                             const wasListOpen = panel &&
                                 panel.style.display !== "none" &&
@@ -1146,6 +1189,7 @@
             nav.classList.remove("disabled");
             nav.classList.remove("cgtn-standby");
         }
+        console.log("startApp Loading...");
         UI?.updateStatusDisplay?.("Loading...");
         try {
             UI?.installUI?.();
@@ -1157,6 +1201,18 @@
             // ★ガード: initialize待ちの間にOFF→ONなどで世代が変わってたら終了
             if (myGen !== RUN.gen || RUN.idle)
                 return;
+            // ==========================================
+            // ★追加: OFF時に止めた「監視機能」をここで確実に再起動する
+            // ==========================================
+            if (typeof window.CGTN_LOGIC?.attachTurnObserver === "function") {
+                window.CGTN_LOGIC.attachTurnObserver();
+            }
+            if (typeof window.CGTN_LOGIC?.startScrollSpy === "function") {
+                window.CGTN_LOGIC.startScrollSpy();
+            }
+            // もしイベントリスナー(RUN.bag)の再登録関数があれば、それも呼ぶ
+            // 例: if (typeof bindEvents === "function") bindEvents();
+            // ==========================================
             // 復帰時は常に一覧OFF
             try {
                 LG?.setListEnabled?.(false);
@@ -1239,10 +1295,8 @@
         }
         catch { }
         const nav = document.getElementById("cgpt-nav");
-        if (nav) {
-            nav.classList.add("disabled");
-        }
-        UI?.updateStatusDisplay?.("OFF");
+        // 最小化＋OFF表示
+        UI?.setPanelOffState?.();
         RUN.bag.flush();
     }
     window.CGTN_APP = {
