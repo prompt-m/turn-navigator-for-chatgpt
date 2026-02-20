@@ -103,7 +103,7 @@
         break;
       }
     }
-
+    console.log("updateStatus:", current, " /", total);
     UI?.updateStatusDisplay?.(`${current} / ${total}`);
   };
 
@@ -142,49 +142,56 @@
     return found || 1;
   }
 
+  // src/logic.ts の bindScrollSpy と stopScrollSpy をまるごと書き換え
+
   // スクロール監視 (数値更新用)
   function bindScrollSpy() {
-    const sc = getTrueScroller();
-    if (!sc) return;
-    // 2026.2.1
-    const handler = () => {
-      // rAFではなく setTimeout で 200ms 程度に間引く
+    const handler = (e) => {
+      // ★最強の改善: スクロールした犯人を捕まえて、本物のスクローラーとして採用する！
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.querySelector("article") ||
+          target.querySelector("[data-message-author-role]"))
+      ) {
+        NS._scroller = target;
+      }
+
       if (NS._spyTimer) return;
       NS._spyTimer = window.setTimeout(() => {
         NS._spyTimer = null;
-        NS.updateStatus();
+        if (typeof NS.updateStatus === "function") NS.updateStatus();
       }, 200);
     };
 
-    // 重複登録防止
-    if (NS._scrollSpy && NS._scrollSpy.el !== sc) {
-      try {
-        NS._scrollSpy.el.removeEventListener("scroll", NS._scrollSpy.fn);
-      } catch {}
-      NS._scrollSpy = null;
-    }
     if (!NS._scrollSpy) {
-      sc.addEventListener("scroll", handler, { passive: true });
-      NS._scrollSpy = { el: sc, fn: handler };
+      // ★修正: 特定の要素ではなく window 全体で「すべてのスクロール」を待ち伏せする
+      window.addEventListener("scroll", handler, {
+        passive: true,
+        capture: true,
+      });
+      NS._scrollSpy = { el: window, fn: handler };
     }
   }
 
   // =================================================================
-  // ★スクロール監視を強制停止 (チャット切替時の誤表示防止) 2026.02.12
+  // ★スクロール監視を強制停止
   // =================================================================
   NS.stopScrollSpy = function () {
-    // リスナー解除
     if (NS._scrollSpy) {
       try {
-        NS._scrollSpy.el.removeEventListener("scroll", NS._scrollSpy.fn);
+        // ★修正: capture: true を指定して確実に監視を解除する
+        NS._scrollSpy.el.removeEventListener("scroll", NS._scrollSpy.fn, {
+          capture: true,
+        });
       } catch {}
       NS._scrollSpy = null;
     }
-    // 待機中の更新タイマーもキャンセル
     if (NS._spyTimer) {
       clearTimeout(NS._spyTimer);
       NS._spyTimer = null;
     }
+    NS._scroller = null;
   };
 
   // ★チャット別ピン・キャッシュ
@@ -219,6 +226,9 @@
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   }
+
+  // src/logic.ts の isScrollable 関数
+
   // ★差し替え: Universal版のスクロール特定ロジック
   function isScrollable(el) {
     if (!el) return false;
@@ -227,9 +237,13 @@
     if (style.display === "none") return false;
     if (style.overflowY === "hidden" || style.overflowY === "visible")
       return false;
-    return el.scrollHeight > el.clientHeight + 1;
-  }
 
+    // ▼▼▼ 修正: 高さの判定を削除！CSSの定義だけで信じる！ ▼▼▼
+    // return el.scrollHeight > el.clientHeight + 1; // ←この行を消す
+    return true;
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+  }
+  /*
   function getTrueScroller() {
     // 1) 特定済みならキャッシュを返す
     if (NS._scroller && document.body.contains(NS._scroller))
@@ -265,6 +279,60 @@
     NS._scroller = document.scrollingElement || document.documentElement;
     return NS._scroller;
   }
+*/
+
+  // src/logic.ts の getTrueScroller をまるごと置き換え 2026.02.20
+
+  function getTrueScroller() {
+    // 1) キャッシュが「本物」で、まだ画面に存在していればそれを返す
+    if (
+      NS._scroller &&
+      NS._scroller !== document.documentElement &&
+      NS._scroller !== document.scrollingElement &&
+      document.body.contains(NS._scroller)
+    ) {
+      return NS._scroller;
+    }
+
+    // 2) 会話要素の親を辿ってスクロール要素を探す
+    let found = null;
+    const clue =
+      document.querySelector("main article") ||
+      document.querySelector("main [data-message-author-role]") ||
+      document.querySelector("article") ||
+      document.querySelector("[data-message-author-role]");
+
+    if (clue) {
+      let node: Node | null = clue;
+      while (node && node !== document.body) {
+        node = node.parentNode;
+        if (node instanceof HTMLElement && isScrollable(node)) {
+          found = node;
+          break;
+        }
+      }
+    }
+
+    // 3) main要素自体
+    if (!found) {
+      const main = document.querySelector("main");
+      if (main && isScrollable(main)) {
+        found = main;
+      }
+    }
+
+    // 4) 結果の判定
+    if (found) {
+      // ★本物が見つかった場合のみキャッシュに保存する！
+      NS._scroller = found;
+      return found;
+    } else {
+      // ★見つからなかった場合は、キャッシュ(NS._scroller)を汚さずに
+      // その場限りのフォールバック(0を返すためのダミー)を返す！
+      return document.scrollingElement || document.documentElement;
+    }
+  }
+
   // ★スクロール用 厳しめ（安定版のまま）
   function headNodeOf(article) {
     if (article?.tagName === "ARTICLE") return article;
@@ -1317,7 +1385,10 @@
       const startCid = cidFromMsg || SH.getChatId?.();
       _rebuildCid = startCid || _rebuildCid;
 
-      NS._scroller = getTrueScroller();
+      // ▼▼▼ 追加: 毎回必ずスクローラーの記憶を消し、最新のDOMから探し直す！
+      NS._scroller = null;
+      getTrueScroller(); // ←これだけにする！2026.02.20
+      // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
       // 型チェックを緩和するために : any をつけます
       const nextST: any = { all: [], user: [], assistant: [], page: 1 };
@@ -3079,21 +3150,68 @@
     NS.detachTurnObserver();
 
     let to = 0;
-    const kick = () => {
-      // SH.isListOpen チェック (なければCFG直接)
-      const open =
-        typeof SH.isListOpen === "function"
-          ? SH.isListOpen()
-          : !!SH.getCFG?.()?.list?.enabled;
-      if (!open) return;
+    let safetyTo = 0; // ★追加: Mikiさん考案の「念押しタイマー」
 
+    const kick = () => {
+      // --------------------------------------------------
+      // ① 最初の更新 (300ms後)
+      // --------------------------------------------------
       clearTimeout(to);
       to = window.setTimeout(() => {
         try {
-          NS.rebuild?.();
-          NS.renderList?.(true);
-        } catch (e) {}
+          if (typeof NS.rebuild === "function") {
+            NS.rebuild();
+          }
+
+          const open =
+            typeof SH.isListOpen === "function"
+              ? SH.isListOpen()
+              : !!SH.getCFG?.()?.list?.enabled;
+
+          if (open) {
+            if (typeof NS.renderList === "function") {
+              NS.renderList(true);
+            }
+          } else {
+            if (typeof NS.updateStatus === "function") {
+              NS.updateStatus();
+            }
+          }
+        } catch (e) {
+          SH.logError("auto-sync kick failed", e);
+        }
       }, 300);
+
+      // --------------------------------------------------
+      // ② ★追加: Mikiさんの「更新ボタンと同じ処理」を自動化！
+      // 画面のガタつきが完全に終わった1.5秒後に、もう一度だけ自動更新をかける
+      // --------------------------------------------------
+      clearTimeout(safetyTo);
+      safetyTo = window.setTimeout(() => {
+        try {
+          if (typeof NS.rebuild === "function") {
+            NS.rebuild();
+          }
+
+          // 1.5秒後も、その時点のリスト開閉状態に合わせて正しく更新する
+          const open =
+            typeof SH.isListOpen === "function"
+              ? SH.isListOpen()
+              : !!SH.getCFG?.()?.list?.enabled;
+
+          if (open) {
+            if (typeof NS.renderList === "function") {
+              NS.renderList(true);
+            }
+          } else {
+            if (typeof NS.updateStatus === "function") {
+              NS.updateStatus();
+            }
+          }
+        } catch (e) {
+          SH.logError("auto-sync safety-kick failed", e);
+        }
+      }, 1500);
     };
 
     _turnObs = new MutationObserver((muts) => {

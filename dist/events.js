@@ -146,6 +146,7 @@
                     }
                     finally {
                         // 3. 終わったら数値表示に戻す
+                        console.log("refresh!");
                         LG.updateStatus?.();
                     }
                 }, 50);

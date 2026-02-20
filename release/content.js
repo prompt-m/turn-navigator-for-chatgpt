@@ -67,37 +67,23 @@
     // =================================================================
     const RUN = {
         running: false,
-        // ★追加: 世代管理とタイマー
         gen: 0,
         timer: 0,
         bag: makeBag(),
         prevListEnabled: null,
-        // getter/setter は既存のまま
+        // ★ 修正: sessionStorage を見るのをやめ、純粋なメモリ変数にする
+        // 初期値は true (Idle状態) とし、initializeで設定から正しい値がセットされる
+        _idle: true,
         get idle() {
-            if (typeof window.__CGTN_IDLE__ === "boolean")
-                return window.__CGTN_IDLE__;
-            try {
-                return sessionStorage.getItem("cgtn_idle") === "true";
-            }
-            catch {
-                return true;
-            }
+            return this._idle;
         },
         set idle(v) {
-            window.__CGTN_IDLE__ = v;
-            try {
-                if (v)
-                    sessionStorage.setItem("cgtn_idle", "true");
-                else
-                    sessionStorage.removeItem("cgtn_idle");
-            }
-            catch { }
+            this._idle = v;
         },
     };
     // 画面操作を一時的にブロック
     // ★引数 label を追加 (デフォルトは "Loading...")
     function setUiBusy(busy = true, label = "Loading...") {
-        console.log("setUiBusy1");
         const ids = ["cgpt-nav", "cgpt-list-panel"];
         for (const id of ids) {
             const host = document.getElementById(id);
@@ -111,30 +97,23 @@
         }
         // ステータス表示
         if (busy) {
-            console.log("setUiBusy2");
             // ★修正: 引数で渡された文字を表示する
             UI?.updateStatusDisplay?.(label);
         }
         else {
-            console.log("setUiBusy3");
             if (RUN.idle) {
-                console.log("setUiBusy4");
                 // 最小化＋OFF表示
                 UI?.setPanelOffState?.();
             }
             else {
-                console.log("setUiBusy5");
                 if (typeof LG.updateStatus === "function") {
-                    console.log("setUiBusy6");
                     LG.updateStatus();
                 }
                 else {
-                    console.log("setUiBusy7 Loading");
                     UI?.updateStatusDisplay?.("Loading...");
                 }
             }
         }
-        console.log("setUiBusy8");
     }
     // CSS（ローディング用スタイル）
     (function ensureBusyStyle() {
@@ -189,7 +168,6 @@
         // ★最強のガード関数: 「計算ID」か「アプリ世代」か「現在OFF」なら中断
         const guard = () => myBuildGen !== __buildGen || myAppGen !== RUN.gen || RUN.idle;
         if (!RUN.idle) {
-            console.log("setUiBusy Loading...");
             setUiBusy(true, "Loading...");
         }
         if (oldSig) {
@@ -230,18 +208,14 @@
                 // ★追加: 画面が最新になったこの瞬間に、監視カメラを付け直す！
                 // ==========================================
                 try {
-                    // 古いカメラを外す (こちらは detachTurnObserver で合っています)
                     if (typeof LG.detachTurnObserver === "function")
                         LG.detachTurnObserver();
                     if (typeof LG.stopScrollSpy === "function")
                         LG.stopScrollSpy();
-                    // 最新のDOMに対してカメラを設置する (★ここを修正)
                     if (typeof LG.installAutoSyncForTurns === "function") {
                         LG.installAutoSyncForTurns();
                     }
-                    if (typeof LG.startScrollSpy === "function") {
-                        LG.startScrollSpy();
-                    }
+                    // ※存在しない startScrollSpy の呼び出しは削除しました
                 }
                 catch (err) {
                     SH.logError("Observer re-attach failed", err);
@@ -274,6 +248,11 @@
         let __pageInfo = { kind: "other", cid: "", hasTurns: false };
         const onMessage = (ev) => {
             (async () => {
+                // ▼▼▼ 追加: 初期化が終わるまで処理を待つ（フライング防止） 2026.02.20
+                if (!__isInitialized && __initPromise) {
+                    await __initPromise;
+                }
+                // ▲▲▲
                 const d = ev && ev.data;
                 if (!d || d.source !== "cgtn")
                     return;
@@ -328,7 +307,6 @@
                                 window.CGTN_PREVIEW?.hide?.("url-change");
                             }
                             catch (e) { }
-                            console.log("setUiBusy Loading...");
                             setUiBusy(true, "Loading...");
                             const panel = document.getElementById("cgpt-list-panel");
                             const wasListOpen = panel &&
@@ -1086,165 +1064,131 @@
     // =================================================================
     // 修正後: initialize (起動遅延を極限まで短縮)
     // =================================================================
+    let __isInitialized = false;
+    let __initPromise = null;
     async function initialize() {
-        // ★変更点: 待機を100msに短縮 (1500msも待つ必要はありません)
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        // ★追加: データ構造が古ければ自動変換して保存し直す 2026.02.03
-        // (loadSettings の前にやるのがポイントです)
-        try {
-            await SH.migrateStorageIfNeeded?.();
-        }
-        catch (e) {
-            SH.logError("Migration check failed", e);
-        }
-        await SH.loadSettings(); // ここで v2 データが読み込まれる
-        // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-        // ★追加: 保存された設定を確認し、OFFならアイドルモードにする
-        // 2026.02.16
-        // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-        const cfg = SH.getCFG?.() || {};
-        // 設定が無い(undefined)場合は true(ON) とみなす
-        const isEnabled = cfg.navEnabled !== false;
-        if (!isEnabled) {
-            console.log("[cgtn] initialize: Starts in IDLE mode.");
-            RUN.running = false;
-            RUN.idle = true;
-            // ※この後に実行される UI.installUI() が RUN.idle を見て
-            // 自動的にスイッチをOFFにしてくれます。
-        }
-        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-        try {
-            await SH.migratePinsStorageOnce?.();
-        }
-        catch { }
-        // 入力設定 2026.02.11
-        enableEnterKeyGuard();
-        UI.installUI();
-        ensureFocusPark();
-        installFocusStealGuard();
-        UI.applyLang();
-        UI.clampPanelWithinViewport();
-        try {
-            const cfg = SH?.getCFG?.();
-            SH?.renderViz?.(cfg, !!cfg?.showViz);
-        }
-        catch { }
-        EV.bindEvents();
-        bindPreviewDockOnce();
-        bindBaselineAutoFollow();
-        if (USE_INJECT_URL_HOOK) {
-            injectUrlChangeHook();
-        }
-        manualInitPageInfo();
-        try {
-            SH.cleanupZeroPinRecords?.();
-        }
-        catch { }
-        // ★変更点: 初回スキャンの待機も100msに短縮
-        setTimeout(() => {
-            rebuildAndRenderSafely({ forceList: false }).catch((e) => SH.logError("[init-delayed] rebuildAndRenderSafely failed", e));
-        }, 100);
-        window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
-            passive: true,
-        });
-        window.addEventListener("orientationchange", () => UI.clampPanelWithinViewport());
-    }
-    // 2026.1.22
-    const boot = () => {
-        // UI（ヘッダー）だけは常に出す：復帰手段
-        try {
-            UI?.installUI?.();
-        }
-        catch { }
-        if (RUN.idle) {
-            // 既にIdleなら軽量モードで待機
+        if (__isInitialized)
+            return;
+        if (__initPromise)
+            return __initPromise;
+        __initPromise = (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
             try {
-                UI?.setIdleMode?.(true);
+                await SH.migrateStorageIfNeeded?.();
+            }
+            catch (e) { }
+            await SH.loadSettings();
+            const cfg = SH.getCFG?.() || {};
+            const isEnabled = cfg.navEnabled !== false;
+            // ★ ここでアプリの初期状態が完全に確定する
+            if (!isEnabled) {
+                console.log("[cgtn] initialize: Starts in IDLE mode.");
+                RUN.idle = true;
+            }
+            else {
+                RUN.idle = false;
+            }
+            try {
+                await SH.migratePinsStorageOnce?.();
             }
             catch { }
+            enableEnterKeyGuard();
+            UI.installUI(); // ★ RUN.idleを見て、最初から正しい姿で描画される
+            ensureFocusPark();
+            installFocusStealGuard();
+            UI.applyLang();
+            UI.clampPanelWithinViewport();
+            try {
+                SH?.renderViz?.(cfg, !!cfg?.showViz);
+            }
+            catch { }
+            EV.bindEvents();
+            bindPreviewDockOnce();
+            bindBaselineAutoFollow();
+            if (USE_INJECT_URL_HOOK)
+                injectUrlChangeHook();
+            manualInitPageInfo();
+            try {
+                SH.cleanupZeroPinRecords?.();
+            }
+            catch { }
+            window.addEventListener("resize", () => UI.clampPanelWithinViewport(), {
+                passive: true,
+            });
+            window.addEventListener("orientationchange", () => UI.clampPanelWithinViewport());
+            __isInitialized = true;
+        })();
+        return __initPromise;
+    }
+    // 2026.01.22 2026.02.20
+    // =================================================================
+    //  アプリの本当の入り口 (boot)
+    // =================================================================
+    const boot = async () => {
+        // 1. まず初期化とDOM生成を完全に終わらせる
+        await initialize();
+        // 2. 初期化の結果、もしOFF設定なら静かに待機して終了
+        if (RUN.idle) {
+            console.log("[cgtn] Booted in IDLE mode. Waiting for user to turn ON.");
             return;
         }
-        // 通常起動
+        // 3. ON設定なら、ここで初めて起動処理(startApp)へ進む
         startApp("boot");
     };
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot, { once: true });
+        document.addEventListener("DOMContentLoaded", () => boot(), { once: true });
     }
     else {
         boot();
     }
     // =================================================================
-    // 2. startApp (ONにする)
+    // 2. startApp (純粋にONにするだけの機能)
     // =================================================================
     async function startApp(reason = "start") {
+        if (!__isInitialized && __initPromise)
+            await __initPromise;
+        else if (!__isInitialized)
+            await initialize();
         if (RUN.running)
             return;
         RUN.running = true;
         RUN.idle = false;
-        // ★重要: 世代を進めて「このON」を最新とする
         const myGen = ++RUN.gen;
+        console.log(`[cgtn] startApp (${reason})`);
         // UIをON状態へ
         const nav = document.getElementById("cgpt-nav");
         if (nav) {
             nav.classList.remove("disabled");
             nav.classList.remove("cgtn-standby");
         }
-        console.log("startApp Loading...");
         UI?.updateStatusDisplay?.("Loading...");
         try {
-            UI?.installUI?.();
             UI?.setIdleMode?.(false);
         }
         catch { }
+        // OFF時に止めた「監視機能」の再起動
+        if (typeof window.CGTN_LOGIC?.installAutoSyncForTurns === "function") {
+            window.CGTN_LOGIC.installAutoSyncForTurns();
+        }
         try {
-            await initialize();
-            // ★ガード: initialize待ちの間にOFF→ONなどで世代が変わってたら終了
+            LG?.setListEnabled?.(false);
+            const chk = document.getElementById("cgpt-list-toggle");
+            if (chk instanceof HTMLInputElement)
+                chk.checked = false;
+            LG?.updatePinOnlyBadge?.();
+            LG?.updateListChatTitle?.();
+        }
+        catch { }
+        if (RUN.timer) {
+            clearTimeout(RUN.timer);
+            RUN.timer = 0;
+        }
+        RUN.timer = window.setTimeout(() => {
+            RUN.timer = 0;
             if (myGen !== RUN.gen || RUN.idle)
                 return;
-            // ==========================================
-            // ★追加: OFF時に止めた「監視機能」をここで確実に再起動する
-            // ==========================================
-            if (typeof window.CGTN_LOGIC?.attachTurnObserver === "function") {
-                window.CGTN_LOGIC.attachTurnObserver();
-            }
-            if (typeof window.CGTN_LOGIC?.startScrollSpy === "function") {
-                window.CGTN_LOGIC.startScrollSpy();
-            }
-            // もしイベントリスナー(RUN.bag)の再登録関数があれば、それも呼ぶ
-            // 例: if (typeof bindEvents === "function") bindEvents();
-            // ==========================================
-            // 復帰時は常に一覧OFF
-            try {
-                LG?.setListEnabled?.(false);
-                const chk = document.getElementById("cgpt-list-toggle");
-                if (chk instanceof HTMLInputElement)
-                    chk.checked = false;
-            }
-            catch { }
-            try {
-                LG?.updatePinOnlyBadge?.();
-                LG?.updateListChatTitle?.();
-            }
-            catch { }
-            // ★追加: 既存タイマーがあれば消す（保険）
-            if (RUN.timer) {
-                clearTimeout(RUN.timer);
-                RUN.timer = 0;
-            }
-            // ターン数再取得（タイマーセット）
-            RUN.timer = window.setTimeout(() => {
-                RUN.timer = 0; // 実行されたのでクリア
-                // ★ガード: 発火時点でも世代確認
-                if (myGen !== RUN.gen || RUN.idle)
-                    return;
-                // 引数に「この時の世代」を渡す
-                rebuildAndRenderSafely({ appGen: myGen }).catch(() => { });
-            }, 50);
-        }
-        catch (e) {
-            SH.logError("[cgtn] start failed", reason, e);
-            LG?.setListEnabled?.(false);
-        }
+            rebuildAndRenderSafely({ appGen: myGen }).catch(() => { });
+        }, 50);
     }
     // =================================================================
     // 3. stopApp (OFFにする)
