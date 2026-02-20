@@ -50,7 +50,8 @@
 
     // 1. アプリ停止中 (OFF) なら即帰る
     if (app?.isIdle?.()) {
-      // 最小化＋OFF表示 (Mikiさん作の最強関数)
+      // 最小化＋OFF表示
+      console.log("setPanelOffState5 updateStatus");
       UI?.setPanelOffState?.();
       return;
     }
@@ -243,43 +244,6 @@
     return true;
     // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
   }
-  /*
-  function getTrueScroller() {
-    // 1) 特定済みならキャッシュを返す
-    if (NS._scroller && document.body.contains(NS._scroller))
-      return NS._scroller;
-
-    // 2) 会話要素の親を辿ってスクロール要素を探す
-    const clue =
-      document.querySelector("main article") ||
-      document.querySelector("main [data-message-author-role]") ||
-      document.querySelector("article") ||
-      document.querySelector("[data-message-author-role]");
-
-    if (clue) {
-      // ★修正: 型を Node | null に明示する
-      let node: Node | null = clue;
-      while (node && node !== document.body) {
-        node = node.parentNode;
-        if (node instanceof HTMLElement && isScrollable(node)) {
-          NS._scroller = node;
-          return node;
-        }
-      }
-    }
-
-    // 3) main要素自体
-    const main = document.querySelector("main");
-    if (main && isScrollable(main)) {
-      NS._scroller = main;
-      return main;
-    }
-
-    // 4) 最後の砦
-    NS._scroller = document.scrollingElement || document.documentElement;
-    return NS._scroller;
-  }
-*/
 
   // src/logic.ts の getTrueScroller をまるごと置き換え 2026.02.20
 

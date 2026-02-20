@@ -103,6 +103,7 @@
         else {
             if (RUN.idle) {
                 // 最小化＋OFF表示
+                console.log("setPanelOffState1 setUiBusy");
                 UI?.setPanelOffState?.();
             }
             else {
@@ -200,6 +201,7 @@
                 return;
             if (RUN.idle) {
                 // 最小化＋OFF表示
+                console.log("setPanelOffState2 rebuildAndRenderSafely");
                 UI?.setPanelOffState?.();
             }
             else {
@@ -280,6 +282,7 @@
                     }
                     else {
                         // 最小化＋OFF表示
+                        console.log("setPanelOffState3 bindCgtnMessageOnce");
                         UI?.setPanelOffState?.();
                     }
                     __lastCid = null;
@@ -1185,9 +1188,20 @@
         }
         RUN.timer = window.setTimeout(() => {
             RUN.timer = 0;
-            if (myGen !== RUN.gen || RUN.idle)
-                return;
+            // まず最初の計算を走らせる（この時はまだズレる可能性がある）
             rebuildAndRenderSafely({ appGen: myGen }).catch(() => { });
+            // ▼▼▼ 追加: 画面の描画が完全に落ち着いた1.5秒後に、念押しでもう一度計算する！
+            setTimeout(() => {
+                if (myGen === RUN.gen && !RUN.idle) {
+                    if (typeof window.CGTN_LOGIC?.rebuild === "function") {
+                        window.CGTN_LOGIC.rebuild();
+                    }
+                    if (typeof window.CGTN_LOGIC?.updateStatus === "function") {
+                        window.CGTN_LOGIC.updateStatus();
+                    }
+                }
+            }, 1500);
+            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         }, 50);
     }
     // =================================================================
@@ -1240,6 +1254,7 @@
         catch { }
         const nav = document.getElementById("cgpt-nav");
         // 最小化＋OFF表示
+        console.log("setPanelOffState4 stopApp");
         UI?.setPanelOffState?.();
         RUN.bag.flush();
     }

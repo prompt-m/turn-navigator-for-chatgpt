@@ -589,7 +589,8 @@ input:checked + .slider:before {
 
       // ★追加: スイッチだけでなく「パネル全体」の見た目も即座に同期する
       if (isIdle) {
-        // Mikiさん作の関数で、パネル最小化＆「OFF」文字を即適用
+        // パネル最小化＆「OFF」文字を即適用
+        console.log("setPanelOffState6 installUI");
         window.CGTN_UI?.setPanelOffState?.();
       } else {
         // ONの場合は、とりあえず「Standby」で初期化しておく
@@ -868,7 +869,6 @@ input:checked + .slider:before {
   // ★追加: パネルを確実にOFF状態（最小化＋OFF表示）にする専用関数
   NS.setPanelOffState = function () {
     const nav = document.getElementById("cgpt-nav");
-    console.log("setPanelOffState nav:", nav);
     if (nav) {
       nav.classList.add("disabled"); // 確実に見えなくする
     }
@@ -881,7 +881,6 @@ input:checked + .slider:before {
     // ==========================================
     // 文字も確実にOFFにする（NSの中なので自身を呼ぶ）
     if (typeof NS.updateStatusDisplay === "function") {
-      console.log("！setPanelOffState OFF");
       NS.updateStatusDisplay("OFF");
     }
   };
