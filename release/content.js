@@ -62,58 +62,86 @@
             },
         };
     }
-    // =================================================================
-    // 1. RUNオブジェクトの定義変更
-    // =================================================================
     const RUN = {
         running: false,
         gen: 0,
         timer: 0,
         bag: makeBag(),
         prevListEnabled: null,
-        // ★ 修正: sessionStorage を見るのをやめ、純粋なメモリ変数にする
-        // 初期値は true (Idle状態) とし、initializeで設定から正しい値がセットされる
-        _idle: true,
+        _state: "OFF",
+        // 組み込み流：状態遷移を一元管理するゲートキーパー
+        changeState(newState, reason) {
+            if (this._state === newState)
+                return; // 変化なしなら無視
+            // ログに軌跡を残す
+            console.log(`[CGTN:State] ${this._state} -> ${newState} (Trigger: ${reason})`);
+            window.CGTN_SHARED?.addLog?.(`State: ${this._state} -> ${newState} (${reason})`, "DEBUG");
+            this._state = newState;
+            // 状態が変わったら「必ず」UI更新関数を呼ぶ
+            if (typeof window.CGTN_LOGIC?.updateStatus === "function") {
+                window.CGTN_LOGIC.updateStatus();
+            }
+        },
+        get state() {
+            return this._state;
+        },
+        // (互換性維持)
         get idle() {
-            return this._idle;
+            return this._state === "OFF";
         },
         set idle(v) {
-            this._idle = v;
+            if (v)
+                this.changeState("OFF", "legacy-idle-setter");
         },
     };
+    /*
     // 画面操作を一時的にブロック
     // ★引数 label を追加 (デフォルトは "Loading...")
     function setUiBusy(busy = true, label = "Loading...") {
+      const ids = ["cgpt-nav", "cgpt-list-panel"];
+      for (const id of ids) {
+        const host = document.getElementById(id);
+        if (!host) continue;
+        host.classList.toggle("loading", busy);
+        // 膜（mask）の処理は前回削除したのでそのまま
+        const mask = host.querySelector(":scope > .cgtn-mask");
+        if (mask) mask.remove();
+      }
+  
+      // ステータス表示
+      if (busy) {
+        // ★修正: 引数で渡された文字を表示する
+        UI?.updateStatusDisplay?.(label);
+      } else {
+        if (RUN.idle) {
+          // 最小化＋OFF表示
+          console.log("setPanelOffState1 setUiBusy");
+          UI?.setPanelOffState?.();
+        } else {
+          if (typeof LG.updateStatus === "function") {
+            LG.updateStatus();
+          } else {
+            UI?.updateStatusDisplay?.("Loading...");
+          }
+        }
+      }
+    }
+  */
+    // UIへの文字渡しをやめ、状態遷移だけに専念 2026.02.20
+    function setUiBusy(busy = true, reason = "ui-busy") {
         const ids = ["cgpt-nav", "cgpt-list-panel"];
         for (const id of ids) {
             const host = document.getElementById(id);
             if (!host)
                 continue;
             host.classList.toggle("loading", busy);
-            // 膜（mask）の処理は前回削除したのでそのまま
             const mask = host.querySelector(":scope > .cgtn-mask");
             if (mask)
                 mask.remove();
         }
-        // ステータス表示
-        if (busy) {
-            // ★修正: 引数で渡された文字を表示する
-            UI?.updateStatusDisplay?.(label);
-        }
-        else {
-            if (RUN.idle) {
-                // 最小化＋OFF表示
-                console.log("setPanelOffState1 setUiBusy");
-                UI?.setPanelOffState?.();
-            }
-            else {
-                if (typeof LG.updateStatus === "function") {
-                    LG.updateStatus();
-                }
-                else {
-                    UI?.updateStatusDisplay?.("Loading...");
-                }
-            }
+        // 状態遷移だけを行う（文字の更新は changeState に任せる）
+        if (busy && RUN.state !== "OFF") {
+            RUN.changeState("LOADING", `setUiBusy:${reason}`);
         }
     }
     // CSS（ローディング用スタイル）
@@ -199,25 +227,52 @@
             // 最終更新
             if (guard())
                 return;
+            /*
             if (RUN.idle) {
-                // 最小化＋OFF表示
-                console.log("setPanelOffState2 rebuildAndRenderSafely");
+              // 最小化＋OFF表示
+              console.log("setPanelOffState2 rebuildAndRenderSafely");
+      
+              UI?.setPanelOffState?.();
+            } else {
+              LG.updateStatus?.();
+              // ==========================================
+              // ★追加: 画面が最新になったこの瞬間に、監視カメラを付け直す！
+              // ==========================================
+              try {
+                if (typeof LG.detachTurnObserver === "function")
+                  LG.detachTurnObserver();
+                if (typeof LG.stopScrollSpy === "function") LG.stopScrollSpy();
+      
+                if (typeof LG.installAutoSyncForTurns === "function") {
+                  LG.installAutoSyncForTurns();
+                }
+                // ※存在しない startScrollSpy の呼び出しは削除しました
+              } catch (err) {
+                SH.logError("Observer re-attach failed", err);
+              }
+            }
+      */
+            if (RUN.state === "OFF") {
                 UI?.setPanelOffState?.();
             }
             else {
-                LG.updateStatus?.();
-                // ==========================================
-                // ★追加: 画面が最新になったこの瞬間に、監視カメラを付け直す！
-                // ==========================================
+                // ★ DOM計算が完了したので、結果に応じて状態を遷移
+                const kind = SH.getPageInfo?.()?.kind || "other";
+                const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
+                if (kind === "chat" && turnsCount > 0) {
+                    RUN.changeState("ACTIVE", "rebuild-complete");
+                }
+                else {
+                    RUN.changeState("STANDBY", "rebuild-complete-empty");
+                }
+                // 監視カメラの付け直しはそのまま残す
                 try {
                     if (typeof LG.detachTurnObserver === "function")
                         LG.detachTurnObserver();
                     if (typeof LG.stopScrollSpy === "function")
                         LG.stopScrollSpy();
-                    if (typeof LG.installAutoSyncForTurns === "function") {
+                    if (typeof LG.installAutoSyncForTurns === "function")
                         LG.installAutoSyncForTurns();
-                    }
-                    // ※存在しない startScrollSpy の呼び出しは削除しました
                 }
                 catch (err) {
                     SH.logError("Observer re-attach failed", err);
@@ -1258,11 +1313,20 @@
         UI?.setPanelOffState?.();
         RUN.bag.flush();
     }
+    // 2026.02.20 ２度目の大手術
     window.CGTN_APP = {
-        start: startApp,
-        stop: stopApp,
-        isRunning: () => RUN.running,
-        isIdle: () => RUN.idle,
+        start: (reason = "start") => {
+            RUN.running = true;
+            RUN.changeState("LOADING", `app-start:${reason}`);
+        },
+        stop: (reason = "stop") => {
+            RUN.running = false;
+            RUN.changeState("OFF", `app-stop:${reason}`);
+        },
+        isRunning: () => RUN.state !== "OFF",
+        isIdle: () => RUN.state === "OFF",
+        getState: () => RUN.state,
+        changeState: (s, reason) => RUN.changeState(s, reason),
     };
     let _turnObs = null;
     let _observedRoot = null;
