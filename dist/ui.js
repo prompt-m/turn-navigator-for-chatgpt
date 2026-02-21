@@ -314,7 +314,8 @@ input:checked + .slider:before {
   transform: translateY(0);
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
 }
-
+@keyframes cgtn-blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+.cgtn-pill-btn.blinking { animation: cgtn-blink 1s linear infinite; background: #000; color: #fff; }
 #cgpt-list-btn.active {
   background: #0c640d;
   color: #fff;

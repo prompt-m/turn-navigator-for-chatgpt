@@ -44,43 +44,42 @@
       // ▲▲▲▲▲▲
 
       // ▼ 一覧表示トグル (#cgpt-list-toggle)
+      // events.ts (一覧表示トグルの部分)
       if (t.id === "cgpt-list-toggle") {
         const on = t.checked;
         const btn = document.getElementById("cgpt-list-btn");
         if (btn) btn.classList.toggle("active", on);
-        // ★ 今回のクリックに番号を振る
+
         const myGen = ++listToggleGen;
         if (on) {
-          // 1. Loading表示
-          UI.updateStatusDisplay?.("List Gen...");
+          // ★ サブステート開始：生成中（ボタンにblinkingクラスをつける）
+          if (btn) btn.classList.add("blinking");
 
-          // 2. 遅延実行
           setTimeout(async () => {
-            // ★チェック: 待っている間に別のクリックがあったら、もう何もしない
             if (myGen !== listToggleGen) return;
 
             try {
               if (typeof LG.setListEnabled === "function") {
-                // ここで待機。途中でOFFにされると、logic側のキャンセル機能により
-                // この await はすぐに false で返ってくる
                 await LG.setListEnabled(true);
               }
             } catch (err) {
               LG.logError?.("List Gen Failed", err);
+            } finally {
+              // ★ サブステート終了：完了（ブリンク解除）
+              if (myGen === listToggleGen && btn) {
+                btn.classList.remove("blinking");
+              }
             }
-
-            // ★チェック: 処理が終わった後も、まだ自分が最新世代か確認
-            if (myGen === listToggleGen) {
-              if (typeof LG.updateStatus === "function") LG.updateStatus();
+            // メインの状態(ACTIVE等)に従って数字などを再描画
+            if (
+              myGen === listToggleGen &&
+              typeof LG.updateStatus === "function"
+            ) {
+              LG.updateStatus();
             }
           }, 50);
         } else {
-          // OFFにする時
-          // ★ logic側で古いON処理をキャンセルしてくれるので、ここは投げるだけでOK
-          if (typeof LG.setListEnabled === "function") {
-            LG.setListEnabled(false);
-          }
-          // 即座に数値更新
+          if (typeof LG.setListEnabled === "function") LG.setListEnabled(false);
           if (typeof LG.updateStatus === "function") LG.updateStatus();
         }
       }
@@ -130,7 +129,11 @@
 
         // 1. "Refresh..." と表示
         //console.log(" updateStatusDisplay Refresh...");
-        UI.updateStatusDisplay?.("Refresh...");
+        //        UI.updateStatusDisplay?.("Refresh...");
+
+        // ★ 1. 状態をLOADINGへ。表示文字を "Refresh..." にする。
+        const app = (window as any).CGTN_APP;
+        app?.changeState?.("LOADING", "click-refresh", "Refresh...");
 
         // 2. UI描画をブロックしないよう少し待ってから処理開始
         setTimeout(async () => {
@@ -140,13 +143,14 @@
               await LG.renderList(true);
             }
           } catch (err) {
-            // エラー時はログに保存
             LG.logError?.("Refresh Failed", err);
-          } finally {
-            // 3. 終わったら数値表示に戻す
-            console.log("refresh!");
-            LG.updateStatus?.();
           }
+          // ★ 2. 終わったら、実際のターン数を見て状態を確定（Loading完了イベント）
+          const total = LG.ST?.all?.length || 0;
+          app?.changeState?.(
+            total > 0 ? "ACTIVE" : "STANDBY",
+            "refresh-complete",
+          );
         }, 50);
         return;
       }

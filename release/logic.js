@@ -31,14 +31,21 @@
             (list && (node === list || list.contains(node))));
     }
     // stateに対応する表示切替え
-    // src/logic.ts (30行目付近〜)
     NS.updateStatus = function updateStatus() {
         const SH = window.CGTN_SHARED;
         const UI = window.CGTN_UI;
         const app = window.CGTN_APP;
         // 1. システムの中枢から「現在の確固たる状態」をもらう
         const state = app?.getState ? app.getState() : "OFF";
-        // 2. 状態遷移表に基づく絶対的なUI制御
+        // ▼▼▼ 追加: マスク(操作不可)の制御をここで一元管理 ▼▼▼
+        const ids = ["cgpt-nav", "cgpt-list-panel"];
+        const isBusy = state === "LOADING"; // LOADING中だけ true
+        for (const id of ids) {
+            const host = document.getElementById(id);
+            if (host)
+                host.classList.toggle("loading", isBusy);
+        }
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         // 状態①・③：OFF（ナビゲートOFF）
         if (state === "OFF") {
             UI?.setPanelOffState?.();
@@ -50,9 +57,11 @@
             nav.classList.remove("disabled", "cgtn-standby");
         }
         // 遷移状態：LOADING
-        // ※ ここで絶対に "Loading..." を維持し、DOMが0件でもStandbyに落とさない！
         if (state === "LOADING") {
-            UI?.updateStatusDisplay?.("Loading...");
+            const msg = typeof app?.getLoadingMsg === "function"
+                ? app.getLoadingMsg()
+                : "Loading...";
+            UI?.updateStatusDisplay?.(msg);
             return;
         }
         // 状態②：STANDBY（ターン無・ナビゲートON）

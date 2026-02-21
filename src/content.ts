@@ -97,13 +97,18 @@
     prevListEnabled: null as null | boolean,
 
     _state: "OFF" as AppState,
+    _loadingMsg: "Loading...", // ★ 追加：LOADING中の表示文字
 
-    changeState(newState: AppState, reason: string) {
-      if (this._state === newState) return; // 変化なしなら無視
+    // ★ 第3引数(customMsg)を追加
+    changeState(newState: AppState, reason: string, customMsg?: string) {
+      if (this._state === newState && newState !== "LOADING") return;
 
-      // ログに軌跡を残す
-      const codeOld = STATE_CODE[this._state];
-      const codeNew = STATE_CODE[newState];
+      if (newState === "LOADING") {
+        this._loadingMsg = customMsg || "Loading...";
+      }
+
+      const codeOld = STATE_CODE[this._state] ?? this._state;
+      const codeNew = STATE_CODE[newState] ?? newState;
       const logStr = `State: [${codeOld}]${this._state} -> [${codeNew}]${newState} (${reason})`;
 
       console.log(`[CGTN] ${logStr}`);
@@ -111,13 +116,15 @@
 
       this._state = newState;
 
-      // 状態が変わったら「必ず」UI更新関数を呼ぶ
       if (typeof window.CGTN_LOGIC?.updateStatus === "function") {
         window.CGTN_LOGIC.updateStatus();
       }
     },
     get state() {
       return this._state;
+    },
+    getLoadingMsg() {
+      return this._loadingMsg;
     },
     get idle() {
       return this._state === "OFF";
@@ -126,23 +133,6 @@
       if (v) this.changeState("OFF", "legacy-idle-setter");
     },
   };
-
-  // UIへの文字渡しをやめ、状態遷移だけに専念 2026.02.20
-  function setUiBusy(busy = true, reason = "ui-busy") {
-    const ids = ["cgpt-nav", "cgpt-list-panel"];
-    for (const id of ids) {
-      const host = document.getElementById(id);
-      if (!host) continue;
-      host.classList.toggle("loading", busy);
-      const mask = host.querySelector(":scope > .cgtn-mask");
-      if (mask) mask.remove();
-    }
-
-    // 状態遷移だけを行う（文字の更新は changeState に任せる）
-    if (busy && RUN.state !== "OFF") {
-      RUN.changeState("LOADING", `setUiBusy:${reason}`);
-    }
-  }
 
   // CSS（ローディング用スタイル）
   (function ensureBusyStyle() {
@@ -211,7 +201,8 @@
       myBuildGen !== __buildGen || myAppGen !== RUN.gen || RUN.idle;
 
     if (!RUN.idle) {
-      setUiBusy(true, "Loading...");
+      //      setUiBusy(true, "Loading...");
+      RUN.changeState("LOADING", "rebuild-start", "Loading...");
     }
 
     if (oldSig) {
@@ -277,9 +268,9 @@
       }
     } finally {
       // ★ガード: 両方の世代が一致している時だけ Busy を解除
-      if (myBuildGen === __buildGen && myAppGen === RUN.gen) {
-        setUiBusy(false);
-      }
+      //      if (myBuildGen === __buildGen && myAppGen === RUN.gen) {
+      //       setUiBusy(false);
+      //      }
     }
   }
 
@@ -357,8 +348,8 @@
               try {
                 window.CGTN_PREVIEW?.hide?.("url-change");
               } catch (e) {}
-              setUiBusy(true, "Loading...");
-
+              //              setUiBusy(true, "Loading...");
+              RUN.changeState("LOADING", "rebuild-start", "Loading...");
               const panel = document.getElementById("cgpt-list-panel");
               const wasListOpen =
                 panel &&
@@ -1369,7 +1360,7 @@
     RUN.gen++;
 
     // ★念のためBusy状態も解除（Loading表示が残るのを防ぐ）
-    setUiBusy(false);
+    //setUiBusy(false);
 
     try {
       LG?.stopScrollSpy?.();
@@ -1412,19 +1403,30 @@
   }
 
   // 2026.02.20 ２度目の大手術
+  //  (window as any).CGTN_APP = {
+  //    start: (reason: string = "start") => {
+  //      RUN.running = true;
+  //      RUN.changeState("LOADING", `app-start:${reason}`);
+  //    },
+  //    stop: (reason: string = "stop") => {
+  //      RUN.running = false;
+  //      RUN.changeState("OFF", `app-stop:${reason}`);
+  //    },
+  //    isRunning: () => RUN.state !== "OFF",
+  //    isIdle: () => RUN.state === "OFF",
+  //    getState: () => RUN.state,
+  //    changeState: (s: AppState, reason: string) => RUN.changeState(s, reason),
+  //  };
+  // 2026.02.20 ２度目の大手術（★修正版）
   (window as any).CGTN_APP = {
-    start: (reason: string = "start") => {
-      RUN.running = true;
-      RUN.changeState("LOADING", `app-start:${reason}`);
-    },
-    stop: (reason: string = "stop") => {
-      RUN.running = false;
-      RUN.changeState("OFF", `app-stop:${reason}`);
-    },
+    start: startApp, // ← 本物の startApp 関数をストレートに呼ぶ！
+    stop: stopApp, // ← 本物の stopApp 関数をストレートに呼ぶ！
     isRunning: () => RUN.state !== "OFF",
     isIdle: () => RUN.state === "OFF",
     getState: () => RUN.state,
-    changeState: (s: AppState, reason: string) => RUN.changeState(s, reason),
+    changeState: (s: AppState, reason: string, msg?: string) =>
+      RUN.changeState(s, reason, msg),
+    getLoadingMsg: () => RUN.getLoadingMsg(),
   };
 
   let _turnObs = null;
