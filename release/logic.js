@@ -30,63 +30,65 @@
         return ((nav && (node === nav || nav.contains(node))) ||
             (list && (node === list || list.contains(node))));
     }
-    // src/logic.ts の updateStatus (完全版)
+    // stateに対応する表示切替え
+    // src/logic.ts (30行目付近〜)
     NS.updateStatus = function updateStatus() {
         const SH = window.CGTN_SHARED;
         const UI = window.CGTN_UI;
-        const nav = document.getElementById("cgpt-nav");
         const app = window.CGTN_APP;
-        // 1. アプリ停止中 (OFF) なら即帰る
-        if (app?.isIdle?.()) {
-            // 最小化＋OFF表示
-            console.log("setPanelOffState5 updateStatus");
+        // 1. システムの中枢から「現在の確固たる状態」をもらう
+        const state = app?.getState ? app.getState() : "OFF";
+        // 2. 状態遷移表に基づく絶対的なUI制御
+        // 状態①・③：OFF（ナビゲートOFF）
+        if (state === "OFF") {
             UI?.setPanelOffState?.();
             return;
         }
-        // 2. ON確定 -> パネルを開く
+        // ON状態ならパネルを表示・操作可能にする
+        const nav = document.getElementById("cgpt-nav");
         if (nav) {
-            nav.classList.remove("disabled");
-            nav.classList.remove("cgtn-standby");
+            nav.classList.remove("disabled", "cgtn-standby");
         }
-        // ==========================================
-        // 3. ★追加: 亡霊ガード！ チャットページ以外ならStandby
-        // ==========================================
-        const kind = SH?.getPageInfo?.()?.kind;
-        if (kind && ["home", "project", "other", "new"].includes(kind)) {
+        // 遷移状態：LOADING
+        // ※ ここで絶対に "Loading..." を維持し、DOMが0件でもStandbyに落とさない！
+        if (state === "LOADING") {
+            UI?.updateStatusDisplay?.("Loading...");
+            return;
+        }
+        // 状態②：STANDBY（ターン無・ナビゲートON）
+        if (state === "STANDBY") {
             UI?.updateStatusDisplay?.("Standby");
             return;
         }
-        // ==========================================
-        // 4. リスト(ターン数)を確認する
-        const list = NS.ST?.all || [];
-        const total = list.length;
-        // 5. 判定ロジック
-        // 「ターンが0」なら Standby (②)
-        if (total === 0) {
-            UI?.updateStatusDisplay?.("Standby");
-            return;
-        }
-        // 6. ターンがある (④)
-        // ここまで来れば「ターン有り」なので、位置計算して表示
-        const sc = NS._scroller || document.scrollingElement || document.documentElement;
-        const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
-        const yStar = (sc.scrollTop || 0) + anchorY;
-        const eps = Number(SH.getCFG?.()?.eps) || 20;
-        let current = 0;
-        for (let i = 0; i < total; i++) {
-            const el = list[i];
-            const top = typeof NS.articleTop === "function"
-                ? NS.articleTop(sc, el)
-                : el.offsetTop;
-            if (top <= yStar + eps) {
-                current = i + 1;
+        // 状態④：ACTIVE（ターン有・ナビゲートON）
+        if (state === "ACTIVE") {
+            const list = NS.ST?.all || [];
+            const total = list.length;
+            // フェールセーフ：万が一ACTIVEなのにDOMが0件ならStandby表示に落とす
+            if (total === 0) {
+                UI?.updateStatusDisplay?.("Standby");
+                return;
             }
-            else {
-                break;
+            // ACTIVE専用のスクロール位置計算と数字(n/m)表示
+            const sc = NS._scroller || document.scrollingElement || document.documentElement;
+            const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
+            const yStar = (sc.scrollTop || 0) + anchorY;
+            const eps = Number(SH.getCFG?.()?.eps) || 20;
+            let current = 0;
+            for (let i = 0; i < total; i++) {
+                const el = list[i];
+                const top = typeof NS.articleTop === "function"
+                    ? NS.articleTop(sc, el)
+                    : el.offsetTop;
+                if (top <= yStar + eps) {
+                    current = i + 1;
+                }
+                else {
+                    break;
+                }
             }
+            UI?.updateStatusDisplay?.(`${current} / ${total}`);
         }
-        console.log("updateStatus:", current, " /", total);
-        UI?.updateStatusDisplay?.(`${current} / ${total}`);
     };
     // ★最適化: 二分探索で現在地を探す（計算量 O(N) -> O(log N)） 2026.02.01
     function calcCurrentTurnIndex(sc) {

@@ -62,6 +62,14 @@
             },
         };
     }
+    // 状態番号の定義（組み込み流ステータスコード）
+    // ★ 変更：Mikiの状態遷移表に合わせたステータスコード
+    const STATE_CODE = {
+        OFF: 0, // 表の①、③（監視停止・スリープ状態）
+        STANDBY: 2, // 表の②（ターン無・ナビON）
+        ACTIVE: 4, // 表の④（ターン有・ナビON）
+        LOADING: 99, // 遷移状態（表の「Loading...」）
+    };
     const RUN = {
         running: false,
         gen: 0,
@@ -69,13 +77,15 @@
         bag: makeBag(),
         prevListEnabled: null,
         _state: "OFF",
-        // 組み込み流：状態遷移を一元管理するゲートキーパー
         changeState(newState, reason) {
             if (this._state === newState)
                 return; // 変化なしなら無視
             // ログに軌跡を残す
-            console.log(`[CGTN:State] ${this._state} -> ${newState} (Trigger: ${reason})`);
-            window.CGTN_SHARED?.addLog?.(`State: ${this._state} -> ${newState} (${reason})`, "DEBUG");
+            const codeOld = STATE_CODE[this._state];
+            const codeNew = STATE_CODE[newState];
+            const logStr = `State: [${codeOld}]${this._state} -> [${codeNew}]${newState} (${reason})`;
+            console.log(`[CGTN] ${logStr}`);
+            window.CGTN_SHARED?.addLog?.(logStr, "DEBUG");
             this._state = newState;
             // 状態が変わったら「必ず」UI更新関数を呼ぶ
             if (typeof window.CGTN_LOGIC?.updateStatus === "function") {
@@ -85,7 +95,6 @@
         get state() {
             return this._state;
         },
-        // (互換性維持)
         get idle() {
             return this._state === "OFF";
         },
@@ -94,39 +103,6 @@
                 this.changeState("OFF", "legacy-idle-setter");
         },
     };
-    /*
-    // 画面操作を一時的にブロック
-    // ★引数 label を追加 (デフォルトは "Loading...")
-    function setUiBusy(busy = true, label = "Loading...") {
-      const ids = ["cgpt-nav", "cgpt-list-panel"];
-      for (const id of ids) {
-        const host = document.getElementById(id);
-        if (!host) continue;
-        host.classList.toggle("loading", busy);
-        // 膜（mask）の処理は前回削除したのでそのまま
-        const mask = host.querySelector(":scope > .cgtn-mask");
-        if (mask) mask.remove();
-      }
-  
-      // ステータス表示
-      if (busy) {
-        // ★修正: 引数で渡された文字を表示する
-        UI?.updateStatusDisplay?.(label);
-      } else {
-        if (RUN.idle) {
-          // 最小化＋OFF表示
-          console.log("setPanelOffState1 setUiBusy");
-          UI?.setPanelOffState?.();
-        } else {
-          if (typeof LG.updateStatus === "function") {
-            LG.updateStatus();
-          } else {
-            UI?.updateStatusDisplay?.("Loading...");
-          }
-        }
-      }
-    }
-  */
     // UIへの文字渡しをやめ、状態遷移だけに専念 2026.02.20
     function setUiBusy(busy = true, reason = "ui-busy") {
         const ids = ["cgpt-nav", "cgpt-list-panel"];
