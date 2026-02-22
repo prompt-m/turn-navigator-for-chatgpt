@@ -342,17 +342,14 @@
             })();
         };
         window.addEventListener("message", onMessage, true);
+        // ★EventListenerは閉じずに開けっ放しにする！ 2026.02.22
         RUN.bag.add(() => {
             try {
                 if (__debTo)
                     window.clearTimeout(__debTo);
             }
             catch { }
-            try {
-                window.removeEventListener("message", onMessage, true);
-            }
-            catch { }
-            window.__CGTN_MSG_BOUND__ = false;
+            // removeEventListener とフラグ折りの処理は完全に削除！
         });
     })();
     const USE_INJECT_URL_HOOK = true;
@@ -1128,20 +1125,16 @@
         })();
         return __initPromise;
     }
-    // 2026.01.22 2026.02.20
+    // 2026.01.22 2026.02.20 2026.02.22
     // =================================================================
     //  アプリの本当の入り口 (boot)
     // =================================================================
     const boot = async () => {
-        // 1. まず初期化とDOM生成を完全に終わらせる
+        // 1. 初期化、DOM生成、および設定に応じた自動起動(startApp)まで、
+        // 新しくなった initialize() がすべて一手に引き受けてくれます！
         await initialize();
-        // 2. 初期化の結果、もしOFF設定なら静かに待機して終了
-        if (RUN.idle) {
-            console.log("[cgtn] Booted in IDLE mode. Waiting for user to turn ON.");
-            return;
-        }
-        // 3. ON設定なら、ここで初めて起動処理(startApp)へ進む
-        startApp("boot");
+        // ※以前ここに書かれていた RUN.idle の判定や、startApp("boot") の呼び出しは、
+        // initialize() の内部に吸収されたため完全に不要（削除）になりました。
     };
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", () => boot(), { once: true });
@@ -1183,6 +1176,10 @@
             const chk = document.getElementById("cgpt-list-toggle");
             if (chk instanceof HTMLInputElement)
                 chk.checked = false;
+            // 一覧ボタンの見た目（色）も確実にOFFに戻す！
+            const listBtn = document.getElementById("cgpt-list-btn");
+            if (listBtn)
+                listBtn.classList.remove("active");
             LG?.updatePinOnlyBadge?.();
             LG?.updateListChatTitle?.();
         }
@@ -1216,8 +1213,12 @@
     // 3. stopApp (OFFにする)
     // =================================================================
     function stopApp(reason = "stop") {
-        RUN.idle = true;
-        // ★追加: 予約済みタイマーがあれば即キャンセル
+        // 1. すでにOFFなら何もしない（ガード節）
+        if (RUN.state === "OFF")
+            return;
+        // 2. 状態をOFFに確定させる
+        RUN.changeState("OFF", `app-stop:${reason}`);
+        // 3. 予約済みタイマーがあれば即キャンセル
         if (RUN.timer) {
             clearTimeout(RUN.timer);
             RUN.timer = 0;
@@ -1248,6 +1249,10 @@
             const chk = document.getElementById("cgpt-list-toggle");
             if (chk instanceof HTMLInputElement)
                 chk.checked = false;
+            // OFFにする時もボタンの色を確実に剥がしておく！
+            const listBtn = document.getElementById("cgpt-list-btn");
+            if (listBtn)
+                listBtn.classList.remove("active");
         }
         catch { }
         try {
@@ -1264,21 +1269,6 @@
         UI?.setPanelOffState?.();
         RUN.bag.flush();
     }
-    // 2026.02.20 ２度目の大手術
-    //  (window as any).CGTN_APP = {
-    //    start: (reason: string = "start") => {
-    //      RUN.running = true;
-    //      RUN.changeState("LOADING", `app-start:${reason}`);
-    //    },
-    //    stop: (reason: string = "stop") => {
-    //      RUN.running = false;
-    //      RUN.changeState("OFF", `app-stop:${reason}`);
-    //    },
-    //    isRunning: () => RUN.state !== "OFF",
-    //    isIdle: () => RUN.state === "OFF",
-    //    getState: () => RUN.state,
-    //    changeState: (s: AppState, reason: string) => RUN.changeState(s, reason),
-    //  };
     // 2026.02.20 ２度目の大手術（★修正版）
     window.CGTN_APP = {
         start: startApp, // ← 本物の startApp 関数をストレートに呼ぶ！

@@ -573,8 +573,6 @@ input:checked + .slider:before {
         if (cb instanceof HTMLInputElement) {
             // ★変更: 初期状態は「現在アプリがIdleかどうか」で決める
             const app = window.CGTN_APP;
-            // RUN.idle が true なら OFF(checked=false)
-            // RUN.idle が false (undefined含む) なら ON(checked=true)
             const isIdle = app?.isIdle?.() ?? false;
             cb.checked = !isIdle;
             // ★追加: スイッチだけでなく「パネル全体」の見た目も即座に同期する
@@ -878,6 +876,10 @@ input:checked + .slider:before {
             const r = box.getBoundingClientRect();
             offX = e.clientX - r.left;
             offY = e.clientY - r.top;
+            // ▼▼▼ 追加: ドラッグ中はマウスに追従させるため、一時的に top 制御にする ▼▼▼
+            box.style.bottom = "auto";
+            box.style.top = r.top + "px";
+            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
             try {
                 grip.setPointerCapture(e.pointerId);
             }
@@ -897,6 +899,7 @@ input:checked + .slider:before {
                 grip.releasePointerCapture(e.pointerId);
             }
             catch { }
+            // ここで再び bottom (下端) 制御に戻る
             clampPanelWithinViewport();
             SH.saveSettingsPatch({
                 panel: {
@@ -914,14 +917,16 @@ input:checked + .slider:before {
         const vw = document.documentElement.clientWidth || window.innerWidth;
         const vh = document.documentElement.clientHeight || window.innerHeight;
         const r = box.getBoundingClientRect();
+        // ▼▼▼ 修正: はみ出しを防ぎつつ、下端(bottom)を基準に固定する ▼▼▼
+        let x = Math.min(vw - r.width - margin, Math.max(margin, r.left));
+        let y = Math.min(vh - r.height - margin, Math.max(margin, r.top));
+        // top座標から、画面下からの距離(bottom)を逆算する
+        const bottom = vh - (y + r.height);
         box.style.right = "auto";
-        box.style.bottom = "auto";
-        let x = Number.isFinite(r.left) ? r.left : vw - r.width - 12;
-        let y = Number.isFinite(r.top) ? r.top : vh - r.height - 140;
-        x = Math.min(vw - r.width - margin, Math.max(margin, x));
-        y = Math.min(vh - r.height - margin, Math.max(margin, y));
+        box.style.top = "auto"; // ★ 上端の固定を解除
         box.style.left = `${x}px`;
-        box.style.top = `${y}px`;
+        box.style.bottom = `${bottom}px`; // ★ 下端を固定
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     }
     // 公開API
     NS.installUI = installUI;
