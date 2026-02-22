@@ -46,18 +46,26 @@
     const UI = window.CGTN_UI;
     const app = (window as any).CGTN_APP;
 
-    // 1. システムの中枢から「現在の確固たる状態」をもらう
     const state = app?.getState ? app.getState() : "OFF";
 
-    // ▼▼▼ 追加: マスク(操作不可)の制御をここで一元管理 ▼▼▼
+    // ▼▼▼ 追加: 物理的にクリックをブロックするバリア ▼▼▼
     const ids = ["cgpt-nav", "cgpt-list-panel"];
-    const isBusy = state === "LOADING"; // LOADING中だけ true
+    const isBusy = state === "LOADING";
     for (const id of ids) {
       const host = document.getElementById(id);
-      if (host) host.classList.toggle("loading", isBusy);
+      if (!host) continue;
+      host.classList.toggle("loading", isBusy);
+
+      let mask = host.querySelector(":scope > .cgtn-mask");
+      if (isBusy && !mask) {
+        mask = document.createElement("div");
+        mask.className = "cgtn-mask";
+        host.appendChild(mask);
+      } else if (!isBusy && mask) {
+        mask.remove();
+      }
     }
     // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
     // 状態①・③：OFF（ナビゲートOFF）
     if (state === "OFF") {
       UI?.setPanelOffState?.();
@@ -2214,8 +2222,9 @@
       return;
     }
 
-    const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
-    const enabled = forceOn ? true : !!cfg.list?.enabled;
+    // forceOn または スイッチがONなら描画する
+    // 2026.02.22 isListToggleOn
+    const enabled = forceOn ? true : SH.isListToggleOn?.();
     if (!enabled) {
       NS._panelOpen = false;
       return;
@@ -2250,6 +2259,7 @@
     body.style.overflowY = "auto";
     body.innerHTML = ""; // クリア
 
+    const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
     // pinOnly 判定
     const pinOnly =
       opts && Object.prototype.hasOwnProperty.call(opts, "pinOnlyOverride")
@@ -2532,7 +2542,8 @@
 
           // 念のため、実行直前にもう一度コンフィグを確認
           // (ページ遷移などで裏でOFFにされている場合があるため)
-          if (!SHX.getCFG?.()?.list?.enabled) {
+          // 2026.02.22 isListToggleOn
+          if (!SH.isListToggleOn?.()) {
             resolve(false);
             return;
           }
@@ -2652,7 +2663,7 @@
   function updateBulkPinButtonsState() {
     try {
       const cfg = SH.getCFG?.() || {};
-      const enabled = !!cfg.list?.enabled;
+      const enabled = SH.isListToggleOn?.();
       const pinOnly = !!cfg.list?.pinOnly;
 
       const onBtn = document.getElementById("cgpt-pin-all-on");
@@ -3140,12 +3151,9 @@
           if (typeof NS.rebuild === "function") {
             NS.rebuild();
           }
-
+          // 2026.02.22 isListOpen
           const open =
-            typeof SH.isListOpen === "function"
-              ? SH.isListOpen()
-              : !!SH.getCFG?.()?.list?.enabled;
-
+            typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
           if (open) {
             if (typeof NS.renderList === "function") {
               NS.renderList(true);
@@ -3172,11 +3180,9 @@
           }
 
           // 1.5秒後も、その時点のリスト開閉状態に合わせて正しく更新する
+          // 2026.02.22 isListOpen
           const open =
-            typeof SH.isListOpen === "function"
-              ? SH.isListOpen()
-              : !!SH.getCFG?.()?.list?.enabled;
-
+            typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
           if (open) {
             if (typeof NS.renderList === "function") {
               NS.renderList(true);

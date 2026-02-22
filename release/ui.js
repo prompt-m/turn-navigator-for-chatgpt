@@ -616,9 +616,10 @@ input:checked + .slider:before {
         const listChk = box.querySelector("#cgpt-list-toggle");
         const listBtn = box.querySelector("#cgpt-list-btn");
         if (listChk instanceof HTMLInputElement) {
-            listChk.checked = !!SH.getCFG().list?.enabled;
-            if (listBtn && listChk.checked)
-                listBtn.classList.add("active");
+            // 初期起動時は必ずリストOFFからスタートする
+            listChk.checked = false;
+            if (listBtn)
+                listBtn.classList.remove("active");
         }
         // --- イベントリスナー ---
         if (listBtn && listChk instanceof HTMLInputElement) {

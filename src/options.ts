@@ -97,7 +97,6 @@
       showViz: !!raw?.showViz,
       panel: raw?.panel || base.panel,
       list: {
-        enabled: !!(raw?.list?.enabled ?? base.list.enabled),
         pinOnly: !!(raw?.list?.pinOnly ?? base.list.pinOnly),
         maxItems: clamp(raw?.list?.maxItems ?? base.list.maxItems, 1, 200),
         maxChars: clamp(raw?.list?.maxChars ?? base.list.maxChars, 10, 400),
@@ -196,7 +195,6 @@
       setVal("sendKeyMethod", v.sendKeyMethod || "enter");
       setChk("showViz", v.showViz);
 
-      setChk("listEnabled", v.list?.enabled);
       setChk("pinOnly", v.list?.pinOnly);
       setVal("listMaxItems", v.list?.maxItems);
       setVal("listMaxChars", v.list?.maxChars);
@@ -205,24 +203,6 @@
       SH.logError("applyToUI failed", e);
     }
   }
-  /*
-  function uiToCfg() {
-    return sanitize({
-      centerBias: $("centerBias")?.value,
-      headerPx: $("headerPx")?.value,
-      eps: $("eps")?.value,
-      lockMs: $("lockMs")?.value,
-      showViz: $("showViz")?.checked,
-      list: {
-        enabled: $("listEnabled")?.checked,
-        pinOnly: $("pinOnly")?.checked,
-        maxItems: $("listMaxItems")?.value,
-        maxChars: $("listMaxChars")?.value,
-        fontSize: $("listFontSize")?.value,
-      },
-    });
-  }
-*/
 
   function uiToCfg() {
     const val = (id: string) => ($(id) as HTMLInputElement | null)?.value;

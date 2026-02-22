@@ -90,7 +90,6 @@
   };
 
   const RUN = {
-    running: false,
     gen: 0,
     timer: 0 as number,
     bag: makeBag(),
@@ -182,7 +181,6 @@
   // 4. rebuildAndRenderSafely (非同期ガード付き)
   // =================================================================
   async function rebuildAndRenderSafely(
-    // 引数の型定義を変更
     {
       forceList = false,
       appGen,
@@ -193,21 +191,18 @@
     const SH = window.CGTN_SHARED;
 
     const myBuildGen = ++__buildGen;
-    // 呼び出し元から世代が渡されなければ、現在の世代を採用
     const myAppGen = appGen ?? RUN.gen;
 
-    // ★最強のガード関数: 「計算ID」か「アプリ世代」か「現在OFF」なら中断
+    // ★修正: RUN.idle を RUN.state === "OFF" に置き換え
     const guard = () =>
-      myBuildGen !== __buildGen || myAppGen !== RUN.gen || RUN.idle;
+      myBuildGen !== __buildGen || myAppGen !== RUN.gen || RUN.state === "OFF";
 
-    if (!RUN.idle) {
-      //      setUiBusy(true, "Loading...");
+    // ★修正: RUN.idle を state 判定に置き換え
+    if (RUN.state !== "OFF") {
       RUN.changeState("LOADING", "rebuild-start", "Loading...");
     }
 
     if (oldSig) {
-      // ★修正: チャットページの場合のみ待機する
-      // (チャット以外やNew Chatでは待つ必要がないため、即座に更新へ進む)
       const kind = SH.getPageInfo?.()?.kind || "other";
       if (kind === "chat") {
         await waitForChatSettled({ mustNotMatch: oldSig });
@@ -217,15 +212,19 @@
 
     try {
       if (guard()) return;
-
       LG.rebuild?.();
 
       const kind = SH.getPageInfo?.()?.kind || "other";
       const cfg = SH.getCFG?.() || {};
 
-      const needList =
-        !RUN.idle && kind === "chat" && (forceList || !!cfg.list?.enabled);
+      // 修正後: ストレージ(cfg)は見ず、実際のスイッチの状態を見る
+      const listToggle = document.getElementById(
+        "cgpt-list-toggle",
+      ) as HTMLInputElement;
+      const isListToggleOn = listToggle ? listToggle.checked : false;
 
+      const needList =
+        RUN.state !== "OFF" && kind === "chat" && (forceList || isListToggleOn);
       if (needList) {
         await new Promise((r) => requestAnimationFrame(r));
         if (guard()) return;
@@ -233,15 +232,11 @@
         if (guard()) return;
       }
 
-      // 最終更新
       if (guard()) return;
 
       if (RUN.state === "OFF") {
         UI?.setPanelOffState?.();
       } else {
-        // ==========================================
-        // ★追加：Loading完了イベント（ターン有無で分岐）
-        // ==========================================
         const kind = SH.getPageInfo?.()?.kind || "other";
         const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
 
@@ -250,7 +245,7 @@
         } else {
           RUN.changeState("STANDBY", "rebuild-complete-empty");
         }
-        // 監視カメラの付け直しはそのまま残す
+
         try {
           if (typeof LG.detachTurnObserver === "function")
             LG.detachTurnObserver();
@@ -266,11 +261,6 @@
       if (forceList) {
         LG?.setListEnabled?.(false);
       }
-    } finally {
-      // ★ガード: 両方の世代が一致している時だけ Busy を解除
-      //      if (myBuildGen === __buildGen && myAppGen === RUN.gen) {
-      //       setUiBusy(false);
-      //      }
     }
   }
 
@@ -331,55 +321,68 @@
           const currentSig = getDomSignature();
 
           // A. URL変更
+          // A. URL変更
           if (d.type === "url-change") {
-            const shouldActivate =
-              RUN.running ||
-              (!RUN.idle && (kind === "chat" || kind === "project"));
+            // =========================================================
+            // ★ 新設計1：OFFの時はデータをクリアするだけで、状態遷移はしない（内部遷移）
+            // =========================================================
+            if (RUN.state === "OFF") {
+              LG?.clearListPanelUI?.(); // 古いターン情報を捨てる
 
-            if (shouldActivate) {
-              if (!RUN.running) startApp("auto-start");
-
-              // ★追加: 何よりも先にスクロール監視を止める！
-              // これで「前の数字」が亡霊のように復活するのを防ぎます
-              // ★修正: スクロール監視だけでなく、ターン監視も一旦止める
-              LG.stopScrollSpy?.();
-              LG.detachTurnObserver?.();
-
-              try {
-                window.CGTN_PREVIEW?.hide?.("url-change");
-              } catch (e) {}
-              //              setUiBusy(true, "Loading...");
-              RUN.changeState("LOADING", "rebuild-start", "Loading...");
-              const panel = document.getElementById("cgpt-list-panel");
-              const wasListOpen =
-                panel &&
-                panel.style.display !== "none" &&
-                !panel.classList.contains("collapsed");
-
-              clearTimeout(__debTo);
-              __debTo = window.setTimeout(() => {
-                requestAnimationFrame(() => {
-                  (async () => {
-                    if (myGen !== __gen) return;
-                    await rebuildAndRenderSafely(
-                      { forceList: !!wasListOpen },
-                      currentSig,
-                    );
-                  })().catch((err) =>
-                    SH.logError("[cgtn] rebuild error:", err),
-                  );
-                });
-              }, 80);
-            } else {
-              // Idle時のサイレント更新
+              // Idle時のサイレント更新（フッターの数字だけ計算するなどの裏処理）
               waitForChatSettled({ maxMs: 5000 })
                 .then(() => LG.updateFooterOnly?.())
                 .catch(() => {});
+
+              return; // ！！絶対にLOADINGやONに遷移させない！！
             }
+
+            // =========================================================
+            // ★ 新設計2：以下は ON (STANDBY, ACTIVE, LOADING) の時の処理
+            // =========================================================
+
+            // チャット以外のページ（HomeやNewなど）に遷移した場合
+            if (["home", "project", "other", "new"].includes(kind)) {
+              LG?.clearListPanelUI?.();
+              RUN.changeState("STANDBY", `not-chat-page:${kind}`);
+              return;
+            }
+
+            // --- チャット画面での変化（新しいチャットを開いた等） ---
+
+            // 何よりも先にスクロール監視とターン監視を止める！
+            LG.stopScrollSpy?.();
+            LG.detachTurnObserver?.();
+
+            try {
+              window.CGTN_PREVIEW?.hide?.("url-change");
+            } catch (e) {}
+
+            // ★ ここでLOADING状態へ遷移！
+            RUN.changeState("LOADING", "url-change", "Loading...");
+
+            const panel = document.getElementById("cgpt-list-panel");
+            const wasListOpen =
+              panel &&
+              panel.style.display !== "none" &&
+              !panel.classList.contains("collapsed");
+
+            clearTimeout(__debTo);
+            __debTo = window.setTimeout(() => {
+              requestAnimationFrame(() => {
+                (async () => {
+                  if (myGen !== __gen) return;
+                  await rebuildAndRenderSafely(
+                    { forceList: !!wasListOpen },
+                    currentSig,
+                  );
+                })().catch((err) => SH.logError("[cgtn] rebuild error:", err));
+              });
+            }, 80);
           }
           // B. 会話追加
           else {
-            if (RUN.running) {
+            if (RUN.state !== "OFF") {
               // 会話中は Loading 表示にしない（スムーズに追従）
               // setUiBusy(true, "Sync...");
 
@@ -1201,20 +1204,27 @@
       const cfg = SH.getCFG?.() || {};
       const isEnabled = cfg.navEnabled !== false;
 
-      // ★ ここでアプリの初期状態が完全に確定する
-      if (!isEnabled) {
-        console.log("[cgtn] initialize: Starts in IDLE mode.");
-        RUN.idle = true;
-      } else {
-        RUN.idle = false;
-      }
+      // =========================================================
+      // ★修正1：RUN.idleの直接代入を廃止し、まずは安全な「OFF」で初期化
+      // =========================================================
+      RUN.changeState("OFF", "init-boot", "OFF");
 
       try {
         await SH.migratePinsStorageOnce?.();
       } catch {}
 
       enableEnterKeyGuard();
-      UI.installUI(); // ★ RUN.idleを見て、最初から正しい姿で描画される
+
+      // ★ RUN.state が OFF なので、最初はスッキリしたOFFの姿でUIが生成される
+      UI.installUI();
+
+      // =========================================================
+      // ★修正2：UI生成直後に、一覧(リスト)トグルを必ずOFFにする(短期記憶リセット)
+      // =========================================================
+      const listToggle = document.getElementById(
+        "cgpt-list-toggle",
+      ) as HTMLInputElement;
+      if (listToggle) listToggle.checked = false;
 
       ensureFocusPark();
       installFocusStealGuard();
@@ -1243,7 +1253,24 @@
         UI.clampPanelWithinViewport(),
       );
 
+      // ★ 初期化完了フラグを立てる
       __isInitialized = true;
+
+      // =========================================================
+      // ★修正3：ストレージ設定(isEnabled)がONなら、最後に自動起動させる！
+      // =========================================================
+      const powerToggle = document.getElementById(
+        "cgtn-power-toggle",
+      ) as HTMLInputElement;
+      if (isEnabled) {
+        console.log("[cgtn] initialize: Auto-starting from storage settings.");
+        if (powerToggle) powerToggle.checked = true;
+        // すでに __isInitialized = true なので、スムーズに起動処理が走る
+        startApp("auto-start-from-storage");
+      } else {
+        console.log("[cgtn] initialize: Starts in IDLE(OFF) mode.");
+        if (powerToggle) powerToggle.checked = false;
+      }
     })();
 
     return __initPromise;
@@ -1276,30 +1303,31 @@
   // =================================================================
   // 2. startApp (純粋にONにするだけの機能)
   // =================================================================
+  // content.ts
   async function startApp(reason: string = "start") {
     if (!__isInitialized && __initPromise) await __initPromise;
     else if (!__isInitialized) await initialize();
 
-    if (RUN.running) return;
-    RUN.running = true;
-    RUN.idle = false;
+    if (RUN.state !== "OFF") return;
+
+    // =========================================================
+    // ★修正の核心: ここで状態をLOADINGにし、UI表示もすべて任せる！
+    // (旧 RUN.idle = false や UIの直接操作は全削除)
+    // =========================================================
+    RUN.changeState("LOADING", `app-start:${reason}`, "Loading...");
 
     const myGen = ++RUN.gen;
     console.log(`[cgtn] startApp (${reason})`);
 
-    // UIをON状態へ
     const nav = document.getElementById("cgpt-nav");
     if (nav) {
-      nav.classList.remove("disabled");
-      nav.classList.remove("cgtn-standby");
+      nav.classList.remove("disabled", "cgtn-standby");
     }
-    UI?.updateStatusDisplay?.("Loading...");
 
     try {
       UI?.setIdleMode?.(false);
     } catch {}
 
-    // OFF時に止めた「監視機能」の再起動
     if (typeof window.CGTN_LOGIC?.installAutoSyncForTurns === "function") {
       window.CGTN_LOGIC.installAutoSyncForTurns();
     }
@@ -1319,16 +1347,14 @@
 
     RUN.timer = window.setTimeout(() => {
       RUN.timer = 0;
-      // まず最初の計算を走らせる（この時はまだズレる可能性がある）
       rebuildAndRenderSafely({ appGen: myGen }).catch(() => {});
 
-      // ▼▼▼ 追加: 画面の描画が完全に落ち着いた1.5秒後に、念押しでもう一度計算する！
+      // 1.5秒後の念押しタイマーはそのまま！
       setTimeout(() => {
         if (myGen === RUN.gen && RUN.state !== "OFF") {
           if (typeof window.CGTN_LOGIC?.rebuild === "function") {
             window.CGTN_LOGIC.rebuild();
           }
-          // ★追加：計算結果に基づいて状態を確定させる（Loading完了イベント）
           const kind = SH.getPageInfo?.()?.kind || "other";
           const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
 
@@ -1339,7 +1365,6 @@
           }
         }
       }, 1500);
-      // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     }, 50);
   }
 
@@ -1347,7 +1372,6 @@
   // 3. stopApp (OFFにする)
   // =================================================================
   function stopApp(reason: string = "stop") {
-    RUN.running = false;
     RUN.idle = true;
 
     // ★追加: 予約済みタイマーがあれば即キャンセル
@@ -1359,15 +1383,13 @@
     // ★重要: 世代を進めて、過去のON/非同期処理をすべて無効化
     RUN.gen++;
 
-    // ★念のためBusy状態も解除（Loading表示が残るのを防ぐ）
-    //setUiBusy(false);
-
     try {
       LG?.stopScrollSpy?.();
     } catch {}
 
     try {
-      RUN.prevListEnabled = !!SH?.getCFG?.()?.list?.enabled;
+      // 2026.02.22
+      RUN.prevListEnabled = window.CGTN_SHARED?.isListToggleOn?.() ?? false;
     } catch {
       RUN.prevListEnabled = null;
     }

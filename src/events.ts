@@ -23,26 +23,22 @@
       const app = (window as any).CGTN_APP; // content.tsで公開している実体
 
       // 1. 電源スイッチ (ON/OFF)
+      // events.ts (電源スイッチの部分)
       if (t.id === "cgtn-power-toggle") {
-        if (t.checked) {
-          // ONの場合
-          if (typeof app?.start === "function") {
-            app.start("toggle-on");
-          } else {
-            console.error("[CGTN] app.start not found");
-          }
-        } else {
-          // OFFの場合
-          if (typeof app?.stop === "function") {
-            app.stop("toggle-off"); // ← これが呼ばれていない！
-          } else {
-            console.error("[CGTN] app.stop not found");
-          }
-        }
-        return;
-      }
-      // ▲▲▲▲▲▲
+        const on = t.checked;
 
+        if (on) {
+          if (typeof SH.saveSettingsPatch === "function") {
+            SH.saveSettingsPatch({ navEnabled: true }); // ★ power を navEnabled に！
+          }
+          if (typeof app?.start === "function") app.start("toggle-on");
+        } else {
+          if (typeof SH.saveSettingsPatch === "function") {
+            SH.saveSettingsPatch({ navEnabled: false }); // ★ power を navEnabled に！
+          }
+          if (typeof app?.stop === "function") app.stop("toggle-off");
+        }
+      }
       // ▼ 一覧表示トグル (#cgpt-list-toggle)
       // events.ts (一覧表示トグルの部分)
       if (t.id === "cgpt-list-toggle") {

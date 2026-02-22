@@ -111,7 +111,7 @@
         showViz: false,
         panel: { x: null, y: null },
         list: {
-            enabled: false,
+            //      enabled: false,
             maxItems: 30,
             maxChars: 40,
             fontSize: 12,
@@ -883,24 +883,18 @@
         });
     }
     catch { }
-    SH.isListOpen = function isListOpen() {
-        let ret;
-        try {
-            const cb = document.getElementById("cgpt-list-toggle");
-            if (cb instanceof HTMLInputElement) {
-                ret = !!cb.checked;
-                return ret;
-            }
-            ret = !!SH.getCFG?.()?.list?.enabled;
-            if (window.CGTN_LOGIC &&
-                typeof window.CGTN_LOGIC._panelOpen === "boolean") {
-                ret = !!window.CGTN_LOGIC._panelOpen;
-            }
-        }
-        catch {
-            return ret;
-        }
-        return ret;
+    // ★新設: スイッチがONかどうかを判定する共通関数
+    SH.isListToggleOn = function () {
+        const listToggle = document.getElementById("cgpt-list-toggle");
+        return listToggle ? listToggle.checked : false;
+    };
+    // ★既存の isListOpen を上書き（パネルが見えているか＆スイッチがONか）
+    SH.isListOpen = function () {
+        const panel = document.getElementById("cgpt-list-panel");
+        const isVisible = panel &&
+            panel.style.display !== "none" &&
+            !panel.classList.contains("collapsed");
+        return !!(isVisible && SH.isListToggleOn());
     };
     // タイトル解決（副作用なし / DOM非依存）
     SH.resolveTitleFor = async function resolveTitleFor(chatId, fallback = "") {
