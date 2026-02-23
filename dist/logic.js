@@ -138,16 +138,20 @@
         }
         return found || 1;
     }
-    // src/logic.ts の bindScrollSpy と stopScrollSpy をまるごと書き換え
     // スクロール監視 (数値更新用)
     function bindScrollSpy() {
         const handler = (e) => {
-            // ★最強の改善: スクロールした犯人を捕まえて、本物のスクローラーとして採用する！
+            // =========================================================
+            // ★爆速化: 超絶重かった querySelector を削除！
+            // =========================================================
             const target = e.target;
-            if (target instanceof HTMLElement &&
-                (target.querySelector("article") ||
-                    target.querySelector("[data-message-author-role]"))) {
-                NS._scroller = target;
+            if (!NS._scroller && target instanceof HTMLElement) {
+                // body や main などの大きな枠がスクロールした時だけ軽く採用
+                if (target.tagName === "MAIN" ||
+                    target.tagName === "BODY" ||
+                    target.tagName === "HTML") {
+                    NS._scroller = target;
+                }
             }
             if (NS._spyTimer)
                 return;
@@ -158,7 +162,6 @@
             }, 200);
         };
         if (!NS._scrollSpy) {
-            // ★修正: 特定の要素ではなく window 全体で「すべてのスクロール」を待ち伏せする
             window.addEventListener("scroll", handler, {
                 passive: true,
                 capture: true,
@@ -1588,12 +1591,6 @@
             catch (_) { }
         })();
         /* ensureIndexCounterStyle ここまで */
-        /*
-        // 付箋ボタンのイベント委譲をセット '25.11.27
-        try {
-          bindDelegatedClipPinHandler();
-        } catch {}
-    */
         // -------------------------------------------------------
         // ★★★ 修正版コード（ここから） ★★★
         // イベント委譲: 行クリックとピン留めをここで一括管理
@@ -1640,32 +1637,6 @@
                             NS.scrollToHead(turn);
                         }
                     }
-                }
-                // ★追加: 3. 「全表示」ボタンの処理
-                if (target.closest(".cgtn-show-all-btn")) {
-                    const SH = window.CGTN_SHARED;
-                    try {
-                        const cfg2 = SH.getCFG ? SH.getCFG() : {};
-                        if (SH.saveSettingsPatch) {
-                            SH.saveSettingsPatch({
-                                list: { ...(cfg2.list || {}), pinOnly: false },
-                            });
-                        }
-                        const allRadio = document.getElementById("lv-all");
-                        if (allRadio instanceof HTMLInputElement)
-                            allRadio.checked = true;
-                        // ここは設定変更なので renderList(true) してOK
-                        if (typeof NS.renderList === "function") {
-                            NS.renderList(true, { pinOnlyOverride: false });
-                        }
-                        if (typeof NS.updateListFooterInfo === "function") {
-                            NS.updateListFooterInfo();
-                        }
-                    }
-                    catch (e) {
-                        SH.logError("show-all click failed", e);
-                    }
-                    return;
                 }
             });
         })(listBox); // ← ここで ensureListBox 内の変数 listBox を渡しています
@@ -1802,46 +1773,100 @@
         })();
         // enableDrag ここまで
         // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
+        /*
+        (function bindRoleFilter(panel) {
+          const box = panel.querySelector("#cgpt-list-filter");
+          if (!box || box._cgtnBound) return;
+          box._cgtnBound = true;
+    
+          const applyFromChecked = () => {
+            const checked = box.querySelector('input[name="cgtn-lv"]:checked');
+            if (!checked) return;
+            // ---- ロール決定（User / Assistant / それ以外は All）----
+            let role = "all";
+            if (checked.id === "lv-user") role = "user";
+            if (checked.id === "lv-assist") role = "assistant";
+            NS.viewRole = role;
+            // ---- ★ pinOnly 状態を cfg に同期（Pinned ラジオが ON なら true）---- '25.11.28
+            try {
+              const cfg = SH.getCFG?.() || {};
+              const pinOnly = checked.id === "lv-pin"; // ← ここが肝
+              SH.saveSettingsPatch?.({
+                list: { ...(cfg.list || {}), pinOnly },
+              });
+            } catch (_) {}
+    
+            // フッターを再計算（会話数の分母/分子ロジックはこの中に既にある）
+            try {
+              window.CGTN_LOGIC?.updateListFooterInfo?.();
+            } catch (_) {}
+          };
+    
+          // ラジオ変更時にフッター更新
+          box.addEventListener("change", (e) => {
+            const input = e.target && e.target.closest('input[name="cgtn-lv"]');
+            if (!input) return;
+            applyFromChecked();
+          });
+    
+          // 初期状態も一度反映
+          applyFromChecked();
+        })(listBox);
+    */
+        // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
         (function bindRoleFilter(panel) {
             const box = panel.querySelector("#cgpt-list-filter");
             if (!box || box._cgtnBound)
                 return;
             box._cgtnBound = true;
-            const applyFromChecked = () => {
+            // ★修正：ユーザー操作かどうかを判定する引数(isUserAction)を追加
+            const applyFromChecked = (isUserAction = false) => {
                 const checked = box.querySelector('input[name="cgtn-lv"]:checked');
                 if (!checked)
                     return;
-                // ---- ロール決定（User / Assistant / それ以外は All）----
                 let role = "all";
                 if (checked.id === "lv-user")
                     role = "user";
                 if (checked.id === "lv-assist")
                     role = "assistant";
                 NS.viewRole = role;
-                // ---- ★ pinOnly 状態を cfg に同期（Pinned ラジオが ON なら true）---- '25.11.28
+                let pinOnlyChanged = false; // ★追加：付箋状態が変わったかのフラグ
                 try {
                     const cfg = SH.getCFG?.() || {};
-                    const pinOnly = checked.id === "lv-pin"; // ← ここが肝
+                    const pinOnly = checked.id === "lv-pin";
+                    // ★追加：前回と状態が変わったかチェック
+                    if (!!cfg.list?.pinOnly !== pinOnly) {
+                        pinOnlyChanged = true;
+                    }
                     SH.saveSettingsPatch?.({
                         list: { ...(cfg.list || {}), pinOnly },
                     });
                 }
                 catch (_) { }
-                // フッターを再計算（会話数の分母/分子ロジックはこの中に既にある）
+                // =======================================================
+                // ★追加：ユーザーが「付箋」と「その他」のタブを行き来した時だけ、
+                // リストの中身を正しく再構築する！
+                // =======================================================
+                if (isUserAction &&
+                    pinOnlyChanged &&
+                    typeof window.CGTN_LOGIC?.renderList === "function") {
+                    window.CGTN_LOGIC.renderList(true, {
+                        pinOnlyOverride: checked.id === "lv-pin",
+                    });
+                }
                 try {
                     window.CGTN_LOGIC?.updateListFooterInfo?.();
                 }
                 catch (_) { }
             };
-            // ラジオ変更時にフッター更新
             box.addEventListener("change", (e) => {
                 const input = e.target && e.target.closest('input[name="cgtn-lv"]');
                 if (!input)
                     return;
-                applyFromChecked();
+                applyFromChecked(true); // ★修正：ユーザー操作として実行
             });
-            // 初期状態も一度反映
-            applyFromChecked();
+            // 初期状態の反映（初期化時は再構築を呼ばない）
+            applyFromChecked(false);
         })(listBox);
         // 畳み/開きのバインドを安全に一度だけ行う
         function bindCollapseOnce(panel) {
@@ -2086,16 +2111,6 @@
             </div>
           `;
                     row.querySelector(".txt").textContent = attachLine;
-                    /* bindListEvents へ移動 2026.02.01
-                    row.addEventListener("click", (ev) => {
-                      const t = ev.target;
-                      if (!(t instanceof Element)) return;
-                      if (t.closest(".cgtn-preview-btn, .cgtn-clip-pin, a")) return;
-                      const txt = t.closest(".txt");
-                      if (!txt) return;
-                      scrollToHead(art);
-                    });
-          */
                     row.dataset.preview = previewText || attachLine || "";
                     row.dataset.role = isUser ? "user" : "assistant";
                     const on = !!pinsArr[index1 - 1];
@@ -2141,16 +2156,6 @@
                         if (isAsst)
                             downloads++;
                     }
-                    /* bindListEvents へ移動 2026.02.01
-                    row2.addEventListener("click", (ev) => {
-                      const t = ev.target;
-                      if (!(t instanceof Element)) return;
-                      if (t.closest(".cgtn-preview-btn, .cgtn-clip-pin, a")) return;
-                      const txt = t.closest(".txt");
-                      if (!txt) return;
-                      scrollToHead(art);
-                    });
-          */
                     row2.dataset.preview = previewText || bodyLine || "";
                     const on2 = !!pinsArr[index1 - 1];
                     paintPinRow(row2, on2);
@@ -2174,26 +2179,9 @@
             empty.className = "cgtn-empty";
             empty.style.cssText = "padding:16px;opacity:.85;font-size:13px;";
             empty.innerHTML = `
-        <div class="msg" style="margin-bottom:6px;" data-kind="msg">${T("list.noPins")}</div>
-        <button class="show-all" type="button">${T("list.showAll")}</button>
+        <div class="msg" data-kind="msg">${T("list.noPins")}</div>
       `;
             body.appendChild(empty);
-            /* bindListEvents へ移動 2026.02.01
-            empty.querySelector(".show-all")?.addEventListener("click", () => {
-              try {
-                const cfg2 = SH.getCFG() || {};
-                SH.saveSettingsPatch({
-                  list: { ...(cfg2.list || {}), pinOnly: false },
-                });
-                const allRadio = document.getElementById("lv-all");
-                if (allRadio instanceof HTMLInputElement) allRadio.checked = true;
-                NS.renderList?.(true, { pinOnlyOverride: false });
-                NS.updateListFooterInfo?.();
-              } catch (e) {
-                SH.logError("show-all click failed", e);
-              }
-            });
-      */
         }
         const rowsCount = body.querySelectorAll(".row").length;
         NS._lastVisibleRows = rowsCount;
@@ -2326,18 +2314,29 @@
         panel.classList.toggle("pinonly", on);
     }
     NS.updatePinOnlyView = updatePinOnlyView;
-    // === 付箋バッジ更新（唯一の正規処理）=== '25.12.2
-    function updatePinOnlyBadge() {
+    // === 付箋バッジ更新（唯一の正規処理）=== '25.12.2 2026.02.23
+    function updatePinOnlyBadge(forceCount) {
         try {
             const cfg = SH.getCFG?.() || {};
             const cid = SH.getChatId?.();
             if (!cid)
                 return;
-            // ★ 付箋数は Shared のヘルパーに丸投げ
-            const pinsCount = typeof SH.getPinsCountByChat === "function"
-                ? SH.getPinsCountByChat(cid)
-                : 0;
-            NS.pinsCount = pinsCount;
+            let pinsCount = 0;
+            // =======================================================
+            // ★修正: 先取り数字(forceCount)が渡されたら、絶対にそれを信じる！
+            // =======================================================
+            if (typeof forceCount === "number") {
+                pinsCount = forceCount;
+                NS.pinsCount = pinsCount;
+            }
+            else {
+                // 渡されなかった時だけ、ストレージ(旧データ)を見に行く
+                pinsCount =
+                    typeof window.CGTN_SHARED?.getPinsCountByChat === "function"
+                        ? window.CGTN_SHARED.getPinsCountByChat(cid)
+                        : 0;
+                NS.pinsCount = pinsCount;
+            }
             // 付箋ボタン（label）とバッジを取得
             const btn = document.getElementById("lv-lab-pin");
             const badge = btn?.querySelector(".cgtn-badge");
@@ -2655,41 +2654,43 @@
         const width = Math.max(minW, Math.min(maxW, Math.round(charsPerLine * charW + padding)));
         panel.style.width = width + "px";
     };
-    // (2055行目付近)
-    // ★追加: 行のイベント委譲から呼ばれるピン留め実行関数
-    // 2026.02.01 -> 2026.02.07 修正
+    // 2026.02.23
     NS.togglePin = async function (article) {
+        console.log("togglePin1 article:", article);
         if (!article)
             return;
         const cid = SH.getChatId?.();
         if (!cid)
             return;
-        // ターン要素からインデックス(1始まり)を取得
         const key = NS.getTurnKey(article);
         const idx1 = Number(String(key).replace("turn:", ""));
         if (!idx1)
             return;
-        // --- 修正ここから ---
-        // 1. 現在のデータ配列を取得
+        // 1. 現在のデータ配列を取得 (メモリ読み込みなので一瞬)
         const arr = await SH.getPinsArrAsync(cid);
-        // 2. 配列長を「現在の画面上の全ターン数」に合わせる (足りない分は0埋め)
-        //    これで "途中の行" をピン留めしても、末尾までデータが確保されます
         const totalTurns = NS.ST?.all?.length || 0;
         if (arr.length < totalTurns) {
             const oldLen = arr.length;
             arr.length = totalTurns;
-            arr.fill(0, oldLen); // 新しく増えた部分を0で埋める
+            arr.fill(0, oldLen);
         }
-        // 3. トグル処理 (0 <=> 1)
-        // idx1 は 1始まりなので -1 してアクセス
+        // 3. トグル処理
         const current = arr[idx1 - 1] ? 1 : 0;
         const next = current ? 0 : 1;
         arr[idx1 - 1] = next;
-        // 4. 保存 (shared側で 0/1 化が入っていますが、ここでも数値になっています)
-        const { ok } = await SH.savePinsArrAsync(arr, cid);
-        const nextState = !!next; // UI反映用に boolean 化
-        // --- 修正ここまで (以降はUI反映処理) ---
-        // UI反映（同じターンの行すべて）
+        const nextState = !!next;
+        // =======================================================
+        // ★追加: メモリ上の PINS (Set) も忘れずに更新する！
+        // =======================================================
+        if (nextState) {
+            PINS.add(String(key));
+        }
+        else {
+            PINS.delete(String(key));
+        }
+        // =======================================================
+        // ★ 爆速化: 保存を待たずに、先にUIをパッと変えてしまう！
+        // =======================================================
         const body = document.getElementById("cgpt-list-body");
         if (body) {
             const rows = body.querySelectorAll(`.row[data-idx="${idx1}"]`);
@@ -2707,15 +2708,22 @@
                 }
             });
         }
-        // バッジ・フッター更新
+        // バッジやフッターの数字も先取りして更新してしまう
+        const latestCount = arr.filter(Boolean).length;
+        NS.pinsCount = latestCount;
         try {
-            NS.updatePinOnlyBadge?.();
+            // ★修正: 最新の数字を引数として渡して、強制上書きさせる！
+            NS.updatePinOnlyBadge?.(latestCount);
         }
         catch { }
         try {
             NS.updateListFooterInfo?.();
         }
         catch { }
+        // =======================================================
+        // ★ その後、裏でこっそり保存する（awaitしない！）
+        // =======================================================
+        SH.savePinsArrAsync(arr, cid).catch((e) => SH.logError("Optimistic save failed", e));
     };
     // --- expose ---
     window.CGTN_LOGIC = Object.assign(window.CGTN_LOGIC || {}, {
@@ -2866,14 +2874,23 @@
             for (const m of muts) {
                 if (inOwnUI(m.target))
                     continue;
-                const sel = "article,[data-message-author-role]";
                 if (m.type === "childList") {
-                    const arr = [...m.addedNodes, ...m.removedNodes];
-                    const hit = arr.some((n) => {
-                        if (!(n instanceof Element))
-                            return false;
-                        return n.matches(sel) || !!n.querySelector(sel);
-                    });
+                    let hit = false;
+                    // =========================================================
+                    // ★爆速化: querySelectorを使わず、追加された要素自身だけを軽く見る！
+                    // =========================================================
+                    for (let i = 0; i < m.addedNodes.length; i++) {
+                        const n = m.addedNodes[i];
+                        if (n.nodeType !== 1)
+                            continue; // Elementのみ
+                        const el = n;
+                        // 自身が article か、専用属性を持っているかだけを判定
+                        if (el.tagName === "ARTICLE" ||
+                            el.hasAttribute("data-message-author-role")) {
+                            hit = true;
+                            break;
+                        }
+                    }
                     if (hit) {
                         kick();
                         break;
@@ -2881,7 +2898,9 @@
                 }
                 else if (m.type === "characterData" || m.type === "attributes") {
                     const host = m.target.nodeType === 3 ? m.target.parentElement : m.target;
-                    if (host instanceof Element && host.closest(sel)) {
+                    // ★修正: selという変数を使わず、直接セレクタの文字列を渡す
+                    if (host instanceof Element &&
+                        host.closest("article,[data-message-author-role]")) {
                         kick();
                         break;
                     }

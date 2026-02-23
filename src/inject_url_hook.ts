@@ -51,8 +51,16 @@
       );
     };
     const turnsQ = 'article,[data-testid^="conversation-turn"]';
+    //    const isTurnNode = (n) =>
+    //      n?.nodeType === 1 && (n.matches?.(turnsQ) || n.querySelector?.(turnsQ));
+
+    // ★爆速化: querySelector を削除 2026.02.23
     const isTurnNode = (n) =>
-      n?.nodeType === 1 && (n.matches?.(turnsQ) || n.querySelector?.(turnsQ));
+      n &&
+      n.nodeType === 1 &&
+      (n.tagName === "ARTICLE" ||
+        n.hasAttribute("data-message-author-role") ||
+        (n.getAttribute("data-testid") || "").startsWith("conversation-turn"));
 
     const root = document.querySelector("main") || document.body;
     if (root) {
