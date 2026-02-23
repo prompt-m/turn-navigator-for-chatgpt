@@ -2458,6 +2458,75 @@
       const empty = document.createElement("div");
       empty.className = "cgtn-empty";
       empty.style.cssText = "padding:16px;opacity:.85;font-size:13px;";
+
+      // ============================================================
+      // ★追加：孤児付箋のレスキューUI生成
+      // ============================================================
+      const orphanPins = [];
+      const totalTurnsForOrphan = turns.length;
+      // 実際のターン数を超えたインデックスに「1」があれば、それは孤児！
+      for (let i = totalTurnsForOrphan; i < pinsArr.length; i++) {
+        if (pinsArr[i]) orphanPins.push(i + 1);
+      }
+
+      // ★ バッジ用にグローバル変数にもセットしておく
+      let validPinsCountForRender = pinsArr
+        .slice(0, totalTurnsForOrphan)
+        .filter(Boolean).length;
+      NS.validPinsCount = validPinsCountForRender;
+      NS.orphanPinsCount = orphanPins.length;
+
+      // 孤児が存在し、かつ「付箋のみ表示」またはリストを開いている時にUIを出す
+      console.log(
+        "renderList orphanPins.length:",
+        orphanPins.length,
+        " pinOnly:",
+        pinOnly,
+      );
+      if (orphanPins.length > 0 && pinOnly) {
+        const orphanDiv = document.createElement("div");
+        orphanDiv.className = "cgtn-orphan-row";
+        // ちょっと目立つようにオレンジ色の破線枠などにします
+        orphanDiv.style.cssText =
+          "padding:12px; margin:8px; border:1px dashed #f57c00; background:#fff3e0; border-radius:6px;";
+
+        orphanDiv.innerHTML = `
+        <div style="color:#e65100; font-weight:bold; font-size:12px; margin-bottom:8px;">
+          ⚠ 見つからない付箋が ${orphanPins.length} 件保護されています
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-rescue-orphan" class="cgtn-mini-btn" style="flex:1; padding:6px; background:#fff; border:1px solid #f57c00; color:#e65100; cursor:pointer; border-radius:4px;">末尾に付け直す</button>
+          <button id="btn-delete-orphan" class="cgtn-mini-btn" style="flex:1; padding:6px; background:#fff; border:1px solid #ccc; cursor:pointer; border-radius:4px;">削除</button>
+        </div>
+      `;
+
+        // 削除ボタンの処理：配列を実際のターン数で切り捨てて保存
+        orphanDiv
+          .querySelector("#btn-delete-orphan")
+          ?.addEventListener("click", async () => {
+            const arr = await SH.getPinsArrAsync(chatId);
+            arr.length = totalTurnsForOrphan;
+            await SH.savePinsArrAsync(arr, chatId);
+            NS.renderList(true); // リスト再構築
+          });
+
+        // レスキューボタンの処理：孤児を切り捨てて、代わりに最後のターンにピンを立てる
+        orphanDiv
+          .querySelector("#btn-rescue-orphan")
+          ?.addEventListener("click", async () => {
+            const arr = await SH.getPinsArrAsync(chatId);
+            arr.length = totalTurnsForOrphan;
+            if (totalTurnsForOrphan > 0) {
+              arr[totalTurnsForOrphan - 1] = 1; // 末尾をON
+            }
+            await SH.savePinsArrAsync(arr, chatId);
+            NS.renderList(true); // リスト再構築
+          });
+
+        body.appendChild(orphanDiv);
+      }
+      // ============================================================
+
       empty.innerHTML = `
         <div class="msg" data-kind="msg">${T("list.noPins")}</div>
       `;
@@ -2606,6 +2675,7 @@
   NS.updatePinOnlyView = updatePinOnlyView;
 
   // === 付箋バッジ更新（唯一の正規処理）=== '25.12.2 2026.02.23
+  /*
   function updatePinOnlyBadge(forceCount?: number) {
     try {
       const cfg = SH.getCFG?.() || {};
@@ -2657,7 +2727,53 @@
       SH.logError("updatePinOnlyBadge failed", e);
     }
   }
+*/
 
+  // 引数に forceOrphan を追加
+  function updatePinOnlyBadge(forceValid?: number, forceOrphan?: number) {
+    try {
+      const cfg = window.CGTN_SHARED?.getCFG?.() || {};
+      const cid = window.CGTN_SHARED?.getChatId?.();
+      if (!cid) return;
+
+      let validCount = 0;
+      let orphanCount = 0;
+
+      // 先取り数字があれば信じる、なければメモリのキャッシュを見る
+      if (typeof forceValid === "number" && typeof forceOrphan === "number") {
+        validCount = forceValid;
+        orphanCount = forceOrphan;
+      } else {
+        validCount = NS.validPinsCount || 0;
+        orphanCount = NS.orphanPinsCount || 0;
+        // （※初期ロード時などのために、厳密には shared 側から読み込む処理が必要ですが、
+        // ひとまずは renderList の中で初期計算されるのでこれで動きます）
+      }
+
+      const btn = document.getElementById("lv-lab-pin");
+      const badge = btn?.querySelector(".cgtn-badge");
+
+      if (!btn || !badge) return;
+      if (!(badge instanceof HTMLElement)) return;
+
+      if (validCount > 0 || orphanCount > 0) {
+        // ★ 孤児がいる場合は (+1) をくっつける
+        badge.textContent =
+          orphanCount > 0
+            ? `${validCount} (+${orphanCount})`
+            : String(validCount);
+        badge.hidden = false;
+      } else {
+        badge.textContent = "";
+        badge.hidden = true;
+      }
+
+      const pinOnly = !!cfg.list?.pinOnly;
+      btn.classList.toggle("active", pinOnly);
+    } catch (e) {
+      window.CGTN_SHARED?.logError?.("updatePinOnlyBadge failed", e);
+    }
+  }
   NS.updatePinOnlyBadge = updatePinOnlyBadge;
 
   // ★ 全ON/全OFFボタンの活性/非活性制御 '25.11.23
@@ -3028,18 +3144,25 @@
         }
       });
     }
+    // 2026.02.23
+    // ★爆速化＆孤児対応：有効な数と孤児の数を分けて先取り計算する！
+    let validCount = 0;
+    let orphanCount = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i]) {
+        if (i < totalTurns) validCount++;
+        else orphanCount++;
+      }
+    }
 
-    // バッジやフッターの数字も先取りして更新してしまう
-    const latestCount = arr.filter(Boolean).length;
-    NS.pinsCount = latestCount;
+    // 全体の数と個別の数を記憶しておく
+    NS.pinsCount = validCount + orphanCount;
+    NS.validPinsCount = validCount;
+    NS.orphanPinsCount = orphanCount;
 
     try {
-      // ★修正: 最新の数字を引数として渡して、強制上書きさせる！
-      NS.updatePinOnlyBadge?.(latestCount);
-    } catch {}
-
-    try {
-      NS.updateListFooterInfo?.();
+      // 両方の数字をバッジ更新関数に渡す
+      NS.updatePinOnlyBadge?.(validCount, orphanCount);
     } catch {}
 
     // =======================================================
