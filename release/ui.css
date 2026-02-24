@@ -1,0 +1,1029 @@
+/* ==========================================================================
+   Turn Navigator for ChatGPT - UI Styles
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   ☀️ ライトテーマ (Prism White) - 鮮明化(ハイコントラスト)版
+   -------------------------------------------------------------------------- */
+
+/* 1. ベースパネル (Nav) */
+#cgpt-nav {
+  position: fixed;
+  right: 12px;
+  bottom: 80px;
+  display: flex;
+  flex-direction: column;
+  z-index: 2147483647;
+  width: 100px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  overflow: hidden;
+  transition: opacity 0.2s;
+  font-size: 11px;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important; /* ★少し濃く */
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important; /* ★影をシャープに */
+}
+
+#cgpt-nav.disabled {
+  cursor: not-allowed;
+}
+#cgpt-nav.disabled .cgtn-body,
+#cgpt-nav.disabled .cgtn-unified-header .cgtn-ver,
+#cgpt-nav.disabled .cgtn-title-main,
+#cgpt-nav.disabled .cgtn-title-sub,
+#cgpt-nav.disabled button {
+  pointer-events: none;
+  opacity: 0.5;
+  filter: grayscale(100%);
+}
+#cgpt-nav.disabled .cgtn-body {
+  display: none;
+}
+#cgpt-nav.disabled .cgtn-power-wrapper,
+#cgpt-nav.disabled #cgtn-power-toggle {
+  pointer-events: auto;
+  opacity: 1;
+  filter: none;
+  cursor: pointer;
+}
+
+/* 2. ヘッダー & モニター (Nav) */
+.cgtn-unified-header {
+  background: #f1f5f9 !important; /* ★少し色をつけて本体との境界をハッキリ */
+  color: #0f172a !important;
+  padding: 16px 8px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important; /* ★境界線を濃く */
+}
+.cgtn-unified-header:active {
+  cursor: grabbing;
+}
+
+.cgtn-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: auto;
+}
+.cgtn-brand-group {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.cgtn-title-main {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a !important;
+  letter-spacing: 0.5px;
+}
+.cgtn-title-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569 !important;
+  margin-top: 3px;
+}
+.cgtn-ver {
+  font-size: 9px;
+  color: #64748b !important;
+  font-family: monospace;
+  margin-top: 1px;
+}
+.cgtn-header-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* トグルスイッチ */
+.cgtn-power-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 10;
+}
+.cgtn-power-wrapper input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.3s;
+  border-radius: 18px;
+  border: 1px solid #94a3b8;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 1px;
+  bottom: 1px;
+  background-color: #fff;
+  transition: 0.3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+input:checked + .slider {
+  background-color: #10b981 !important;
+  border-color: #10b981 !important;
+}
+input:checked + .slider:before {
+  transform: translateX(10px);
+}
+
+/* モニター */
+#cgtn-status-monitor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.digital-screen {
+  text-align: right;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin-left: 2px;
+  cursor: text;
+}
+.digital-screen .screen-value {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0f172a !important;
+  width: 100%;
+  text-align: center;
+}
+.digital-screen .screen-value.loading {
+  font-size: 10px;
+  opacity: 0.8;
+}
+.digital-screen .screen-value .curr {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 1px;
+  display: flex;
+  justify-content: center;
+  line-height: 1;
+}
+.digital-screen .screen-value .sub {
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1px;
+  color: #64748b !important;
+}
+.digital-screen .off-text {
+  color: #94a3b8 !important;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 3. ボディ & グループボタン (Nav) */
+.cgtn-body {
+  padding: 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  background: #ffffff !important;
+}
+
+.cgpt-nav-group {
+  border-radius: 10px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important; /* ★クッキリ */
+}
+.cgpt-nav-group[data-role="user"] {
+  background: #f4f7fb !important;
+  border-color: #cbd5e1 !important;
+}
+.cgpt-nav-group[data-role="assistant"] {
+  background: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.cgpt-nav-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #64748b !important;
+}
+.cgpt-nav-group[data-role="user"] .cgpt-nav-label,
+.cgpt-nav-group[data-role="assistant"] .cgpt-nav-label {
+  color: #334155 !important;
+}
+
+.cgtn-pill-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 4px;
+  width: 100%;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+.cgtn-pill-btn:active {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+.cgtn-pill-btn:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+} /* ★ホバーを少し強く */
+
+#cgpt-list-btn.active {
+  background: #0066cc !important;
+  color: #ffffff !important;
+  border-color: #005bb5 !important;
+  font-weight: 700;
+}
+
+@keyframes cgtn-blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.cgtn-pill-btn.blinking {
+  animation: cgtn-blink 1s linear infinite;
+  background: #1e293b !important;
+  color: #fff !important;
+}
+
+.cgpt-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+#cgpt-nav.cgtn-idle .cgtn-body {
+  display: none;
+}
+#cgpt-nav.cgtn-standby .cgpt-nav-body {
+  display: none !important;
+}
+#cgpt-nav
+  :where(button, label, input[type="checkbox"]):focus:not(:focus-visible),
+#cgpt-list-panel
+  :where(button, label, input[type="checkbox"]):focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* 4. リストパネル (List Panel) */
+#cgpt-list-panel {
+  position: fixed;
+  right: 120px;
+  bottom: 140px;
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  width: 360px;
+  min-width: 260px;
+  max-width: min(92vw, 720px);
+  max-height: min(62vh, 680px);
+  border-radius: 16px;
+  overflow: hidden;
+  resize: horizontal;
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important; /* ★境界線を濃く */
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2) !important; /* ★影を深く */
+}
+#cgpt-list-panel.no-anim * {
+  transition: none !important;
+}
+#cgpt-list-panel.collapsed {
+  max-height: 38px;
+}
+#cgpt-list-panel.collapsed #cgpt-list-body,
+#cgpt-list-panel.collapsed #cgpt-list-foot {
+  display: none;
+}
+
+#cgpt-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important; /* ★境界線 */
+  cursor: grab;
+}
+#cgpt-list-head:active {
+  cursor: grabbing;
+}
+
+#cgpt-list-foot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  background: transparent !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+#cgpt-chat-title {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  opacity: 0.9;
+  padding: 1px 6px 0;
+  line-height: 1.2;
+  color: #0f172a !important;
+}
+#cgpt-list-foot-info {
+  color: #475569 !important;
+  margin-left: auto;
+  font-size: 12px;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+
+#cgpt-list-collapse {
+  all: unset;
+  display: inline-grid;
+  place-items: center;
+  color: #334155 !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+#cgpt-list-collapse:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+#cgpt-list-grip {
+  display: none !important;
+}
+
+/* 5. 上部フィルタータブ */
+#cgpt-list-filter {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  position: sticky;
+  top: 34px;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(4px);
+  justify-content: center;
+  align-items: center;
+}
+#cgpt-list-filter label {
+  position: relative;
+  user-select: none;
+  cursor: pointer;
+}
+#cgpt-list-filter input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+}
+
+.cgpt-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  min-width: 50px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s ease;
+}
+#cgpt-list-filter label:hover .cgpt-filter-pill {
+  background: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #cbd5e1 !important;
+}
+#cgpt-list-filter input:checked + .cgpt-filter-pill {
+  background: #1e293b !important;
+  color: #ffffff !important;
+  border-color: #1e293b !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+#lv-pin:checked + .cgpt-filter-pill {
+  background: #fee2e2 !important;
+  color: #ef4444 !important;
+  border-color: #fca5a5 !important;
+  box-shadow: none !important;
+}
+
+/* 6. リストボディ・行 (Rows) */
+#cgpt-list-body {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 8px;
+}
+#cgpt-list-body .row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  line-height: 1.7;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important; /* ★行の区切りを少しクッキリ */
+  color: #1e293b !important; /* ★文字を濃く */
+}
+#cgpt-list-body .row::before {
+  content: "";
+  display: inline-block;
+  min-width: 2em;
+  margin-right: 8px;
+  text-align: right;
+  opacity: 0;
+  font-size: 11px;
+  line-height: inherit;
+  vertical-align: middle;
+}
+#cgpt-list-body .turn-idx-anchor::before {
+  content: attr(data-idx);
+  opacity: 0.6;
+  color: #64748b !important;
+  vertical-align: middle;
+}
+
+#cgpt-list-body .row.user-turn {
+  background: #f8fafc !important;
+}
+#cgpt-list-body .row.asst-turn {
+  background: #f0fdf4 !important;
+}
+#cgpt-list-body .row:hover {
+  background: #e2e8f0 !important;
+} /* ★ホバーを少し濃く */
+#cgpt-list-body .row.asst-turn:hover {
+  background: #dcfce7 !important;
+}
+
+#cgpt-list-body .txt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  cursor: pointer;
+}
+#cgpt-list-body .attach {
+  margin-left: 0.5em;
+  opacity: 0.75;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+/* 7. アイコン & ボタン類 */
+#cgpt-list-body .ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  align-self: center;
+}
+.cgtn-preview-btn,
+.cgtn-clip-pin {
+  all: unset;
+  font-size: 12px;
+  padding: 3px 5px;
+  color: #94a3b8 !important;
+}
+.cgtn-preview-btn:hover,
+.cgtn-clip-pin:hover {
+  color: #0f172a !important;
+  background: #cbd5e1 !important;
+  border-radius: 4px;
+}
+
+.cgtn-clip-pin,
+.cgtn-preview-btn {
+  cursor: pointer !important;
+}
+
+#cgpt-list-panel .row .clip-dummy {
+  visibility: hidden;
+  pointer-events: none;
+}
+.cgtn-clip-pin.on {
+  color: #ef4444 !important;
+}
+#cgpt-list-body .cgtn-clip-pin svg.cgtn-pin-svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+}
+#cgpt-list-body .cgtn-clip-pin.on svg.cgtn-pin-svg {
+  fill: currentColor;
+}
+
+.cgtn-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444 !important;
+  color: #fff !important;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cgtn-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.cgtn-mini-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+.cgtn-mini-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+#cgpt-list-foot svg path[stroke="#111827"],
+#cgpt-list-foot svg circle[stroke="#111827"] {
+  stroke: #334155 !important;
+}
+#cgpt-list-foot svg path[fill="#111827"] {
+  fill: #334155 !important;
+}
+#cgpt-list-foot svg text {
+  fill: #334155 !important;
+}
+
+/* 8. プレビュー & ドック */
+.cgtn-preview-popup,
+.cgtn-popover,
+.cgtn-dock {
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2) !important;
+  z-index: 2147483647;
+}
+.cgtn-preview-popup {
+  position: absolute;
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-width: 320px;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: normal;
+}
+.cgtn-popover {
+  position: fixed;
+  max-width: 520px;
+  max-height: 320px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  overflow: auto;
+  display: none;
+  font-size: 12px;
+  line-height: 1.5;
+  transform: translate(10px, 14px);
+  white-space: pre-wrap;
+  will-change: left, top, transform;
+  pointer-events: none;
+}
+.cgtn-popover[data-show="1"] {
+  display: block;
+}
+.cgtn-dock {
+  position: absolute;
+  width: 460px;
+  max-width: 80vw;
+  height: 300px;
+  max-height: 80vh;
+  border-radius: 8px;
+  display: none;
+  overflow: hidden;
+  user-select: none;
+}
+.cgtn-dock[data-show="1"] {
+  display: block;
+}
+.cgtn-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: move;
+  font-weight: 600;
+  background: #f1f5f9 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #0f172a !important;
+}
+.cgtn-dock-title {
+  font-weight: 600;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.cgtn-dock-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #475569 !important;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.9;
+}
+.cgtn-dock-close:hover {
+  color: #0f172a !important;
+}
+.cgtn-dock-body {
+  height: calc(100% - 40px);
+  overflow: auto;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  user-select: text;
+  line-height: 1.6;
+  max-height: 60vh;
+}
+.cgtn-dock-resize {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0.7;
+  color: #475569 !important;
+}
+
+/* 9. スクロールバー (Webkit) */
+.cgtn-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+#cgpt-list-body::-webkit-scrollbar,
+.cgtn-dock-body::-webkit-scrollbar,
+#cgtn-preview-panel::-webkit-scrollbar {
+  width: 8px;
+}
+#cgpt-list-body::-webkit-scrollbar-track,
+.cgtn-dock-body::-webkit-scrollbar-track,
+#cgtn-preview-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+#cgpt-list-body::-webkit-scrollbar-thumb,
+.cgtn-dock-body::-webkit-scrollbar-thumb,
+#cgtn-preview-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+#cgpt-list-body::-webkit-scrollbar-thumb:hover,
+.cgtn-dock-body::-webkit-scrollbar-thumb:hover,
+#cgtn-preview-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   🌙 ダークテーマ (Professional Dark) - オーバーライド
+   ※ body[data-cgtn-theme="dark"] が付与された時に、上記の色を上書きします
+   ========================================================================== */
+
+body[data-cgtn-theme="dark"] #cgpt-nav {
+  background: #1a1a1a !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-unified-header {
+  background: #000 !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-title-main {
+  color: #ebfff5 !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-title-sub,
+body[data-cgtn-theme="dark"] .cgtn-ver {
+  color: #bbb !important;
+}
+body[data-cgtn-theme="dark"] .slider {
+  background-color: #555;
+  border-color: #666;
+}
+body[data-cgtn-theme="dark"] .slider:before {
+  background-color: #ddd;
+}
+body[data-cgtn-theme="dark"] input:checked + .slider {
+  background-color: #ac0000 !important;
+  border-color: #ac0000 !important;
+}
+body[data-cgtn-theme="dark"] input:checked + .slider:before {
+  background-color: #fff !important;
+}
+body[data-cgtn-theme="dark"] .digital-screen .screen-value {
+  color: #fff !important;
+}
+body[data-cgtn-theme="dark"] .digital-screen .sub {
+  color: #fff !important;
+  opacity: 0.75;
+}
+body[data-cgtn-theme="dark"] .digital-screen .off-text {
+  color: #aaa !important;
+}
+
+body[data-cgtn-theme="dark"] .cgtn-body {
+  background: #222 !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group {
+  background: #2a2a2a !important;
+  border-color: #333 !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="all"] {
+  background: #262329 !important;
+  border-color: #35313a !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="user"] {
+  background: #131c2b !important;
+  border-color: #1e293b !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="assistant"] {
+  background: #113322 !important;
+  border-color: #164a33 !important;
+}
+
+body[data-cgtn-theme="dark"] .cgpt-nav-label {
+  color: #ccc !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group .cgpt-nav-label {
+  color: #fff !important;
+}
+
+body[data-cgtn-theme="dark"] .cgtn-pill-btn {
+  background: #444 !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+body[data-cgtn-theme="dark"]
+  .cgpt-nav-group[data-role="all"]
+  .cgtn-pill-btn:hover {
+  background: #50445a !important;
+  color: #fff !important;
+}
+body[data-cgtn-theme="dark"]
+  .cgpt-nav-group[data-role="user"]
+  .cgtn-pill-btn:hover {
+  background: #294060 !important;
+  color: #fff !important;
+}
+body[data-cgtn-theme="dark"]
+  .cgpt-nav-group[data-role="assistant"]
+  .cgtn-pill-btn:hover {
+  background: #205c3d !important;
+  color: #fff !important;
+}
+body[data-cgtn-theme="dark"]
+  .cgpt-nav-group[data-role="tools"]
+  #cgpt-list-btn:hover {
+  background: #ededed !important;
+  color: #000 !important;
+}
+body[data-cgtn-theme="dark"]
+  .cgpt-nav-group[data-role="others"]
+  .cgtn-pill-btn:hover {
+  background: #ededed !important;
+  color: #000 !important;
+}
+
+body[data-cgtn-theme="dark"] #cgpt-list-btn.active {
+  background: #0066cc !important;
+  color: #fff !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-pill-btn.blinking {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* ダークテーマ - リストパネル */
+body[data-cgtn-theme="dark"] #cgpt-list-panel,
+body[data-cgtn-theme="dark"] .cgtn-preview-popup,
+body[data-cgtn-theme="dark"] .cgtn-popover,
+body[data-cgtn-theme="dark"] .cgtn-dock {
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: #ececec !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.4) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-head {
+  background: rgba(30, 30, 30, 0.95) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-foot {
+  background: transparent !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-chat-title {
+  color: #ececec !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-foot-info {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-collapse {
+  color: #ececec !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-collapse:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+body[data-cgtn-theme="dark"] #cgpt-list-filter {
+  background: rgba(30, 30, 30, 0.85) !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-filter-pill {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-filter label:hover .cgpt-filter-pill {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+}
+body[data-cgtn-theme="dark"]
+  #cgpt-list-filter
+  input:checked
+  + .cgpt-filter-pill {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  box-shadow: none !important;
+}
+body[data-cgtn-theme="dark"] #lv-pin:checked + .cgpt-filter-pill {
+  background: rgba(255, 59, 48, 0.2) !important;
+  color: #ff3b30 !important;
+  border-color: rgba(255, 59, 48, 0.5) !important;
+}
+
+body[data-cgtn-theme="dark"] #cgpt-list-body .row {
+  border-bottom-color: rgba(255, 255, 255, 0.05) !important;
+  color: #ececec !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .turn-idx-anchor::before {
+  color: #aaa !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.user-turn {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn {
+  background: rgba(16, 163, 127, 0.08) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .row:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+body[data-cgtn-theme="dark"] .cgtn-preview-btn,
+body[data-cgtn-theme="dark"] .cgtn-clip-pin {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-preview-btn:hover,
+body[data-cgtn-theme="dark"] .cgtn-clip-pin:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-clip-pin.on {
+  color: #ff3b30 !important;
+}
+
+body[data-cgtn-theme="dark"] .cgtn-badge {
+  background: #e11 !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px #222 !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-mini-btn {
+  color: #ececec !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-mini-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-foot svg path[stroke="#111827"],
+body[data-cgtn-theme="dark"] #cgpt-list-foot svg circle[stroke="#111827"] {
+  stroke: #ececec !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-foot svg path[fill="#111827"] {
+  fill: #ececec !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-foot svg text {
+  fill: #ececec !important;
+}
+
+body[data-cgtn-theme="dark"] .cgtn-dock-head {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ececec !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-dock-close,
+body[data-cgtn-theme="dark"] .cgtn-dock-resize {
+  color: #ececec !important;
+}
+body[data-cgtn-theme="dark"] .cgtn-dock-close:hover {
+  color: #fff !important;
+}
+
+body[data-cgtn-theme="dark"] #cgpt-list-body::-webkit-scrollbar-track,
+body[data-cgtn-theme="dark"] .cgtn-dock-body::-webkit-scrollbar-track,
+body[data-cgtn-theme="dark"] #cgtn-preview-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body::-webkit-scrollbar-thumb,
+body[data-cgtn-theme="dark"] .cgtn-dock-body::-webkit-scrollbar-thumb,
+body[data-cgtn-theme="dark"] #cgtn-preview-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body::-webkit-scrollbar-thumb:hover,
+body[data-cgtn-theme="dark"] .cgtn-dock-body::-webkit-scrollbar-thumb:hover,
+body[data-cgtn-theme="dark"]
+  #cgtn-preview-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ==========================================================================
+   機能系CSS (テーマによらない共通設定)
+   ========================================================================== */
+#cgpt-list-panel.pinonly #cgpt-list-body .row:not([data-pin="1"]) {
+  display: none;
+}
+#cgpt-list-filter:has(#lv-pin:checked)
+  + #cgpt-list-body:not(:has(.row[data-pin="1"]))
+  .cgtn-empty {
+  display: block !important;
+}

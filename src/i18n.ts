@@ -90,6 +90,11 @@
       "options.epsHint": "小さい=敏感 / 大きい=安定（目安 5–50）",
       "options.headerPx": "ヘッダー補正 (px)",
       "options.lockMs": "スクロールロック (ms)",
+      // ===== オプション画面 ===== 2026.02.24
+      "options.themeModeLabel": "カラーテーマ設定",
+      "options.theme_auto": "Auto (OS設定に連動)",
+      "options.theme_light": "プリズム・ホワイト (Light)",
+      "options.theme_dark": "プロフェッショナル (Dark)",
       // 入力設定 2026.02.11
       "options.sendKeyLabel": "送信キー設定",
       "options.sk_enter": "Enter (標準)",
@@ -231,6 +236,11 @@
       "options.epsHint": "Small-sensitive / Large=stable (5–50)",
       "options.headerPx": "Header offset (px)",
       "options.lockMs": "Scroll lock (ms)",
+      // ===== Options ===== 2026.02.24
+      "options.themeModeLabel": "Color Theme",
+      "options.theme_auto": "Auto (Sync with OS)",
+      "options.theme_light": "Prism White (Light)",
+      "options.theme_dark": "Professional (Dark)",
       // 入力設定 2026.02.11
       "options.sendKeyLabel": "Send Key",
       "options.sk_enter": "Enter (Default)",

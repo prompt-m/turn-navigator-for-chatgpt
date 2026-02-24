@@ -1589,7 +1589,12 @@
           #cgpt-list-panel.pinonly #cgpt-list-body .row:not([data-pin="1"]) {
             display:none;
           }
-        `;
+          /* ▼▼▼ 追加：ピンタブ選択中で、かつピン付き行が1件も無い時だけ Emptyメッセージを出す ▼▼▼ */
+          #cgpt-list-filter:has(#lv-pin:checked) + #cgpt-list-body:not(:has(.row[data-pin="1"])) .cgtn-empty {
+            display: block !important;
+          }            
+
+          `;
                 /* ここまで */
                 document.head.appendChild(st);
             }
@@ -1749,7 +1754,10 @@
         listBox.style.bottom = "auto";
         // ドラッグ保存
         (function enableDrag() {
-            const grip = listBox.querySelector("#cgpt-list-grip");
+            // ★修正: つまみ(grip)ではなく、ヘッダー全体(head)をドラッグ対象にする
+            const grip = listBox.querySelector("#cgpt-list-head");
+            if (!grip)
+                return; // ← 念のため追加
             let dragging = false, offX = 0, offY = 0;
             grip.addEventListener("pointerdown", (e) => {
                 dragging = true;
@@ -1777,47 +1785,6 @@
             });
         })();
         // enableDrag ここまで
-        // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
-        /*
-        (function bindRoleFilter(panel) {
-          const box = panel.querySelector("#cgpt-list-filter");
-          if (!box || box._cgtnBound) return;
-          box._cgtnBound = true;
-    
-          const applyFromChecked = () => {
-            const checked = box.querySelector('input[name="cgtn-lv"]:checked');
-            if (!checked) return;
-            // ---- ロール決定（User / Assistant / それ以外は All）----
-            let role = "all";
-            if (checked.id === "lv-user") role = "user";
-            if (checked.id === "lv-assist") role = "assistant";
-            NS.viewRole = role;
-            // ---- ★ pinOnly 状態を cfg に同期（Pinned ラジオが ON なら true）---- '25.11.28
-            try {
-              const cfg = SH.getCFG?.() || {};
-              const pinOnly = checked.id === "lv-pin"; // ← ここが肝
-              SH.saveSettingsPatch?.({
-                list: { ...(cfg.list || {}), pinOnly },
-              });
-            } catch (_) {}
-    
-            // フッターを再計算（会話数の分母/分子ロジックはこの中に既にある）
-            try {
-              window.CGTN_LOGIC?.updateListFooterInfo?.();
-            } catch (_) {}
-          };
-    
-          // ラジオ変更時にフッター更新
-          box.addEventListener("change", (e) => {
-            const input = e.target && e.target.closest('input[name="cgtn-lv"]');
-            if (!input) return;
-            applyFromChecked();
-          });
-    
-          // 初期状態も一度反映
-          applyFromChecked();
-        })(listBox);
-    */
         // ★ ロール切り替え（全体 / ユーザー / アシスタント）のバインド
         (function bindRoleFilter(panel) {
             const box = panel.querySelector("#cgpt-list-filter");
@@ -1848,17 +1815,6 @@
                     });
                 }
                 catch (_) { }
-                // =======================================================
-                // ★追加：ユーザーが「付箋」と「その他」のタブを行き来した時だけ、
-                // リストの中身を正しく再構築する！
-                // =======================================================
-                if (isUserAction &&
-                    pinOnlyChanged &&
-                    typeof window.CGTN_LOGIC?.renderList === "function") {
-                    window.CGTN_LOGIC.renderList(true, {
-                        pinOnlyOverride: checked.id === "lv-pin",
-                    });
-                }
                 try {
                     window.CGTN_LOGIC?.updateListFooterInfo?.();
                 }
@@ -2041,8 +1997,8 @@
         if (my !== _renderTicket)
             return;
         let turns = ST.all.slice();
-        if (pinOnly)
-            turns = turns.filter((_, i) => !!pinsArr[i]);
+        // 2026.02.24
+        //if (pinOnly) turns = turns.filter((_, i) => !!pinsArr[i]);
         const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
         const fontPx = (cfg.list?.fontSize || 12) + "px";
         // カウンタリセット
@@ -2232,17 +2188,30 @@
             body.appendChild(orphanDiv);
         }
         // ============================================================
+        /*
         // 空チェック
         let madeRows = body.querySelectorAll(".row").length;
         if (madeRows === 0 && pinOnly) {
-            const empty = document.createElement("div");
-            empty.className = "cgtn-empty";
-            empty.style.cssText = "padding:16px;opacity:.85;font-size:13px;";
-            empty.innerHTML = `
-        <div class="msg" data-kind="msg">${T("list.noPins")}</div>
-      `;
-            body.appendChild(empty);
+          const empty = document.createElement("div");
+          empty.className = "cgtn-empty";
+          empty.style.cssText = "padding:16px;opacity:.85;font-size:13px;";
+    
+          empty.innerHTML = `
+            <div class="msg" data-kind="msg">${T("list.noPins")}</div>
+          `;
+          body.appendChild(empty);
         }
+    */
+        // ★ `if` の条件判定を完全に削除し、常に empty を追加する！
+        const empty = document.createElement("div");
+        empty.className = "cgtn-empty";
+        // ★ style に `display: none;` を追加して普段は隠しておく
+        empty.style.cssText =
+            "padding:16px;opacity:.85;font-size:13px; display:none;";
+        empty.innerHTML = `
+      <div class="msg" data-kind="msg">${T("list.noPins")}</div>
+    `;
+        body.appendChild(empty);
         const rowsCount = body.querySelectorAll(".row").length;
         NS._lastVisibleRows = rowsCount;
         const box = pinOnly ? NS.metrics.pins : NS.metrics.all;
@@ -3059,6 +3028,60 @@
             SH.logError("[auto-sync] observe failed", e);
         }
     };
+    // ==========================================================================
+    // ★ カラーテーマの適用と監視 (2026.02.24)
+    // ==========================================================================
+    // 1. テーマ適用関数
+    NS.applyTheme = function (themeObj) {
+        const mode = themeObj?.mode || "auto";
+        let isDark = false;
+        if (mode === "dark") {
+            isDark = true;
+        }
+        else if (mode === "auto") {
+            // OSの設定がダークモードかどうかを判定
+            isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+        if (isDark) {
+            document.body.setAttribute("data-cgtn-theme", "dark");
+        }
+        else {
+            document.body.removeAttribute("data-cgtn-theme");
+        }
+    };
+    // 2. 初期化時に一度テーマを適用する（少し遅延させて設定ロードを待つ）
+    setTimeout(() => {
+        try {
+            const cfg = window.CGTN_SHARED?.getCFG?.() || {};
+            NS.applyTheme(cfg.theme);
+        }
+        catch (e) {
+            window.CGTN_SHARED?.logError?.("Theme init failed", e);
+        }
+    }, 200);
+    // 3. OSのテーマ設定変更をリアルタイム監視して自動切り替え
+    window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+        try {
+            const cfg = window.CGTN_SHARED?.getCFG?.() || {};
+            const mode = cfg.theme?.mode || "auto";
+            if (mode === "auto") {
+                NS.applyTheme({ mode: "auto" });
+            }
+        }
+        catch { }
+    });
+    // 4. オプション画面で設定が変更されたら、リアルタイムで色を切り替える
+    if (chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener((msg) => {
+            if (msg?.type === "cgtn:settings-updated" && msg.patch) {
+                if (msg.patch.theme) {
+                    NS.applyTheme(msg.patch.theme);
+                }
+            }
+        });
+    }
     // --- expose ---
     NS.ensureTurnsReady = ensureTurnsReady;
     NS.clearListFooterInfo = clearListFooterInfo;

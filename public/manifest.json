@@ -4,7 +4,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDesc__",
   "version": "1.1.0",
-  "version_name": "1.1.0 (2026-02-23)",
+  "version_name": "1.1.0 (2026-02-24)",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",
@@ -36,6 +36,9 @@
       "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*"
+      ],
+      "css": [
+        "ui.css"
       ],
       "js": [
         "i18n.js",

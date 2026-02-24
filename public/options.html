@@ -581,6 +581,38 @@
             詳細設定
           </div>
           <div class="settings">
+            <label for="themeMode"
+              ><b id="lbl-themeMode" data-i18n="options.themeModeLabel"
+                >カラーテーマ設定</b
+              >
+              <span class="badge-new">NEW!</span>
+            </label>
+            <select
+              id="themeMode"
+              name="themeMode"
+              style="
+                width: 242px;
+                max-width: 100%;
+                padding: 8px 10px;
+                border-radius: 10px;
+                border: 1px solid var(--bd);
+                background: var(--bg);
+                color: var(--fg);
+                font-size: 14px;
+              "
+            >
+              <option value="auto" data-i18n="options.theme_auto">
+                Auto (OS設定に連動)
+              </option>
+              <option value="light" data-i18n="options.theme_light">
+                プリズム・ホワイト (Light)
+              </option>
+              <option value="dark" data-i18n="options.theme_dark">
+                プロフェッショナル (Dark)
+              </option>
+            </select>
+          </div>
+          <div class="settings">
             <label for="sendKeyMethod"
               ><b id="lbl-sendKeyMethod" data-i18n="options.sendKeyLabel"
                 >送信キー設定</b
