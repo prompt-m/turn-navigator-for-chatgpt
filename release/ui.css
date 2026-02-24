@@ -324,11 +324,11 @@ input:checked + .slider:before {
   max-height: min(62vh, 680px);
   border-radius: 16px;
   overflow: hidden;
-  resize: horizontal;
+  resize: both !important; /* ★要望1: horizontal から both に変更（縦横リサイズ） */
   background: rgba(255, 255, 255, 0.98) !important;
   color: #0f172a !important;
-  border: 1px solid rgba(0, 0, 0, 0.18) !important; /* ★境界線を濃く */
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2) !important; /* ★影を深く */
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2) !important;
 }
 #cgpt-list-panel.no-anim * {
   transition: none !important;
@@ -345,39 +345,45 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 14px 10px 6px 10px; /* ★要望4: 上部に少し余白を作る */
   position: sticky;
   top: 0;
   z-index: 10;
   background: rgba(255, 255, 255, 0.95) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important; /* ★境界線 */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important;
   cursor: grab;
 }
 #cgpt-list-head:active {
   cursor: grabbing;
 }
 
-#cgpt-list-foot {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  padding: 6px 8px;
-  background: transparent !important;
-  border-top: 1px solid rgba(0, 0, 0, 0.12) !important;
+/* ★要望4: iOS風のスマートなドラッグハンドル（つまみ）を擬似要素で追加 */
+#cgpt-list-head::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
 }
+
 #cgpt-chat-title {
-  max-width: 100%;
-  white-space: nowrap;
+  flex: 1; /* ★タイトルエリアをめいっぱい広げる */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical; /* ★要望5: 2行表示にしてはみ出しを隠す */
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
   text-align: center;
   font-weight: 600;
   font-size: 13px;
   opacity: 0.9;
-  padding: 1px 6px 0;
-  line-height: 1.2;
+  padding: 0 4px;
+  line-height: 1.3;
   color: #0f172a !important;
 }
 #cgpt-list-foot-info {
@@ -388,16 +394,23 @@ input:checked + .slider:before {
   font-weight: 600;
 }
 
+/* ★要望3: 畳むボタンを「丸くて押しやすいモダンなデザイン」に！ */
 #cgpt-list-collapse {
   all: unset;
-  display: inline-grid;
-  place-items: center;
-  color: #334155 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50% !important; /* まん丸に */
+  font-weight: bold;
+  font-size: 14px;
+  flex-shrink: 0;
+  color: #475569 !important;
   background: #f1f5f9 !important;
   border: 1px solid #cbd5e1 !important;
-  border-radius: 6px;
-  padding: 2px 8px;
   cursor: pointer;
+  transition: 0.2s;
 }
 #cgpt-list-collapse:hover {
   background: #e2e8f0 !important;
@@ -472,12 +485,14 @@ input:checked + .slider:before {
   padding: 6px 8px;
 }
 #cgpt-list-body .row {
+  /* ★修正: stretchをcenterに変更し、上下に少し余白(padding)を入れてフィットさせる */
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 6px;
-  line-height: 1.7;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important; /* ★行の区切りを少しクッキリ */
-  color: #1e293b !important; /* ★文字を濃く */
+  line-height: 1.5;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f5f9 !important;
+  color: #334155 !important;
 }
 #cgpt-list-body .row::before {
   content: "";
@@ -525,13 +540,16 @@ input:checked + .slider:before {
 }
 
 /* 7. アイコン & ボタン類 */
+/* ★追加: アイコン群がフォントサイズ変更に押しつぶされないように flex-shrink: 0 を追加 */
 #cgpt-list-body .ops {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
   align-self: center;
+  flex-shrink: 0;
 }
+
 .cgtn-preview-btn,
 .cgtn-clip-pin {
   all: unset;
@@ -1016,6 +1034,21 @@ body[data-cgtn-theme="dark"]
   background: rgba(255, 255, 255, 0.4);
 }
 
+/* ダークテーマ用のつまみの色 */
+body[data-cgtn-theme="dark"] #cgpt-list-head::before {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 畳むボタンのダーク用カラー */
+body[data-cgtn-theme="dark"] #cgpt-list-collapse {
+  color: #ececec !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-collapse:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+}
 /* ==========================================================================
    機能系CSS (テーマによらない共通設定)
    ========================================================================== */

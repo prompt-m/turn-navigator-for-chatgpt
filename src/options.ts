@@ -23,7 +23,7 @@
     eps: 20,
     lockMs: 700,
     showViz: false,
-    list: { maxChars: 60, fontSize: 12 },
+    list: { maxChars: 30, fontSize: 12 },
     sendKeyMethod: "enter",
   };
 
@@ -90,10 +90,13 @@
       showViz: !!raw?.showViz,
       panel: raw?.panel || base.panel,
       list: {
+        enabled: chk("listEnabled"),
         pinOnly: !!(raw?.list?.pinOnly ?? base.list.pinOnly),
         maxItems: clamp(raw?.list?.maxItems ?? base.list.maxItems, 1, 200),
-        maxChars: clamp(raw?.list?.maxChars ?? base.list.maxChars, 10, 400),
-        fontSize: clamp(raw?.list?.fontSize ?? base.list.fontSize, 8, 24),
+        // ★修正: 文字数の上限下限を実用的な範囲(10〜100)に
+        maxChars: clamp(raw?.list?.maxChars ?? base.list.maxChars, 10, 100),
+        // ★修正: フォントサイズを 10〜18 に制限！
+        fontSize: clamp(raw?.list?.fontSize ?? base.list.fontSize, 10, 18),
         w: raw?.list?.w ?? base.list.w,
         h: raw?.list?.h ?? base.list.h,
         x: raw?.list?.x ?? base.list.x,

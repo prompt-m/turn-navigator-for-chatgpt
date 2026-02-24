@@ -510,7 +510,10 @@
       dock.innerHTML = `
         <div class="cgtn-dock-head">
           <span class="cgtn-dock-title"></span>
-          <button class="cgtn-dock-close" aria-label="Close">✕</button>
+          <div style="margin-left: auto; display: flex; gap: 16px; align-items: center;">
+            <button class="cgtn-dock-copy" aria-label="Copy" title="テキストをコピー" style="all: unset; cursor: pointer; font-size: 14px; opacity: 0.9;">📋</button>
+            <button class="cgtn-dock-close" aria-label="Close" style="margin: 0;">✕</button>
+          </div>
         </div>
         <div class="cgtn-dock-body"></div>
         <div class="cgtn-dock-resize" title="Resize">⤡</div>
@@ -577,6 +580,27 @@
         pinned = false;
       });
 
+      // =======================================================
+      // ★追加: コピーボタンの処理
+      // =======================================================
+      dock
+        .querySelector(".cgtn-dock-copy")
+        .addEventListener("click", async (e) => {
+          const btn = e.currentTarget as HTMLButtonElement;
+          try {
+            // ドックのボディ（テキストが入っている部分）の中身をコピー
+            await navigator.clipboard.writeText(body.textContent || "");
+
+            // 一瞬だけチェックマークにして成功を伝える
+            btn.textContent = "✅";
+            setTimeout(() => {
+              btn.textContent = "📋";
+            }, 1500);
+          } catch (err) {
+            console.error("Copy failed", err);
+          }
+        });
+
       // 移動（ヘッダー掴み）
       const head = dock.querySelector(".cgtn-dock-head");
       head.addEventListener("mousedown", (e) => {
@@ -635,11 +659,12 @@
       // === 言語切り替え対応：タイトルを再翻訳 ===
       (function setupDockTitleI18N() {
         const titleEl = dock.querySelector(".cgtn-dock-title");
-        if (!titleEl) return;
+        const copyBtn = dock.querySelector(".cgtn-dock-copy"); // ★追加
 
         const applyDockTitle = () => {
           const t = window.CGTN_I18N?.t || ((k) => k);
-          titleEl.textContent = t("preview.title");
+          if (titleEl) titleEl.textContent = t("preview.title");
+          if (copyBtn) copyBtn.title = t("preview.copy"); // ★追加
         };
 
         // 初期設定

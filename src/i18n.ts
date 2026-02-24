@@ -55,6 +55,7 @@
       listTurns: "ターン",
       preview: "プレビュー",
       "preview.title": "プレビュー",
+      "preview.copy": "テキストをコピー",
       attachments: "添付",
       "storage.saveFailed.title": "保存に失敗しました",
       "storage.saveFailed.body":
@@ -200,6 +201,7 @@
       listTurns: "turns",
       preview: "Preview",
       "preview.title": "Preview",
+      "preview.copy": "Copy text",
       attachments: "Attachments",
       "storage.saveFailed.title": "Save failed",
       "storage.saveFailed.body":
