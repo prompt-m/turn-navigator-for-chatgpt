@@ -393,6 +393,7 @@ input:checked + .slider:before {
   line-height: 1.3;
   color: #0f172a !important;
   min-height: 2.6em; /* ★常に2行分の高さを確保し、レイアウトを安定させる */
+  padding-top: 0.2em;
 }
 
 #cgpt-list-foot-info {
@@ -852,17 +853,26 @@ body[data-cgtn-theme="dark"] .cgpt-nav-group {
   border-color: #333 !important;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
 }
-body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="all"] {
-  background: #262329 !important;
-  border-color: #35313a !important;
-}
+
 body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="user"] {
-  background: #131c2b !important;
-  border-color: #1e293b !important;
+  background: #0f172a !important;
+  border-color: #2a2a2a !important;
 }
 body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="assistant"] {
-  background: #113322 !important;
-  border-color: #164a33 !important;
+  background: #0f172a !important;
+  border-color: #2a2a2a !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="all"] {
+  background: #0f172a !important;
+  border-color: #2a2a2a !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="tools"] {
+  background: #0f172a !important;
+  border-color: #2a2a2a !important;
+}
+body[data-cgtn-theme="dark"] .cgpt-nav-group[data-role="others"] {
+  background: #0f172a !important;
+  border-color: #2a2a2a !important;
 }
 
 body[data-cgtn-theme="dark"] .cgpt-nav-label {
@@ -892,7 +902,7 @@ body[data-cgtn-theme="dark"]
 body[data-cgtn-theme="dark"]
   .cgpt-nav-group[data-role="assistant"]
   .cgtn-pill-btn:hover {
-  background: #205c3d !important;
+  background: #273330 !important;
   color: #fff !important;
 }
 body[data-cgtn-theme="dark"]

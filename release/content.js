@@ -87,8 +87,8 @@
             const codeOld = STATE_CODE[this._state] ?? this._state;
             const codeNew = STATE_CODE[newState] ?? newState;
             const logStr = `State: [${codeOld}]${this._state} -> [${codeNew}]${newState} (${reason})`;
-            console.log(`[CGTN] ${logStr}`);
-            window.CGTN_SHARED?.addLog?.(logStr, "DEBUG");
+            //      console.log(`[CGTN] ${logStr}`);
+            //window.CGTN_SHARED?.addLog?.(logStr, "DEBUG");
             this._state = newState;
             if (typeof window.CGTN_LOGIC?.updateStatus === "function") {
                 window.CGTN_LOGIC.updateStatus();
@@ -196,7 +196,19 @@
                 const kind = SH.getPageInfo?.()?.kind || "other";
                 const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
                 if (kind === "chat" && turnsCount > 0) {
+                    console.log("rebuildAndRenderSafely最強の念押しの直前 kind:", kind, " turnsCount:", turnsCount);
                     RUN.changeState("ACTIVE", "rebuild-complete");
+                    // =========================================================
+                    // ★追加: 初回ロードでもチャット切替でも、必ず最後に通る「最強の念押し」
+                    // =========================================================
+                    setTimeout(() => {
+                        if (RUN.state === "ACTIVE" &&
+                            typeof window.CGTN_LOGIC?.rebuild === "function") {
+                            console.log("rebuildAndRenderSafely 念押しタイマー発動");
+                            window.CGTN_LOGIC.rebuild();
+                            window.CGTN_LOGIC.updateStatus?.();
+                        }
+                    }, 1500);
                 }
                 else {
                     RUN.changeState("STANDBY", "rebuild-complete-empty");
@@ -1184,7 +1196,7 @@
         // =========================================================
         RUN.changeState("LOADING", `app-start:${reason}`, "Loading...");
         const myGen = ++RUN.gen;
-        console.log(`[cgtn] startApp (${reason})`);
+        //    console.log(`[cgtn] startApp (${reason})`);
         const nav = document.getElementById("cgpt-nav");
         if (nav) {
             nav.classList.remove("disabled", "cgtn-standby");
@@ -1220,6 +1232,7 @@
             setTimeout(() => {
                 if (myGen === RUN.gen && RUN.state !== "OFF") {
                     if (typeof window.CGTN_LOGIC?.rebuild === "function") {
+                        console.log("startApp 更新処理と同じ処理");
                         window.CGTN_LOGIC.rebuild();
                     }
                     const kind = SH.getPageInfo?.()?.kind || "other";

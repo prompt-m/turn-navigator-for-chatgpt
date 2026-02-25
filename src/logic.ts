@@ -41,7 +41,6 @@
   }
 
   // stateに対応する表示切替え
-  // stateに対応する表示切替え
   NS.updateStatus = function updateStatus() {
     const SH = window.CGTN_SHARED;
     const UI = window.CGTN_UI;
@@ -93,7 +92,6 @@
     }
 
     // 状態④：ACTIVE（ターン有・ナビゲートON）
-    // 状態④：ACTIVE（ターン有・ナビゲートON）
     if (state === "ACTIVE") {
       const list = NS.ST?.all || [];
       const total = list.length;
@@ -142,28 +140,30 @@
       // --- 2. 現在地の計算 ---
       if (isBottom) {
         // ★ 一番下にいるなら、途中の計算をすっ飛ばして問答無用でMAXにする！
+        console.log("問答無用でMAX");
         current = total;
       } else {
-        // 一番下ではない場合は、今まで通り正確に計算する
-        const anchorY = SH.computeAnchor
-          ? SH.computeAnchor(cfg).y
-          : window.innerHeight * bias;
-        const yStar = (sc.scrollTop || 0) + anchorY;
+        console.log("絶対座標で正確に計算");
+        // ★改善：Universal版と同じ絶対座標(getBoundingClientRect)ベースの計算！
+        // スクロールコンテナの scrollTop や offsetTop の一時的な狂いに影響されません。
+        const vh = window.innerHeight;
+        const targetY = vh * bias; // 判定の基準線
 
         for (let i = 0; i < total; i++) {
-          const el = list[i];
-          const top =
-            typeof NS.articleTop === "function"
-              ? NS.articleTop(sc, el)
-              : el.offsetTop;
-          if (top <= yStar + eps) {
+          const rect = list[i].getBoundingClientRect();
+
+          // 要素の上端が「基準線＋遊び(eps)」より上にあれば、それを現在地とする
+          if (rect.top <= targetY + eps) {
             current = i + 1;
           } else {
             break; // 基準線を越えたら探索終了
           }
         }
-      }
 
+        // ガタつきで1件も見つからなかった時のための保護
+        if (current === 0) current = 1;
+      }
+      console.log("updatestatus:[", current, "/", total, "]");
       UI?.updateStatusDisplay?.(`${current} / ${total}`);
     }
   };
@@ -3332,6 +3332,7 @@
       safetyTo = window.setTimeout(() => {
         try {
           if (typeof NS.rebuild === "function") {
+            console.log("installAutoSyncForTurns 更新処理と同じ処理 rebuild");
             NS.rebuild();
           }
 
@@ -3341,10 +3342,16 @@
             typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
           if (open) {
             if (typeof NS.renderList === "function") {
+              console.log(
+                "installAutoSyncForTurns 更新処理と同じ処理 renderList",
+              );
               NS.renderList(true);
             }
           } else {
             if (typeof NS.updateStatus === "function") {
+              console.log(
+                "installAutoSyncForTurns 更新処理と同じ処理 updatestatus",
+              );
               NS.updateStatus();
             }
           }
