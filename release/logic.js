@@ -31,12 +31,13 @@
             (list && (node === list || list.contains(node))));
     }
     // stateに対応する表示切替え
+    // stateに対応する表示切替え
     NS.updateStatus = function updateStatus() {
         const SH = window.CGTN_SHARED;
         const UI = window.CGTN_UI;
         const app = window.CGTN_APP;
         const state = app?.getState ? app.getState() : "OFF";
-        // ▼▼▼ 追加: 物理的にクリックをブロックするバリア ▼▼▼
+        // ▼▼▼ 物理バリア等既存コード維持 ▼▼▼
         const ids = ["cgpt-nav", "cgpt-list-panel"];
         const isBusy = state === "LOADING";
         for (const id of ids) {
@@ -55,17 +56,14 @@
             }
         }
         // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-        // 状態①・③：OFF（ナビゲートOFF）
         if (state === "OFF") {
             UI?.setPanelOffState?.();
             return;
         }
-        // ON状態ならパネルを表示・操作可能にする
         const nav = document.getElementById("cgpt-nav");
         if (nav) {
             nav.classList.remove("disabled", "cgtn-standby");
         }
-        // 遷移状態：LOADING
         if (state === "LOADING") {
             const msg = typeof app?.getLoadingMsg === "function"
                 ? app.getLoadingMsg()
@@ -73,11 +71,11 @@
             UI?.updateStatusDisplay?.(msg);
             return;
         }
-        // 状態②：STANDBY（ターン無・ナビゲートON）
         if (state === "STANDBY") {
             UI?.updateStatusDisplay?.("Standby");
             return;
         }
+        // 状態④：ACTIVE（ターン有・ナビゲートON）
         // 状態④：ACTIVE（ターン有・ナビゲートON）
         if (state === "ACTIVE") {
             const list = NS.ST?.all || [];
@@ -87,22 +85,56 @@
                 UI?.updateStatusDisplay?.("Standby");
                 return;
             }
-            // ACTIVE専用のスクロール位置計算と数字(n/m)表示
-            const sc = NS._scroller || document.scrollingElement || document.documentElement;
-            const anchorY = SH.computeAnchor ? SH.computeAnchor(SH.getCFG()).y : 0;
-            const yStar = (sc.scrollTop || 0) + anchorY;
-            const eps = Number(SH.getCFG?.()?.eps) || 20;
-            let current = 0;
-            for (let i = 0; i < total; i++) {
-                const el = list[i];
-                const top = typeof NS.articleTop === "function"
-                    ? NS.articleTop(sc, el)
-                    : el.offsetTop;
-                if (top <= yStar + eps) {
-                    current = i + 1;
+            // =======================================================
+            // ★改善: 絶対座標と相対座標のハイブリッド最強判定
+            // =======================================================
+            const sc = typeof getTrueScroller === "function"
+                ? getTrueScroller()
+                : NS._scroller || document.scrollingElement;
+            const cfg = SH.getCFG?.() || {};
+            const bias = Number(cfg.centerBias) || 0.4;
+            const eps = Number(cfg.eps) || 20;
+            let current = 1;
+            let isBottom = false;
+            // --- 1. 一番下にいるかどうかの絶対判定（これで1に戻るバグを物理的に封殺！） ---
+            // 判定A: スクロールコンテナの計算上、一番下にいるか
+            if (sc && sc.scrollHeight > 0 && sc.clientHeight > 0) {
+                if (sc.scrollHeight - Math.ceil(sc.scrollTop) <= sc.clientHeight + 10) {
+                    isBottom = true;
                 }
-                else {
-                    break;
+            }
+            // 判定B: 最後のターン(要素)が画面内に直接見えているか
+            const lastEl = list[total - 1];
+            if (lastEl) {
+                const r = lastEl.getBoundingClientRect();
+                // 上端が画面内にある、あるいは下端が画面の底辺付近にあるなら一番下とみなす
+                if ((r.top >= 0 && r.top <= window.innerHeight) ||
+                    (r.bottom >= 0 && r.bottom <= window.innerHeight + 50)) {
+                    isBottom = true;
+                }
+            }
+            // --- 2. 現在地の計算 ---
+            if (isBottom) {
+                // ★ 一番下にいるなら、途中の計算をすっ飛ばして問答無用でMAXにする！
+                current = total;
+            }
+            else {
+                // 一番下ではない場合は、今まで通り正確に計算する
+                const anchorY = SH.computeAnchor
+                    ? SH.computeAnchor(cfg).y
+                    : window.innerHeight * bias;
+                const yStar = (sc.scrollTop || 0) + anchorY;
+                for (let i = 0; i < total; i++) {
+                    const el = list[i];
+                    const top = typeof NS.articleTop === "function"
+                        ? NS.articleTop(sc, el)
+                        : el.offsetTop;
+                    if (top <= yStar + eps) {
+                        current = i + 1;
+                    }
+                    else {
+                        break; // 基準線を越えたら探索終了
+                    }
                 }
             }
             UI?.updateStatusDisplay?.(`${current} / ${total}`);
@@ -1338,6 +1370,10 @@
             ST.all = [];
             ST.user = [];
             ST.assistant = [];
+            // ★追加：チャット切り替え時に現在地記憶もリセットする
+            NS._lastCalculatedTurn = 1;
+            // ★追加：ピンカウントのキャッシュも確実に 0 にクリア！
+            NS.validPinsCount = 0;
             // ★追加：ピンカウントのキャッシュも確実に 0 にクリア！
             NS.validPinsCount = 0;
             NS.orphanPinsCount = 0;
@@ -1391,21 +1427,9 @@
         listBox = document.createElement("div");
         listBox.id = "cgpt-list-panel";
         listBox.innerHTML = `
-      <div id="cgpt-list-head"
-           style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-                  padding:2px 6px 3px;
-                  border-bottom:1px solid rgba(0,0,0,0.15);
-                  background:rgba(255,255,255,0.95);backdrop-filter:blur(4px);
-                  position:sticky;top:0;z-index:1;">
-        <div id="cgpt-list-grip"></div>
-        <!-- ★ チャット名（つまみの下＝ヘッダ中央）。幅はパネル内に収めて…省略 -->
-        <div id="cgpt-chat-title-wrap" style="order:2;flex:1 0 100%;min-width:0">
-         <div id="cgpt-chat-title"
-               style="max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                      text-align:center;font-weight:600;font-size:13px;opacity:.9;padding:2px 4px;">
-         </div>
-        </div>
+      <div id="cgpt-list-head">
         <button id="cgpt-list-collapse" aria-expanded="true">▴</button>
+        <div id="cgpt-chat-title"></div>
       </div>
 
       <!-- ★ 表示切替（CSSだけで絞り込み） -->
@@ -1760,6 +1784,9 @@
                 return; // ← 念のため追加
             let dragging = false, offX = 0, offY = 0;
             grip.addEventListener("pointerdown", (e) => {
+                // ★追加: 押した場所が「ボタン」なら、ドラッグは開始しない！
+                if (e.target.closest("button"))
+                    return;
                 dragging = true;
                 const r = listBox.getBoundingClientRect();
                 offX = e.clientX - r.left;

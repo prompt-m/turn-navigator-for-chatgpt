@@ -22,9 +22,9 @@
   transition: opacity 0.2s;
   font-size: 11px;
   background: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.15) !important; /* ★少し濃く */
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
   border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important; /* ★影をシャープに */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
 }
 
 #cgpt-nav.disabled {
@@ -52,14 +52,14 @@
 
 /* 2. ヘッダー & モニター (Nav) */
 .cgtn-unified-header {
-  background: #f1f5f9 !important; /* ★少し色をつけて本体との境界をハッキリ */
+  background: #f1f5f9 !important;
   color: #0f172a !important;
   padding: 16px 8px 14px 8px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   cursor: grab;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important; /* ★境界線を濃く */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important;
 }
 .cgtn-unified-header:active {
   cursor: grabbing;
@@ -219,7 +219,7 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 5px;
   background: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important; /* ★クッキリ */
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
 .cgpt-nav-group[data-role="user"] {
   background: #f4f7fb !important;
@@ -265,7 +265,7 @@ input:checked + .slider:before {
 .cgtn-pill-btn:hover {
   background: #e2e8f0 !important;
   color: #0f172a !important;
-} /* ★ホバーを少し強く */
+}
 
 #cgpt-list-btn.active {
   background: #0066cc !important;
@@ -324,32 +324,39 @@ input:checked + .slider:before {
   max-height: min(62vh, 680px);
   border-radius: 16px;
   overflow: hidden;
-  resize: both !important; /* ★要望1: horizontal から both に変更（縦横リサイズ） */
+  resize: both !important;
   background: rgba(255, 255, 255, 0.98) !important;
   color: #0f172a !important;
   border: 1px solid rgba(0, 0, 0, 0.18) !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2) !important;
 }
+
 #cgpt-list-panel.no-anim * {
   transition: none !important;
 }
+
+/* ★修正: 高さを強引に潰すのをやめ、中身（ヘッダー）の高さに自然に合わせる */
 #cgpt-list-panel.collapsed {
-  max-height: 38px;
-}
-#cgpt-list-panel.collapsed #cgpt-list-body,
-#cgpt-list-panel.collapsed #cgpt-list-foot {
-  display: none;
+  height: auto !important;
+  min-height: 0 !important;
 }
 
+/* ★修正: ボディとフッターに加え、フィルタータブも非表示にする */
+#cgpt-list-panel.collapsed #cgpt-list-filter,
+#cgpt-list-panel.collapsed #cgpt-list-body,
+#cgpt-list-panel.collapsed #cgpt-list-foot {
+  display: none !important;
+}
 #cgpt-list-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* ★上揃えに変更 */
   gap: 8px;
-  padding: 14px 10px 6px 10px; /* ★要望4: 上部に少し余白を作る */
+  padding: 12px 10px 8px 10px; /* ★上はつまみ用に広め、左右下は均等に */
   position: sticky;
   top: 0;
   z-index: 10;
   background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(4px); /* ★すりガラス効果復活 */
   border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important;
   cursor: grab;
 }
@@ -357,11 +364,11 @@ input:checked + .slider:before {
   cursor: grabbing;
 }
 
-/* ★要望4: iOS風のスマートなドラッグハンドル（つまみ）を擬似要素で追加 */
+/* iOS風のドラッグつまみ */
 #cgpt-list-head::before {
   content: "";
   position: absolute;
-  top: 5px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
   width: 36px;
@@ -370,22 +377,24 @@ input:checked + .slider:before {
   background: rgba(0, 0, 0, 0.15);
 }
 
+/* ★要望: タイトルをボタンの横に配置し、2行分の高さを確保 */
 #cgpt-chat-title {
-  flex: 1; /* ★タイトルエリアをめいっぱい広げる */
+  flex: 1;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-  -webkit-box-orient: vertical; /* ★要望5: 2行表示にしてはみ出しを隠す */
+  -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: normal;
-  text-align: center;
+  text-align: left; /* ★中央揃えから左揃えに変更して読みやすく */
   font-weight: 600;
   font-size: 13px;
   opacity: 0.9;
-  padding: 0 4px;
   line-height: 1.3;
   color: #0f172a !important;
+  min-height: 2.6em; /* ★常に2行分の高さを確保し、レイアウトを安定させる */
 }
+
 #cgpt-list-foot-info {
   color: #475569 !important;
   margin-left: auto;
@@ -394,29 +403,31 @@ input:checked + .slider:before {
   font-weight: 600;
 }
 
-/* ★要望3: 畳むボタンを「丸くて押しやすいモダンなデザイン」に！ */
+/* ★要望: 畳むボタンのサイズを18pxにし、配置を整える */
 #cgpt-list-collapse {
   all: unset;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50% !important; /* まん丸に */
+  width: 18px;
+  height: 18px;
+  border-radius: 50% !important;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 12px;
   flex-shrink: 0;
   color: #475569 !important;
   background: #f1f5f9 !important;
   border: 1px solid #cbd5e1 !important;
   cursor: pointer;
   transition: 0.2s;
+  margin-top: 1px; /* ★タイトルテキストの高さとピッタリ合わせる魔法の1px */
 }
 #cgpt-list-collapse:hover {
   background: #e2e8f0 !important;
   color: #0f172a !important;
   border-color: #94a3b8 !important;
 }
+
 #cgpt-list-grip {
   display: none !important;
 }
@@ -478,18 +489,21 @@ input:checked + .slider:before {
   box-shadow: none !important;
 }
 
-/* 6. リストボディ・行 (Rows) */
+/* =======================================================
+   6. リストボディ・行 (Rows) - ★極限圧縮版
+   ======================================================= */
 #cgpt-list-body {
   flex: 1;
   overflow: auto;
-  padding: 6px 8px;
-}
+  padding: 4px 6px;
+} /* 余白を削る */
+
 #cgpt-list-body .row {
   display: flex;
   align-items: center;
-  gap: 0.5em; /* ★ 6px -> 0.5em に変更 */
-  line-height: 1.5;
-  padding: 0.3em 0; /* ★ 4px -> 0.3em に変更 */
+  gap: 0.2em; /* ★ 0.5em -> 0.2em (アイコンと文字の隙間) */
+  line-height: 1.3; /* ★ 1.5 -> 1.3 (文字の上下の隙間) */
+  padding: 0.1em 0; /* ★ 0.3em -> 0.1em (行同士の隙間) */
   border-bottom: 1px solid #f1f5f9 !important;
   color: #334155 !important;
 }
@@ -497,10 +511,10 @@ input:checked + .slider:before {
   content: "";
   display: inline-block;
   min-width: 2em;
-  margin-right: 0.6em; /* ★ 8px -> 0.6em に変更 */
+  margin-right: 0.4em; /* ★ 番号とテキストの隙間を詰める */
   text-align: right;
   opacity: 0;
-  font-size: 0.9em; /* ★ 11px -> 0.9em に変更 */
+  font-size: 0.9em;
   line-height: inherit;
   vertical-align: middle;
 }
@@ -532,39 +546,42 @@ input:checked + .slider:before {
   cursor: pointer;
 }
 #cgpt-list-body .attach {
-  margin-left: 0.5em;
+  margin-left: 0.4em;
   opacity: 0.75;
   font-size: 0.9em;
   white-space: nowrap;
 }
 
-/* 7. アイコン & ボタン類 */
+/* =======================================================
+   7. アイコン & ボタン類 - ★完全正方形・サイズ統一版
+   ======================================================= */
 #cgpt-list-body .ops {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.3em; /* ★ 4px -> 0.3em に変更 */
+  gap: 0.1em; /* ★ アイコン同士の隙間を詰める */
   align-self: center;
   flex-shrink: 0;
 }
 
+/* ★ paddingを廃止し、widthとheightで正方形の「箱」を強制する */
 .cgtn-preview-btn,
 .cgtn-clip-pin {
   all: unset;
-  font-size: 1em; /* ★ 12px固定を廃止し、親文字サイズに合わせる！ */
-  padding: 0.25em 0.4em; /* ★ 3px 5px -> 相対値に変更 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em; /* 固定幅 */
+  height: 1.6em; /* 固定高 */
   color: #94a3b8 !important;
+  cursor: pointer !important;
+  border-radius: 4px;
+  transition: 0.1s;
 }
 .cgtn-preview-btn:hover,
 .cgtn-clip-pin:hover {
   color: #0f172a !important;
   background: #cbd5e1 !important;
-  border-radius: 4px;
-}
-
-.cgtn-clip-pin,
-.cgtn-preview-btn {
-  cursor: pointer !important;
 }
 
 #cgpt-list-panel .row .clip-dummy {
@@ -574,15 +591,74 @@ input:checked + .slider:before {
 .cgtn-clip-pin.on {
   color: #ef4444 !important;
 }
+
+/* SVG（付箋）を箱より少し小さく配置 */
 #cgpt-list-body .cgtn-clip-pin svg.cgtn-pin-svg {
-  width: 1.2em; /* ★ 16px固定を廃止し、文字より少し大きめに設定！ */
-  height: 1.2em; /* ★ 同上 */
+  width: 1.1em;
+  height: 1.1em;
   display: block;
   stroke: currentColor;
   fill: none;
 }
 #cgpt-list-body .cgtn-clip-pin.on svg.cgtn-pin-svg {
   fill: currentColor;
+}
+
+/* 虫眼鏡（絵文字）のサイズ微調整 */
+.cgtn-preview-btn {
+  font-size: 1.1em;
+}
+
+.cgtn-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444 !important;
+  color: #fff !important;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cgtn-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.cgtn-mini-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+.cgtn-mini-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+#cgpt-list-foot svg path[stroke="#111827"],
+#cgpt-list-foot svg circle[stroke="#111827"] {
+  stroke: #334155 !important;
+}
+#cgpt-list-foot svg path[fill="#111827"] {
+  fill: #334155 !important;
+}
+#cgpt-list-foot svg text {
+  fill: #334155 !important;
 }
 
 /* 8. プレビュー & ドック */
@@ -623,6 +699,7 @@ input:checked + .slider:before {
 .cgtn-popover[data-show="1"] {
   display: block;
 }
+
 .cgtn-dock {
   position: absolute;
   width: 460px;
@@ -637,17 +714,23 @@ input:checked + .slider:before {
 .cgtn-dock[data-show="1"] {
   display: block;
 }
+
+/* ★ 修正: プレビューパネル(Dock)のヘッダーを手のひらカーソル(grab)に！ */
 .cgtn-dock-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  cursor: move;
+  cursor: grab; /* ← moveからgrabに変更 */
   font-weight: 600;
   background: #f1f5f9 !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.12) !important;
   color: #0f172a !important;
 }
+.cgtn-dock-head:active {
+  cursor: grabbing;
+} /* ← 掴んでいる時はgrabbingに */
+
 .cgtn-dock-title {
   font-weight: 600;
   font-size: 12px;
@@ -717,7 +800,6 @@ input:checked + .slider:before {
 
 /* ==========================================================================
    🌙 ダークテーマ (Professional Dark) - オーバーライド
-   ※ body[data-cgtn-theme="dark"] が付与された時に、上記の色を上書きします
    ========================================================================== */
 
 body[data-cgtn-theme="dark"] #cgpt-nav {
@@ -825,7 +907,6 @@ body[data-cgtn-theme="dark"]
   background: #ededed !important;
   color: #000 !important;
 }
-
 body[data-cgtn-theme="dark"] #cgpt-list-btn.active {
   background: #0066cc !important;
   color: #fff !important;
@@ -866,6 +947,7 @@ body[data-cgtn-theme="dark"] #cgpt-list-collapse {
 }
 body[data-cgtn-theme="dark"] #cgpt-list-collapse:hover {
   background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
 }
 
 body[data-cgtn-theme="dark"] #cgpt-list-filter {
@@ -915,6 +997,7 @@ body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn:hover {
   background: rgba(255, 255, 255, 0.12) !important;
 }
 
+/* ★ ダークモード側のアイコンホバー設定 */
 body[data-cgtn-theme="dark"] .cgtn-preview-btn,
 body[data-cgtn-theme="dark"] .cgtn-clip-pin {
   color: rgba(255, 255, 255, 0.5) !important;
@@ -937,7 +1020,7 @@ body[data-cgtn-theme="dark"] .cgtn-mini-btn {
   color: #ececec !important;
 }
 body[data-cgtn-theme="dark"] .cgtn-mini-btn:hover {
-  background-color: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
 }
 body[data-cgtn-theme="dark"] #cgpt-list-foot svg path[stroke="#111827"],
 body[data-cgtn-theme="dark"] #cgpt-list-foot svg circle[stroke="#111827"] {
@@ -980,21 +1063,10 @@ body[data-cgtn-theme="dark"]
   background: rgba(255, 255, 255, 0.4);
 }
 
-/* ダークテーマ用のつまみの色 */
 body[data-cgtn-theme="dark"] #cgpt-list-head::before {
   background: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* 畳むボタンのダーク用カラー */
-body[data-cgtn-theme="dark"] #cgpt-list-collapse {
-  color: #ececec !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-}
-body[data-cgtn-theme="dark"] #cgpt-list-collapse:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  color: #fff !important;
-}
 /* ==========================================================================
    機能系CSS (テーマによらない共通設定)
    ========================================================================== */

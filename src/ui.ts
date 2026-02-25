@@ -22,17 +22,15 @@
   const pinCurURL = chrome.runtime.getURL("assets/pin16.png");
   const prvCurURL = chrome.runtime.getURL("assets/prev16.png");
 
-  /* ==========================================================================
-     CSS 定義 (幅100px & 12pxフォント対応)
-     ========================================================================== */
-  //  const ALL_CSS = ``;// cssお引越し
-
-  //  const injectCss = (css) => {
-  //    const s = document.createElement("style");
-  //    s.textContent = css;
-  //    document.head.appendChild(s);
-  //  };
-  //  injectCss(ALL_CSS);
+  // =======================================================
+  // ★ マウスカーソルの動的適用（CSSファイル分離対応）
+  // =======================================================
+  const style = document.createElement("style");
+  style.textContent = `
+    .cgtn-clip-pin { cursor: url(${pinCurURL}), pointer !important; }
+    .cgtn-preview-btn { cursor: url(${prvCurURL}), pointer !important; }
+  `;
+  document.head.appendChild(style);
 
   // ★ 追加: テーマ適用関数
   NS.applyTheme = function (themeObj?: { mode?: "auto" | "light" | "dark" }) {

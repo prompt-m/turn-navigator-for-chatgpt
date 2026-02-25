@@ -569,11 +569,13 @@
             // === 言語切り替え対応：タイトルを再翻訳 ===
             (function setupDockTitleI18N() {
                 const titleEl = dock.querySelector(".cgtn-dock-title");
-                if (!titleEl)
-                    return;
+                const copyBtn = dock.querySelector(".cgtn-dock-copy"); // ★追加
                 const applyDockTitle = () => {
                     const t = window.CGTN_I18N?.t || ((k) => k);
-                    titleEl.textContent = t("preview.title");
+                    if (titleEl)
+                        titleEl.textContent = t("preview.title");
+                    if (copyBtn)
+                        copyBtn.title = t("preview.copy"); // ★追加
                 };
                 // 初期設定
                 applyDockTitle();
