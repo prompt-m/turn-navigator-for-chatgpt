@@ -153,6 +153,7 @@
   function sendToActive(payload) {
     return new Promise((resolve) => {
       const urls = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
+      /*
       chrome.tabs.query(
         { url: urls, active: true, lastFocusedWindow: true },
         (tabs) => {
@@ -165,6 +166,7 @@
           });
         },
       );
+      */
     });
   }
 
@@ -571,7 +573,7 @@
       const cfgNow = (SH.getCFG && SH.getCFG()) || DEF;
       SH.renderViz?.(cfgNow, on);
     } catch {}
-
+    /*
     chrome.tabs.query(
       { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
       (tabs) => {
@@ -581,6 +583,7 @@
         });
       },
     );
+    */
   });
 
   // ========================================================
@@ -589,6 +592,7 @@
   const broadcastSettingsUpdate = (patch) => {
     SH.saveSettingsPatch?.(patch, () => {
       flashMsgInline("msg-adv", "options.saved");
+      /*
       chrome.tabs.query(
         { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
         (tabs) => {
@@ -602,6 +606,7 @@
           });
         },
       );
+      */
     });
   };
 
@@ -627,6 +632,7 @@
     if (ok) {
       try {
         const targets = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
+        /*
         chrome.tabs.query({ url: targets }, (tabs) => {
           tabs.forEach((tab) => {
             if (tab.id) {
@@ -637,6 +643,7 @@
             }
           });
         });
+        */
       } catch {}
 
       await renderPinsManager();

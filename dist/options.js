@@ -124,16 +124,20 @@
     function sendToActive(payload) {
         return new Promise((resolve) => {
             const urls = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
-            chrome.tabs.query({ url: urls, active: true, lastFocusedWindow: true }, (tabs) => {
+            /*
+            chrome.tabs.query(
+              { url: urls, active: true, lastFocusedWindow: true },
+              (tabs) => {
                 const t = tabs?.[0];
-                if (!t?.id)
-                    return resolve({ ok: false, reason: "no-tab" });
+                if (!t?.id) return resolve({ ok: false, reason: "no-tab" });
                 chrome.tabs.sendMessage(t.id, payload, (res) => {
-                    if (chrome.runtime.lastError)
-                        return resolve({ ok: false, reason: "no-response" });
-                    resolve(res || { ok: false, reason: "empty" });
+                  if (chrome.runtime.lastError)
+                    return resolve({ ok: false, reason: "no-response" });
+                  resolve(res || { ok: false, reason: "empty" });
                 });
-            });
+              },
+            );
+            */
         });
     }
     function applyToUI(cfg) {
@@ -478,13 +482,17 @@
             SH.renderViz?.(cfgNow, on);
         }
         catch { }
-        chrome.tabs.query({ url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] }, (tabs) => {
+        /*
+        chrome.tabs.query(
+          { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
+          (tabs) => {
             tabs.forEach((tab) => {
-                if (!tab.id)
-                    return;
-                chrome.tabs.sendMessage(tab.id, { type: "cgtn:viz-toggle", on });
+              if (!tab.id) return;
+              chrome.tabs.sendMessage(tab.id, { type: "cgtn:viz-toggle", on });
             });
-        });
+          },
+        );
+        */
     });
     // ========================================================
     // ★統合・整理済: プルダウン類の即時反映 (changeイベント)
@@ -492,16 +500,21 @@
     const broadcastSettingsUpdate = (patch) => {
         SH.saveSettingsPatch?.(patch, () => {
             flashMsgInline("msg-adv", "options.saved");
-            chrome.tabs.query({ url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] }, (tabs) => {
+            /*
+            chrome.tabs.query(
+              { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
+              (tabs) => {
                 tabs.forEach((tab) => {
-                    if (tab.id) {
-                        chrome.tabs.sendMessage(tab.id, {
-                            type: "cgtn:settings-updated",
-                            patch: patch,
-                        });
-                    }
+                  if (tab.id) {
+                    chrome.tabs.sendMessage(tab.id, {
+                      type: "cgtn:settings-updated",
+                      patch: patch,
+                    });
+                  }
                 });
-            });
+              },
+            );
+            */
         });
     };
     document.getElementById("sendKeyMethod")?.addEventListener("change", (ev) => {
@@ -521,16 +534,18 @@
         if (ok) {
             try {
                 const targets = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
+                /*
                 chrome.tabs.query({ url: targets }, (tabs) => {
-                    tabs.forEach((tab) => {
-                        if (tab.id) {
-                            chrome.tabs.sendMessage(tab.id, {
-                                type: "cgtn:pins-deleted",
-                                chatId,
-                            });
-                        }
-                    });
+                  tabs.forEach((tab) => {
+                    if (tab.id) {
+                      chrome.tabs.sendMessage(tab.id, {
+                        type: "cgtn:pins-deleted",
+                        chatId,
+                      });
+                    }
+                  });
                 });
+                */
             }
             catch { }
             await renderPinsManager();

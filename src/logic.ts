@@ -3509,13 +3509,32 @@
         }
       } catch {}
     });
-
+  /*
   // 4. オプション画面で設定が変更されたら、リアルタイムで色を切り替える
   if (chrome.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg?.type === "cgtn:settings-updated" && msg.patch) {
         if (msg.patch.theme) {
           NS.applyTheme(msg.patch.theme);
+        }
+      }
+    });
+  }
+*/
+  // 4. ストレージの変更を監視して、リアルタイムで設定を反映する
+  if (chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "sync" && changes.settings) {
+        // 変更された新しい設定値を取得
+        const newValue = (changes.settings.newValue || {}) as any;
+        // ① テーマが変更されていれば即時反映
+        if (newValue.theme) {
+          NS.applyTheme(newValue.theme);
+        }
+
+        // ② リストの幅が変更されていれば即時反映
+        if (newValue.list && newValue.list.maxChars) {
+          NS.applyPanelWidthByChars(newValue.list.maxChars);
         }
       }
     });
