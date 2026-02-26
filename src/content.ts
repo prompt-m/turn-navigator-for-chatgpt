@@ -3,6 +3,12 @@
   "use strict";
   if (document.getElementById("cgpt-nav")) return;
 
+  if ((window as any).__CGTN_RUNNING__) {
+    console.warn("[CGTN] duplicate injection blocked");
+  } else {
+    (window as any).__CGTN_RUNNING__ = true;
+  }
+
   const SH = window.CGTN_SHARED;
   const UI = window.CGTN_UI;
   const EV = window.CGTN_EVENTS;

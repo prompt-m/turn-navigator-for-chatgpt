@@ -1080,15 +1080,38 @@
             NS.updateListFooterInfo?.();
         }
         catch (_) { }
-        // ★追加: もしリストパネルが開いたまま一括操作したなら、リスト全体を再描画して変更を反映する
-        // (pinOnlyモードの時に不要な行を消すため)
-        if (typeof window.CGTN_SHARED?.isListOpen === "function" &&
-            window.CGTN_SHARED.isListOpen()) {
-            NS.renderList?.(true);
+        // ★ pinOnly の時だけ、DOMをその場でフィルタして見た目を合わせる（renderListしない）
+        try {
+            const cfgNow = SH.getCFG?.() || {};
+            const pinOnly = !!cfgNow?.list?.pinOnly;
+            if (pinOnly &&
+                typeof window.CGTN_SHARED?.isListOpen === "function" &&
+                window.CGTN_SHARED.isListOpen()) {
+                const body = qListBody(); // ※Mikiさんの環境のリスト取得関数に合わせてください
+                if (body) {
+                    const rows = body.querySelectorAll(".row[data-idx]");
+                    let visibleCount = 0; // 見える行数をカウントする
+                    rows.forEach((r) => {
+                        if (!(r instanceof HTMLElement))
+                            return;
+                        const pinned = r.dataset.pin === "1";
+                        // pinOnly なら pinned だけ表示
+                        r.style.display = pinned ? "" : "none";
+                        if (pinned)
+                            visibleCount++;
+                    });
+                    // ★Gemの追加：もし全部OFFにして見える行が「0」になったら、
+                    // 「付箋がありません」のメッセージを出すために、そこだけ例外的にrenderListを呼ぶ！
+                    if (visibleCount === 0) {
+                        NS.renderList?.(true);
+                    }
+                }
+            }
+        }
+        catch (e) {
+            SH.logError("[bulkSetPins] quick filter failed", e);
         }
     }
-    NS.bulkSetPins = bulkSetPins;
-    // どこかの「公開テーブル」にまだ載せていなければこれも追加
     NS.bulkSetPins = bulkSetPins;
     const NAV_SNAP = { smoothMs: 220, idleFrames: 2, maxTries: 5, epsPx: 0.75 };
     const nextFrame = () => new Promise((r) => requestAnimationFrame(r));

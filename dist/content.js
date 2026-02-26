@@ -3,6 +3,7 @@
     "use strict";
     if (document.getElementById("cgpt-nav"))
         return;
+    console.info("[CGTN] build=1.1.0-20260227");
     const SH = window.CGTN_SHARED;
     const UI = window.CGTN_UI;
     const EV = window.CGTN_EVENTS;

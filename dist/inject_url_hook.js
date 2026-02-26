@@ -102,6 +102,10 @@
         catch { }
     }
     window.addEventListener("popstate", () => fireUrlChange("popstate"), true);
-    // 2026.02.01 1000 -> 3000
-    setInterval(() => fireUrlChange("poll"), 3000);
+    // ★修正：裏タブ（非表示）の時は監視をストップしてメモリを節約する
+    setInterval(() => {
+        if (document.visibilityState !== "visible")
+            return;
+        fireUrlChange("poll");
+    }, 3000); // 3秒に1回のポーリング
 })();
