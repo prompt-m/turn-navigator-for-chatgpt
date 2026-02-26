@@ -241,12 +241,6 @@
         const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
 
         if (kind === "chat" && turnsCount > 0) {
-          console.log(
-            "rebuildAndRenderSafely最強の念押しの直前 kind:",
-            kind,
-            " turnsCount:",
-            turnsCount,
-          );
           RUN.changeState("ACTIVE", "rebuild-complete");
           // =========================================================
           // ★追加: 初回ロードでもチャット切替でも、必ず最後に通る「最強の念押し」
@@ -256,7 +250,6 @@
               RUN.state === "ACTIVE" &&
               typeof window.CGTN_LOGIC?.rebuild === "function"
             ) {
-              console.log("rebuildAndRenderSafely 念押しタイマー発動");
               window.CGTN_LOGIC.rebuild();
               window.CGTN_LOGIC.updateStatus?.();
             }
@@ -646,6 +639,16 @@
         if (dragging || resizing) {
           dragging = false;
           resizing = false;
+
+          // =======================================================
+          // ★ 追加: ドロップ・リサイズした瞬間に、画面内にクランプ（押し戻す）！
+          // =======================================================
+          if (typeof window.CGTN_UI?.clampPanelWithinViewport === "function") {
+            // プレビューパネルも上端(top)固定なので第2引数は false
+            window.CGTN_UI.clampPanelWithinViewport(dock, false);
+          }
+
+          // ★ 修正: クランプで押し戻された「後」の正しい座標を保存する
           _savePlace(dock);
         }
       });
@@ -1304,7 +1307,6 @@
         "cgtn-power-toggle",
       ) as HTMLInputElement;
       if (isEnabled) {
-        console.log("[cgtn] initialize: Auto-starting from storage settings.");
         if (powerToggle) powerToggle.checked = true;
         // すでに __isInitialized = true なので、スムーズに起動処理が走る
         startApp("auto-start-from-storage");
@@ -1388,12 +1390,11 @@
     RUN.timer = window.setTimeout(() => {
       RUN.timer = 0;
       rebuildAndRenderSafely({ appGen: myGen }).catch(() => {});
-
+      /*
       // 1.5秒後の念押しタイマーはそのまま！
       setTimeout(() => {
         if (myGen === RUN.gen && RUN.state !== "OFF") {
           if (typeof window.CGTN_LOGIC?.rebuild === "function") {
-            console.log("startApp 更新処理と同じ処理");
             window.CGTN_LOGIC.rebuild();
           }
           const kind = SH.getPageInfo?.()?.kind || "other";
@@ -1406,6 +1407,7 @@
           }
         }
       }, 1500);
+*/
     }, 50);
   }
 
@@ -1464,10 +1466,7 @@
     const nav = document.getElementById("cgpt-nav");
 
     // 最小化＋OFF表示
-    console.log("setPanelOffState4 stopApp");
-
     UI?.setPanelOffState?.();
-
     RUN.bag.flush();
   }
 

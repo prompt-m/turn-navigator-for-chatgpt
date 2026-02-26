@@ -58,7 +58,7 @@
             "storage.saveFailed.body": "ストレージ上限に達しています。設定 → 付箋データ管理で不要な付箋を削除してください。",
             // ===== 設定画面（options.*） =====
             "options.pinsTitle": "付箋データ管理",
-            "options.pinsHint": "各チャットの付箋を一覧。不要になったチャットは削除できます。",
+            "options.pinsHint": "各チャットの付箋一覧。不要になったチャットは削除できます。",
             "options.thChat": "チャット",
             "options.thTurns": "会話数",
             "options.thCount": "付箋数",
@@ -86,9 +86,9 @@
             "options.lockMs": "スクロールロック (ms)",
             // ===== オプション画面 ===== 2026.02.24
             "options.themeModeLabel": "カラーテーマ設定",
-            "options.theme_auto": "Auto (OS設定に連動)",
-            "options.theme_light": "プリズム・ホワイト (Light)",
-            "options.theme_dark": "プロフェッショナル (Dark)",
+            "options.theme_auto": "自動 (OS設定に連動)",
+            "options.theme_light": "ライト",
+            "options.theme_dark": "ダーク",
             // 入力設定 2026.02.11
             "options.sendKeyLabel": "送信キー設定",
             "options.sk_enter": "Enter (標準)",
@@ -222,8 +222,8 @@
             // ===== Options ===== 2026.02.24
             "options.themeModeLabel": "Color Theme",
             "options.theme_auto": "Auto (Sync with OS)",
-            "options.theme_light": "Prism White (Light)",
-            "options.theme_dark": "Professional (Dark)",
+            "options.theme_light": "Light",
+            "options.theme_dark": "Dark",
             // 入力設定 2026.02.11
             "options.sendKeyLabel": "Send Key",
             "options.sk_enter": "Enter (Default)",

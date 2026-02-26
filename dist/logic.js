@@ -114,11 +114,9 @@
             // --- 2. 現在地の計算 ---
             if (isBottom) {
                 // ★ 一番下にいるなら、途中の計算をすっ飛ばして問答無用でMAXにする！
-                console.log("問答無用でMAX");
                 current = total;
             }
             else {
-                console.log("絶対座標で正確に計算");
                 // ★改善：Universal版と同じ絶対座標(getBoundingClientRect)ベースの計算！
                 // スクロールコンテナの scrollTop や offsetTop の一時的な狂いに影響されません。
                 const vh = window.innerHeight;
@@ -137,7 +135,6 @@
                 if (current === 0)
                     current = 1;
             }
-            console.log("updatestatus:[", current, "/", total, "]");
             UI?.updateStatusDisplay?.(`${current} / ${total}`);
         }
     };
@@ -1059,16 +1056,36 @@
             SH.logError("[bulkSetPins] sync DOM failed", e);
         }
         // --- バッジ・フッター更新 ---
-        NS.pinsCount = pinsCount;
         try {
-            NS.updatePinOnlyBadge?.();
+            // ★修正: 最新のピン配列から、有効なピン(valid)と孤児(orphan)を正確に数え直す
+            const totalTurns = NS.ST?.all?.length || 0;
+            let valid = 0;
+            let orphan = 0;
+            for (let i = 0; i < pinsArr.length; i++) {
+                if (pinsArr[i]) {
+                    if (i < totalTurns)
+                        valid++;
+                    else
+                        orphan++;
+                }
+            }
+            NS.validPinsCount = valid;
+            NS.orphanPinsCount = orphan;
+            NS.pinsCount = valid + orphan;
+            // ★修正: 再計算した数字を渡してバッジを即時更新
+            NS.updatePinOnlyBadge?.(valid, orphan);
         }
         catch (_) { }
         try {
             NS.updateListFooterInfo?.();
         }
         catch (_) { }
-        // renderList() はここでは呼ばない方針のまま維持
+        // ★追加: もしリストパネルが開いたまま一括操作したなら、リスト全体を再描画して変更を反映する
+        // (pinOnlyモードの時に不要な行を消すため)
+        if (typeof window.CGTN_SHARED?.isListOpen === "function" &&
+            window.CGTN_SHARED.isListOpen()) {
+            NS.renderList?.(true);
+        }
     }
     NS.bulkSetPins = bulkSetPins;
     // どこかの「公開テーブル」にまだ載せていなければこれも追加
@@ -1391,7 +1408,6 @@
             NS.updateStatus();
         }
         else {
-            console.log("clearListPanelUI Loading...");
             window.CGTN_UI?.updateStatusDisplay?.("Loading...");
         }
     };
@@ -1431,6 +1447,8 @@
       <div id="cgpt-list-head">
         <button id="cgpt-list-collapse" aria-expanded="true">▴</button>
         <div id="cgpt-chat-title"></div>
+        <button id="cgpt-list-close" class="cgtn-dock-close" aria-label="Close">✕</button>
+
       </div>
 
       <!-- ★ 表示切替（CSSだけで絞り込み） -->
@@ -1553,6 +1571,26 @@
                     NS.renderList?.(true);
                 }
                 catch { }
+            });
+        }
+        // =======================================================
+        // ★ 追加: リストパネルの「×閉じる」ボタン処理
+        // =======================================================
+        const closeBtn = listBox.querySelector("#cgpt-list-close");
+        if (closeBtn && !closeBtn._cgtnBound) {
+            closeBtn._cgtnBound = true;
+            closeBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // ナビパネル側の一覧トグル（裏に隠れているチェックボックス）を取得
+                const chk = document.getElementById("cgpt-list-toggle");
+                if (chk instanceof HTMLInputElement && chk.checked) {
+                    // 1. チェックを外す
+                    chk.checked = false;
+                    // 2. 「ユーザーがマウスクリックでOFFにした」のと同じ変更イベントを人工的に発火させる
+                    // これにより、events.ts が反応してパネルを閉じ、ボタンの色を戻し、設定を保存してくれます！
+                    chk.dispatchEvent(new Event("change", { bubbles: true }));
+                }
             });
         }
         // ★ 全ON/全OFF ボタン（バルク付箋切替）'25.11.23
@@ -1805,6 +1843,11 @@
                     return;
                 dragging = false;
                 grip.releasePointerCapture(e.pointerId);
+                // ★追加：ドロップした瞬間に画面内に押し戻す（リストはtop固定なので false）
+                if (typeof window.CGTN_UI?.clampPanelWithinViewport === "function") {
+                    window.CGTN_UI.clampPanelWithinViewport(listBox, false);
+                }
+                // ★修正：押し戻されたあとの「正しい座標」を取り直してから保存する
                 const r = listBox.getBoundingClientRect();
                 const cfg = SH.getCFG();
                 SH.saveSettingsPatch({
@@ -2783,7 +2826,6 @@
     };
     // 2026.02.23
     NS.togglePin = async function (article) {
-        console.log("togglePin1 article:", article);
         if (!article)
             return;
         const cid = SH.getChatId?.();
@@ -2981,33 +3023,39 @@
             // ② ★追加: Mikiさんの「更新ボタンと同じ処理」を自動化！
             // 画面のガタつきが完全に終わった1.5秒後に、もう一度だけ自動更新をかける
             // --------------------------------------------------
+            /*
             clearTimeout(safetyTo);
             safetyTo = window.setTimeout(() => {
-                try {
-                    if (typeof NS.rebuild === "function") {
-                        console.log("installAutoSyncForTurns 更新処理と同じ処理 rebuild");
-                        NS.rebuild();
-                    }
-                    // 1.5秒後も、その時点のリスト開閉状態に合わせて正しく更新する
-                    // 2026.02.22 isListOpen
-                    const open = typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
-                    if (open) {
-                        if (typeof NS.renderList === "function") {
-                            console.log("installAutoSyncForTurns 更新処理と同じ処理 renderList");
-                            NS.renderList(true);
-                        }
-                    }
-                    else {
-                        if (typeof NS.updateStatus === "function") {
-                            console.log("installAutoSyncForTurns 更新処理と同じ処理 updatestatus");
-                            NS.updateStatus();
-                        }
-                    }
+              try {
+                if (typeof NS.rebuild === "function") {
+                  console.log("installAutoSyncForTurns 更新処理と同じ処理 rebuild");
+                  NS.rebuild();
                 }
-                catch (e) {
-                    SH.logError("auto-sync safety-kick failed", e);
+      
+                // 1.5秒後も、その時点のリスト開閉状態に合わせて正しく更新する
+                // 2026.02.22 isListOpen
+                const open =
+                  typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
+                if (open) {
+                  if (typeof NS.renderList === "function") {
+                    console.log(
+                      "installAutoSyncForTurns 更新処理と同じ処理 renderList",
+                    );
+                    NS.renderList(true);
+                  }
+                } else {
+                  if (typeof NS.updateStatus === "function") {
+                    console.log(
+                      "installAutoSyncForTurns 更新処理と同じ処理 updatestatus",
+                    );
+                    NS.updateStatus();
+                  }
                 }
+              } catch (e) {
+                SH.logError("auto-sync safety-kick failed", e);
+              }
             }, 1500);
+      */
         };
         _turnObs = new MutationObserver((muts) => {
             for (const m of muts) {

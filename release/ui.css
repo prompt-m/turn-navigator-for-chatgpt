@@ -887,22 +887,25 @@ body[data-cgtn-theme="dark"] .cgtn-pill-btn {
   color: #fff !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
 }
+/* 全体（All）のホバー：深く黒に近い赤 */
 body[data-cgtn-theme="dark"]
   .cgpt-nav-group[data-role="all"]
   .cgtn-pill-btn:hover {
-  background: #50445a !important;
+  background: rgba(239, 68, 68, 0.15) !important;
   color: #fff !important;
 }
+/* ユーザーのホバー：青 */
 body[data-cgtn-theme="dark"]
   .cgpt-nav-group[data-role="user"]
   .cgtn-pill-btn:hover {
-  background: #294060 !important;
+  background: rgba(59, 130, 246, 0.15) !important;
   color: #fff !important;
 }
+/* アシスタントのホバー：緑 */
 body[data-cgtn-theme="dark"]
   .cgpt-nav-group[data-role="assistant"]
   .cgtn-pill-btn:hover {
-  background: #273330 !important;
+  background: rgba(16, 185, 129, 0.15) !important;
   color: #fff !important;
 }
 body[data-cgtn-theme="dark"]
@@ -918,9 +921,21 @@ body[data-cgtn-theme="dark"]
   color: #000 !important;
 }
 body[data-cgtn-theme="dark"] #cgpt-list-btn.active {
-  background: #0066cc !important;
-  color: #fff !important;
+  background: rgba(
+    59,
+    130,
+    246,
+    0.3
+  ) !important; /* ホバー色と同じ青の透明度アップ */
+  border-color: rgba(
+    59,
+    130,
+    246,
+    0.6
+  ) !important; /* 枠線をくっきりさせてONを強調 */
+  color: #eff6ff !important; /* 真っ白よりほんの少し青みがかった白 */
 }
+
 body[data-cgtn-theme="dark"] .cgtn-pill-btn.blinking {
   background: #000 !important;
   color: #fff !important;
@@ -986,27 +1001,30 @@ body[data-cgtn-theme="dark"] #lv-pin:checked + .cgpt-filter-pill {
   color: #ff3b30 !important;
   border-color: rgba(255, 59, 48, 0.5) !important;
 }
-
+/* リストパネルの行 */
 body[data-cgtn-theme="dark"] #cgpt-list-body .row {
   border-bottom-color: rgba(255, 255, 255, 0.05) !important;
   color: #ececec !important;
 }
 body[data-cgtn-theme="dark"] #cgpt-list-body .turn-idx-anchor::before {
-  color: #aaa !important;
-}
-body[data-cgtn-theme="dark"] #cgpt-list-body .row.user-turn {
-  background: rgba(255, 255, 255, 0.03) !important;
-}
-body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn {
-  background: rgba(16, 163, 127, 0.08) !important;
-}
-body[data-cgtn-theme="dark"] #cgpt-list-body .row:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
-body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
+  color: #8892b0 !important; /* 番号の色も少し上品なブルーグレーに */
 }
 
+/* ユーザー行：少し青みを足して区別（TailwindのBlue系） */
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.user-turn {
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.user-turn:hover {
+  background: rgba(59, 130, 246, 0.15) !important;
+}
+
+/* アシスタント行：少し緑みを足して区別（TailwindのEmerald系） */
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn {
+  background: rgba(16, 185, 129, 0.06) !important;
+}
+body[data-cgtn-theme="dark"] #cgpt-list-body .row.asst-turn:hover {
+  background: rgba(16, 185, 129, 0.12) !important;
+}
 /* ★ ダークモード側のアイコンホバー設定 */
 body[data-cgtn-theme="dark"] .cgtn-preview-btn,
 body[data-cgtn-theme="dark"] .cgtn-clip-pin {

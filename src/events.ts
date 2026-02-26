@@ -32,6 +32,15 @@
             SH.saveSettingsPatch({ navEnabled: true }); // ★ power を navEnabled に！
           }
           if (typeof app?.start === "function") app.start("toggle-on");
+          // =========================================================
+          // ★追加: パネルが展開して高さが変わった後、上に突き抜けたヘッダを
+          // 画面内に押し戻す（クランプ処理を呼ぶ）
+          // =========================================================
+          setTimeout(() => {
+            if (typeof UI.clampPanelWithinViewport === "function") {
+              UI.clampPanelWithinViewport();
+            }
+          }, 150); // DOMが展開されて高さが確定するのを少しだけ待つ
         } else {
           if (typeof SH.saveSettingsPatch === "function") {
             SH.saveSettingsPatch({ navEnabled: false }); // ★ power を navEnabled に！

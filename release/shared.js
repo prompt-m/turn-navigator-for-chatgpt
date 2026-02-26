@@ -24,8 +24,6 @@
             console.warn(`[CGTN] ${msg}`);
         else if (level === "DEBUG")
             console.debug(`[CGTN] ${msg}`); // ★追加: debug出力
-        else
-            console.log(`[CGTN] ${msg}`);
         // 保存
         const prefix = level === "ERROR"
             ? "❌ [ERROR]"
@@ -104,6 +102,7 @@
     const DEFAULTS = Object.freeze({
         // ★追加: Navigate機能のON/OFF記憶 (true=ON)
         navEnabled: true,
+        theme: { mode: "auto" },
         centerBias: 0.4,
         headerPx: 0,
         eps: 20,

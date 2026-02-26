@@ -166,7 +166,6 @@
       // ★追加: スイッチだけでなく「パネル全体」の見た目も即座に同期する
       if (isIdle) {
         // パネル最小化＆「OFF」文字を即適用
-        console.log("setPanelOffState6 installUI");
         window.CGTN_UI?.setPanelOffState?.();
       } else {
         // ONの場合は、とりあえず「Standby」で初期化しておく
@@ -527,7 +526,7 @@
         (grip as Element).releasePointerCapture(e.pointerId);
       } catch {}
 
-      // ここで再び bottom (下端) 制御に戻る
+      // ここで再び bottom (下端) 制御に戻る　引数無しはナビパネル
       clampPanelWithinViewport();
 
       SH.saveSettingsPatch({
@@ -539,26 +538,42 @@
     });
   }
 
-  function clampPanelWithinViewport() {
-    const box = document.getElementById("cgpt-nav");
+  // ★進化版: どのパネルでも画面内に収める万能クランプ関数
+  function clampPanelWithinViewport(
+    targetEl?: HTMLElement | string,
+    useBottomAnchor?: boolean,
+  ) {
+    // targetElが指定されなかった場合は従来のナビパネルとして動く（後方互換）
+    const isNav = !targetEl || targetEl === "cgpt-nav";
+    const box =
+      typeof targetEl === "string"
+        ? document.getElementById(targetEl)
+        : targetEl || document.getElementById("cgpt-nav");
     if (!box) return;
+
     const margin = 8;
     const vw = document.documentElement.clientWidth || window.innerWidth;
     const vh = document.documentElement.clientHeight || window.innerHeight;
     const r = box.getBoundingClientRect();
 
-    // ▼▼▼ 修正: はみ出しを防ぎつつ、下端(bottom)を基準に固定する ▼▼▼
-    let x = Math.min(vw - r.width - margin, Math.max(margin, r.left));
-    let y = Math.min(vh - r.height - margin, Math.max(margin, r.top));
-
-    // top座標から、画面下からの距離(bottom)を逆算する
-    const bottom = vh - (y + r.height);
+    // 画面の下端よりも「上端（ヘッダ）が常に画面内にいること」を最優先にする
+    let x = Math.max(margin, Math.min(vw - r.width - margin, r.left));
+    let y = Math.max(margin, Math.min(vh - r.height - margin, r.top));
 
     box.style.right = "auto";
-    box.style.top = "auto"; // ★ 上端の固定を解除
     box.style.left = `${x}px`;
-    box.style.bottom = `${bottom}px`; // ★ 下端を固定
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+    // ナビパネルは下端(bottom)固定、リストやプレビューは上端(top)固定
+    const anchorBottom = isNav || useBottomAnchor;
+
+    if (anchorBottom) {
+      const bottom = vh - (y + r.height);
+      box.style.top = "auto";
+      box.style.bottom = `${bottom}px`;
+    } else {
+      box.style.bottom = "auto";
+      box.style.top = `${y}px`;
+    }
   }
 
   // 公開API

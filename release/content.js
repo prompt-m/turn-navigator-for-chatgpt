@@ -196,7 +196,6 @@
                 const kind = SH.getPageInfo?.()?.kind || "other";
                 const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
                 if (kind === "chat" && turnsCount > 0) {
-                    console.log("rebuildAndRenderSafely最強の念押しの直前 kind:", kind, " turnsCount:", turnsCount);
                     RUN.changeState("ACTIVE", "rebuild-complete");
                     // =========================================================
                     // ★追加: 初回ロードでもチャット切替でも、必ず最後に通る「最強の念押し」
@@ -204,7 +203,6 @@
                     setTimeout(() => {
                         if (RUN.state === "ACTIVE" &&
                             typeof window.CGTN_LOGIC?.rebuild === "function") {
-                            console.log("rebuildAndRenderSafely 念押しタイマー発動");
                             window.CGTN_LOGIC.rebuild();
                             window.CGTN_LOGIC.updateStatus?.();
                         }
@@ -554,6 +552,14 @@
                 if (dragging || resizing) {
                     dragging = false;
                     resizing = false;
+                    // =======================================================
+                    // ★ 追加: ドロップ・リサイズした瞬間に、画面内にクランプ（押し戻す）！
+                    // =======================================================
+                    if (typeof window.CGTN_UI?.clampPanelWithinViewport === "function") {
+                        // プレビューパネルも上端(top)固定なので第2引数は false
+                        window.CGTN_UI.clampPanelWithinViewport(dock, false);
+                    }
+                    // ★ 修正: クランプで押し戻された「後」の正しい座標を保存する
                     _savePlace(dock);
                 }
             });
@@ -1148,7 +1154,6 @@
             // =========================================================
             const powerToggle = document.getElementById("cgtn-power-toggle");
             if (isEnabled) {
-                console.log("[cgtn] initialize: Auto-starting from storage settings.");
                 if (powerToggle)
                     powerToggle.checked = true;
                 // すでに __isInitialized = true なので、スムーズに起動処理が走る
@@ -1228,23 +1233,24 @@
         RUN.timer = window.setTimeout(() => {
             RUN.timer = 0;
             rebuildAndRenderSafely({ appGen: myGen }).catch(() => { });
+            /*
             // 1.5秒後の念押しタイマーはそのまま！
             setTimeout(() => {
-                if (myGen === RUN.gen && RUN.state !== "OFF") {
-                    if (typeof window.CGTN_LOGIC?.rebuild === "function") {
-                        console.log("startApp 更新処理と同じ処理");
-                        window.CGTN_LOGIC.rebuild();
-                    }
-                    const kind = SH.getPageInfo?.()?.kind || "other";
-                    const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
-                    if (kind === "chat" && turnsCount > 0) {
-                        RUN.changeState("ACTIVE", "start-app-safety-kick");
-                    }
-                    else {
-                        RUN.changeState("STANDBY", "start-app-safety-kick");
-                    }
+              if (myGen === RUN.gen && RUN.state !== "OFF") {
+                if (typeof window.CGTN_LOGIC?.rebuild === "function") {
+                  window.CGTN_LOGIC.rebuild();
                 }
+                const kind = SH.getPageInfo?.()?.kind || "other";
+                const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
+      
+                if (kind === "chat" && turnsCount > 0) {
+                  RUN.changeState("ACTIVE", "start-app-safety-kick");
+                } else {
+                  RUN.changeState("STANDBY", "start-app-safety-kick");
+                }
+              }
             }, 1500);
+      */
         }, 50);
     }
     // =================================================================
@@ -1303,7 +1309,6 @@
         catch { }
         const nav = document.getElementById("cgpt-nav");
         // 最小化＋OFF表示
-        console.log("setPanelOffState4 stopApp");
         UI?.setPanelOffState?.();
         RUN.bag.flush();
     }

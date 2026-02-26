@@ -144,13 +144,6 @@
         font-size: 13px;
         color: var(--muted);
       }
-      /*
-      .hint {
-        color: var(--muted);
-        font-size: 14px;
-        margin: 4px 0 8px;
-      }
-*/
 
       .hint {
         font-size: 0.85em;
@@ -391,6 +384,38 @@
         background: #ffe0e0;
       }
 
+      /* ★追加: 付箋データ管理リストの高さを制限し、スクロールバーを表示する */
+      .cgtn-pins-scroll {
+        max-height: 190px; /* 約5〜6件分の高さ。好みに合わせて微調整してください */
+        overflow-y: auto;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+        background: #fff;
+      }
+
+      /* スクロールバーの見た目を少し整える（お好みで） */
+      .cgtn-pins-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .cgtn-pins-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .cgtn-pins-scroll::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+      }
+
+      /* ダークモード対応（options画面にダークモードがあれば） */
+      @media (prefers-color-scheme: dark) {
+        .cgtn-pins-scroll {
+          border-color: rgba(255, 255, 255, 0.1);
+          background: #1e1e1e;
+        }
+        .cgtn-pins-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+        }
+      }
+
       /* Responsive */
       @media (max-width: 720px) {
         :root {
@@ -450,13 +475,13 @@
           <div class="section-title" data-i18n="options.pinsTitle">
             付箋データ管理
           </div>
-          <div
+          <!--div
             class="hint"
             data-i18n="options.pinsHint"
             style="margin-bottom: 0"
           >
             各チャットの付箋を一覧・管理します。
-          </div>
+          </div-->
 
           <div class="data-toolbar">
             <div class="data-actions-left">

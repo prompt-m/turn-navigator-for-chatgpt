@@ -25,9 +25,7 @@
     // コンソール出力
     if (level === "ERROR") console.error(`[CGTN] ${msg}`);
     else if (level === "WARN") console.warn(`[CGTN] ${msg}`);
-    else if (level === "DEBUG")
-      console.debug(`[CGTN] ${msg}`); // ★追加: debug出力
-    else console.log(`[CGTN] ${msg}`);
+    else if (level === "DEBUG") console.debug(`[CGTN] ${msg}`); // ★追加: debug出力
 
     // 保存
     const prefix =
