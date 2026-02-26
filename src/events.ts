@@ -131,11 +131,6 @@
       // ★修正: 更新ボタン
       if (el.id === "cgpt-navi-refresh") {
         e.preventDefault();
-
-        // 1. "Refresh..." と表示
-        //console.log(" updateStatusDisplay Refresh...");
-        //        UI.updateStatusDisplay?.("Refresh...");
-
         // ★ 1. 状態をLOADINGへ。表示文字を "Refresh..." にする。
         const app = (window as any).CGTN_APP;
         app?.changeState?.("LOADING", "click-refresh", "Refresh...");

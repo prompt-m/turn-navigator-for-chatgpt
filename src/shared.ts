@@ -626,7 +626,6 @@
   };
 
   SH.setPinsArrAsync = async function setPinsArrAsync(chatId, pinsArr) {
-    //console.log("◎setPinsArrAsync◎ :chatId", chatId, " pinsArr:", pinsArr);
     const map = await SH.loadPinsMapAsync();
     if (pinsArr && pinsArr.length) map[chatId] = pinsArr;
     else delete map[chatId];
@@ -859,13 +858,10 @@
   // ========= saveSettingsPatch（書き込みガード付き）=========
   SH.saveSettingsPatch = async function saveSettingsPatch(patch = {}, cb) {
     const before = SH.getCFG?.() || {};
-    //console.log("saveSettingsPatch");
     const merged = deepMerge(structuredClone(before), patch);
-    //console.log("saveSettingsPatch merged:",merged);
     SH.setCFG?.(merged);
     try {
       if (canUseStorage()) {
-        //console.log("saveSettingsPatch canUseStorage true");
         await syncSetAsync({ [KEY_CFG]: merged });
       } else {
         // 破棄中はメモリ反映のみで良し（警告は残さない）
@@ -1186,7 +1182,6 @@
           return;
         }
 
-        //        console.log(`[AutoMigrate] Optimizing storage (v${currentVer})...`);
         const v2Data = migrateV1toV2(raw);
 
         // ★保存用オブジェクトの構築
@@ -1203,7 +1198,6 @@
         // 全クリアして保存（これでルートの meta や pinsByChat は消える）
         chrome.storage.sync.clear(() => {
           chrome.storage.sync.set(toSave, () => {
-            //console.log("[AutoMigrate] Done. Storage optimized.");
             resolve();
           });
         });

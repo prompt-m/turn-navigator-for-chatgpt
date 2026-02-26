@@ -3019,43 +3019,6 @@
                     SH.logError("auto-sync kick failed", e);
                 }
             }, 300);
-            // --------------------------------------------------
-            // ② ★追加: Mikiさんの「更新ボタンと同じ処理」を自動化！
-            // 画面のガタつきが完全に終わった1.5秒後に、もう一度だけ自動更新をかける
-            // --------------------------------------------------
-            /*
-            clearTimeout(safetyTo);
-            safetyTo = window.setTimeout(() => {
-              try {
-                if (typeof NS.rebuild === "function") {
-                  console.log("installAutoSyncForTurns 更新処理と同じ処理 rebuild");
-                  NS.rebuild();
-                }
-      
-                // 1.5秒後も、その時点のリスト開閉状態に合わせて正しく更新する
-                // 2026.02.22 isListOpen
-                const open =
-                  typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
-                if (open) {
-                  if (typeof NS.renderList === "function") {
-                    console.log(
-                      "installAutoSyncForTurns 更新処理と同じ処理 renderList",
-                    );
-                    NS.renderList(true);
-                  }
-                } else {
-                  if (typeof NS.updateStatus === "function") {
-                    console.log(
-                      "installAutoSyncForTurns 更新処理と同じ処理 updatestatus",
-                    );
-                    NS.updateStatus();
-                  }
-                }
-              } catch (e) {
-                SH.logError("auto-sync safety-kick failed", e);
-              }
-            }, 1500);
-      */
         };
         _turnObs = new MutationObserver((muts) => {
             for (const m of muts) {
@@ -3151,31 +3114,54 @@
         }
         catch { }
     });
-    /*
-    // 4. オプション画面で設定が変更されたら、リアルタイムで色を切り替える
-    if (chrome.runtime?.onMessage) {
-      chrome.runtime.onMessage.addListener((msg) => {
-        if (msg?.type === "cgtn:settings-updated" && msg.patch) {
-          if (msg.patch.theme) {
-            NS.applyTheme(msg.patch.theme);
-          }
-        }
-      });
-    }
-  */
     // 4. ストレージの変更を監視して、リアルタイムで設定を反映する
     if (chrome.storage?.onChanged) {
         chrome.storage.onChanged.addListener((changes, areaName) => {
-            if (areaName === "sync" && changes.settings) {
-                // 変更された新しい設定値を取得
-                const newValue = (changes.settings.newValue || {});
-                // ① テーマが変更されていれば即時反映
-                if (newValue.theme) {
-                    NS.applyTheme(newValue.theme);
+            if (areaName === "sync") {
+                const SH = window.CGTN_SHARED;
+                const LG = window.CGTN_LOGIC;
+                // ① 設定全体 (cgNavSettings) が変わった時の処理 ★ここを修正しました！
+                if (changes.cgNavSettings) {
+                    const newVal = (changes.cgNavSettings.newValue || {});
+                    // ★超重要: ChatGPT側のメモリ上にある設定(CFG)を最新に読み直す！
+                    // （これにより、送信キー設定なども次にEnterを押した瞬間に最新状態が適用されます）
+                    if (typeof SH?.loadSettings === "function") {
+                        SH.loadSettings();
+                    }
+                    // テーマの即時反映
+                    if (newVal.theme) {
+                        LG?.applyTheme?.(newVal.theme);
+                    }
+                    // 送信キー設定ラベル（表示テキスト）の即時反映
+                    if (newVal.sendKeyMethod) {
+                        const skVal = document.getElementById("cgpt-sendkey-val");
+                        if (skVal) {
+                            let key = "nav.sk_enter";
+                            if (newVal.sendKeyMethod === "ctrl_enter")
+                                key = "nav.sk_ctrl";
+                            else if (newVal.sendKeyMethod === "alt_enter")
+                                key = "nav.sk_alt";
+                            // 翻訳関数（T）を取得してテキストを更新
+                            const t = window.CGTN_I18N?.t || ((k) => k);
+                            skVal.textContent = t(key);
+                        }
+                    }
+                    // リスト幅の即時反映
+                    if (newVal.list && newVal.list.maxChars) {
+                        LG?.applyPanelWidthByChars?.(newVal.list.maxChars);
+                    }
+                    // 基準線 (showViz) の即時反映
+                    if (typeof newVal.showViz === "boolean") {
+                        SH?.renderViz?.(newVal, newVal.showViz);
+                    }
                 }
-                // ② リストの幅が変更されていれば即時反映
-                if (newValue.list && newValue.list.maxChars) {
-                    NS.applyPanelWidthByChars(newValue.list.maxChars);
+                // ② 付箋データが設定画面から全消去された時の対応
+                // ※（旧仕様の pinsByChat 削除時用ですが、念のため残しておきます）
+                if (changes.pinsByChat) {
+                    LG?.syncPinCounts?.();
+                    if (SH?.isListOpen?.()) {
+                        LG?.renderList?.(true);
+                    }
                 }
             }
         });

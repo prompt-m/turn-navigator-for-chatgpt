@@ -153,20 +153,6 @@
   function sendToActive(payload) {
     return new Promise((resolve) => {
       const urls = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
-      /*
-      chrome.tabs.query(
-        { url: urls, active: true, lastFocusedWindow: true },
-        (tabs) => {
-          const t = tabs?.[0];
-          if (!t?.id) return resolve({ ok: false, reason: "no-tab" });
-          chrome.tabs.sendMessage(t.id, payload, (res) => {
-            if (chrome.runtime.lastError)
-              return resolve({ ok: false, reason: "no-response" });
-            resolve(res || { ok: false, reason: "empty" });
-          });
-        },
-      );
-      */
     });
   }
 
@@ -573,17 +559,6 @@
       const cfgNow = (SH.getCFG && SH.getCFG()) || DEF;
       SH.renderViz?.(cfgNow, on);
     } catch {}
-    /*
-    chrome.tabs.query(
-      { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
-      (tabs) => {
-        tabs.forEach((tab) => {
-          if (!tab.id) return;
-          chrome.tabs.sendMessage(tab.id, { type: "cgtn:viz-toggle", on });
-        });
-      },
-    );
-    */
   });
 
   // ========================================================
@@ -592,21 +567,6 @@
   const broadcastSettingsUpdate = (patch) => {
     SH.saveSettingsPatch?.(patch, () => {
       flashMsgInline("msg-adv", "options.saved");
-      /*
-      chrome.tabs.query(
-        { url: ["*://chatgpt.com/*", "*://chat.openai.com/*"] },
-        (tabs) => {
-          tabs.forEach((tab) => {
-            if (tab.id) {
-              chrome.tabs.sendMessage(tab.id, {
-                type: "cgtn:settings-updated",
-                patch: patch,
-              });
-            }
-          });
-        },
-      );
-      */
     });
   };
 
@@ -632,18 +592,6 @@
     if (ok) {
       try {
         const targets = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
-        /*
-        chrome.tabs.query({ url: targets }, (tabs) => {
-          tabs.forEach((tab) => {
-            if (tab.id) {
-              chrome.tabs.sendMessage(tab.id, {
-                type: "cgtn:pins-deleted",
-                chatId,
-              });
-            }
-          });
-        });
-        */
       } catch {}
 
       await renderPinsManager();

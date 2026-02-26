@@ -87,8 +87,6 @@
             const codeOld = STATE_CODE[this._state] ?? this._state;
             const codeNew = STATE_CODE[newState] ?? newState;
             const logStr = `State: [${codeOld}]${this._state} -> [${codeNew}]${newState} (${reason})`;
-            //      console.log(`[CGTN] ${logStr}`);
-            //window.CGTN_SHARED?.addLog?.(logStr, "DEBUG");
             this._state = newState;
             if (typeof window.CGTN_LOGIC?.updateStatus === "function") {
                 window.CGTN_LOGIC.updateStatus();
@@ -878,10 +876,8 @@
     try {
         chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             //      SH.addLog("onMessage addlog", "DEBUG"); //log
-            //      console.log("onMessage msg:", msg, "msg.type:", msg.type);
             if (!msg || !msg.type)
                 return;
-            //      console.log("onMessage2 msg:", msg, "msg.type:", msg.type);
             if (msg.type === "cgtn:get-chat-meta") {
                 try {
                     const chatId = SH.getChatId?.() || "";
@@ -916,7 +912,6 @@
             }
             // 設定画面でピン削除 付箋データ削除　メッセージ受信
             if (msg.type === "cgtn:pins-deleted") {
-                //        console.log("onMessage4 msg:", msg, "msg.type:", msg.type);
                 //        SH.addLog("cgtn:pins-deleted addlog", "DEBUG"); //log
                 const cid = SH.getChatId?.();
                 if (!cid || (msg.chatId && msg.chatId !== cid))
@@ -936,7 +931,6 @@
                 return true;
             }
             if (msg.type === "cgtn:viz-toggle") {
-                //        console.log("onMessage3 msg:", msg, "msg.type:", msg.type);
                 //        SH.addLog(":viz-toggle addlog", "DEBUG"); //log
                 const on = !!msg.on;
                 SH.toggleViz?.(on);
@@ -972,7 +966,6 @@
         });
     }
     catch (e) {
-        //    console.log("catch chrome.runtime.onMessage", e);
         SH.logError("catch chrome.runtime.onMessage", e);
     }
     // ======== URL変化をフックして postMessage させる＋再構築タイミングを遅延 ========
@@ -1160,7 +1153,6 @@
                 startApp("auto-start-from-storage");
             }
             else {
-                console.log("[cgtn] initialize: Starts in IDLE(OFF) mode.");
                 if (powerToggle)
                     powerToggle.checked = false;
             }
@@ -1201,7 +1193,6 @@
         // =========================================================
         RUN.changeState("LOADING", `app-start:${reason}`, "Loading...");
         const myGen = ++RUN.gen;
-        //    console.log(`[cgtn] startApp (${reason})`);
         const nav = document.getElementById("cgpt-nav");
         if (nav) {
             nav.classList.remove("disabled", "cgtn-standby");
@@ -1233,24 +1224,6 @@
         RUN.timer = window.setTimeout(() => {
             RUN.timer = 0;
             rebuildAndRenderSafely({ appGen: myGen }).catch(() => { });
-            /*
-            // 1.5秒後の念押しタイマーはそのまま！
-            setTimeout(() => {
-              if (myGen === RUN.gen && RUN.state !== "OFF") {
-                if (typeof window.CGTN_LOGIC?.rebuild === "function") {
-                  window.CGTN_LOGIC.rebuild();
-                }
-                const kind = SH.getPageInfo?.()?.kind || "other";
-                const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
-      
-                if (kind === "chat" && turnsCount > 0) {
-                  RUN.changeState("ACTIVE", "start-app-safety-kick");
-                } else {
-                  RUN.changeState("STANDBY", "start-app-safety-kick");
-                }
-              }
-            }, 1500);
-      */
         }, 50);
     }
     // =================================================================
