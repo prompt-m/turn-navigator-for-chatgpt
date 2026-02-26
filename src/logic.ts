@@ -3471,50 +3471,60 @@
         }
       } catch {}
     });
-
-  // 4. ストレージの変更を監視して、リアルタイムで設定を反映する
+  /*
+    // 4. ストレージの変更を監視して、リアルタイムで設定を反映する
   if (chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === "sync") {
         const SH = window.CGTN_SHARED;
         const LG = window.CGTN_LOGIC;
 
-        // ① 設定全体 (cgNavSettings) が変わった時の処理 ★ここを修正しました！
+        // ① 設定全体 (cgNavSettings) が変わった時の処理
         if (changes.cgNavSettings) {
+          const oldVal = (changes.cgNavSettings.oldValue || {}) as any;
           const newVal = (changes.cgNavSettings.newValue || {}) as any;
 
-          // ★超重要: ChatGPT側のメモリ上にある設定(CFG)を最新に読み直す！
-          // （これにより、送信キー設定なども次にEnterを押した瞬間に最新状態が適用されます）
-          if (typeof SH?.loadSettings === "function") {
-            SH.loadSettings();
+          // ★変更: 「本当に値が書き換わったのか」を厳格に判定する（誤爆を100%防ぐ）
+          const themeChanged =
+            JSON.stringify(oldVal.theme || {}) !==
+            JSON.stringify(newVal.theme || {});
+          const widthChanged = oldVal.list?.maxChars !== newVal.list?.maxChars;
+          const vizChanged = oldVal.showViz !== newVal.showViz;
+          const sendKeyChanged = oldVal.sendKeyMethod !== newVal.sendKeyMethod;
+
+          // 上記の「見た目に関わる設定」のどれかが明確に変わった時だけ、メモリを更新する
+          if (themeChanged || widthChanged || vizChanged || sendKeyChanged) {
+            if (typeof SH?.loadSettings === "function") {
+              SH.loadSettings();
+            }
           }
 
-          // テーマの即時反映
-          if (newVal.theme) {
+          // テーマが本当に変わった時だけ即時反映
+          if (themeChanged && newVal.theme) {
             LG?.applyTheme?.(newVal.theme);
           }
 
-          // 送信キー設定ラベル（表示テキスト）の即時反映
-          if (newVal.sendKeyMethod) {
+          // リスト幅が本当に変わった時だけ即時反映
+          if (widthChanged && newVal.list && newVal.list.maxChars) {
+            LG?.applyPanelWidthByChars?.(newVal.list.maxChars);
+          }
+
+          // 基準線が本当に変わった時だけ即時反映
+          if (vizChanged && typeof newVal.showViz === "boolean") {
+            SH?.renderViz?.(newVal, newVal.showViz);
+          }
+
+          // 送信キー設定ラベルが本当に変わった時だけ即時反映
+          if (sendKeyChanged && newVal.sendKeyMethod) {
             const skVal = document.getElementById("cgpt-sendkey-val");
             if (skVal) {
               let key = "nav.sk_enter";
               if (newVal.sendKeyMethod === "ctrl_enter") key = "nav.sk_ctrl";
               else if (newVal.sendKeyMethod === "alt_enter") key = "nav.sk_alt";
 
-              // 翻訳関数（T）を取得してテキストを更新
               const t = window.CGTN_I18N?.t || ((k: string) => k);
               skVal.textContent = t(key);
             }
-          }
-          // リスト幅の即時反映
-          if (newVal.list && newVal.list.maxChars) {
-            LG?.applyPanelWidthByChars?.(newVal.list.maxChars);
-          }
-
-          // 基準線 (showViz) の即時反映
-          if (typeof newVal.showViz === "boolean") {
-            SH?.renderViz?.(newVal, newVal.showViz);
           }
         }
 
@@ -3529,6 +3539,68 @@
       }
     });
   }
+  */
+
+  // 4. ストレージの変更を監視して、リアルタイムで設定を反映する
+  if (chrome.storage?.onChanged && !(window as any).__CGTN_ONCHG_BOUND__) {
+    (window as any).__CGTN_ONCHG_BOUND__ = true;
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "sync") return;
+
+      const SH = window.CGTN_SHARED;
+      const LG = window.CGTN_LOGIC;
+
+      // cgNavSettings が変わった時だけ
+      const ch = changes.cgNavSettings;
+      if (!ch || !ch.newValue) return;
+
+      const oldVal = (ch.oldValue || {}) as any;
+      const newVal = (ch.newValue || {}) as any;
+
+      // メモリCFGを storage.get なしで更新（DEFAULTS + newVal）
+      try {
+        const base = structuredClone(SH?.DEFAULTS || {});
+        const nextCfg = Object.assign(base, newVal);
+        SH?.setCFG?.(nextCfg);
+      } catch {}
+
+      // 変更判定（必要なキーだけ）
+      const oldThemeMode = oldVal.theme?.mode ?? "auto";
+      const newThemeMode = newVal.theme?.mode ?? "auto";
+      const themeChanged = oldThemeMode !== newThemeMode;
+
+      const oldMaxChars = oldVal.list?.maxChars;
+      const newMaxChars = newVal.list?.maxChars;
+      const widthChanged = oldMaxChars !== newMaxChars;
+
+      const vizChanged =
+        (oldVal.showViz ?? false) !== (newVal.showViz ?? false);
+
+      const oldSend = oldVal.sendKeyMethod ?? "enter";
+      const newSend = newVal.sendKeyMethod ?? "enter";
+      const sendKeyChanged = oldSend !== newSend;
+
+      // 即時反映（必要なものだけ）
+      if (themeChanged) LG?.applyTheme?.({ mode: newThemeMode });
+      if (widthChanged && typeof newMaxChars === "number")
+        LG?.applyPanelWidthByChars?.(newMaxChars);
+      if (vizChanged && typeof newVal.showViz === "boolean")
+        SH?.renderViz?.(newVal, newVal.showViz);
+
+      if (sendKeyChanged) {
+        const skVal = document.getElementById("cgpt-sendkey-val");
+        if (skVal) {
+          const t = window.CGTN_I18N?.t || ((k: string) => k);
+          let key = "nav.sk_enter";
+          if (newSend === "ctrl_enter") key = "nav.sk_ctrl";
+          else if (newSend === "alt_enter") key = "nav.sk_alt";
+          skVal.textContent = t(key);
+        }
+      }
+    });
+  }
+
   // --- expose ---
   NS.ensureTurnsReady = ensureTurnsReady;
   NS.clearListFooterInfo = clearListFooterInfo;
