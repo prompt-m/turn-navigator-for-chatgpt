@@ -36,6 +36,11 @@
         const UI = window.CGTN_UI;
         const app = window.CGTN_APP;
         const state = app?.getState ? app.getState() : "OFF";
+        // ▼▼▼ 電源トグルの「起動中」見た目制御 追加 ▼▼▼
+        const powerWrap = document.querySelector(".cgtn-power-wrapper");
+        if (powerWrap) {
+            powerWrap.classList.toggle("loading", state === "LOADING");
+        }
         // ▼▼▼ 物理バリア等既存コード維持 ▼▼▼
         const ids = ["cgpt-nav", "cgpt-list-panel"];
         const isBusy = state === "LOADING";

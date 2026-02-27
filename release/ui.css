@@ -116,6 +116,22 @@
   width: 0;
   height: 0;
 }
+@keyframes cgtnPowerPulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.cgtn-power-wrapper.loading .slider {
+  animation: cgtnPowerPulse 1s ease-in-out infinite;
+  pointer-events: none; /* 誤連打防止 */
+}
 .slider {
   position: absolute;
   cursor: pointer;

@@ -8,6 +8,39 @@
 
   // ★追加: 世代管理カウンター（関数の外に置いてください）
   let listToggleGen = 0;
+  let powerToggleGen = 0;
+
+  // LOADING中だけ一時的にスイッチをロック → 落ち着いたら解除（ポーリング無し）
+  function unlockWhenSettled(
+    gen: number,
+    toggleEl: HTMLInputElement,
+    maxMs = 5000,
+  ) {
+    const app = (window as any).CGTN_APP;
+    const t0 = performance.now();
+
+    const tick = () => {
+      // 別の操作が先に起きたら、この待ちは破棄
+      if (gen !== powerToggleGen) return;
+
+      const st = app?.getState?.() || "OFF";
+      if (st !== "LOADING") {
+        toggleEl.disabled = false;
+        toggleEl.removeAttribute("aria-busy");
+        return;
+      }
+      if (performance.now() - t0 > maxMs) {
+        // タイムアウトでも解除（詰まりっぱなし回避）
+        toggleEl.disabled = false;
+        toggleEl.removeAttribute("aria-busy");
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+
+    requestAnimationFrame(tick);
+  }
+
   function bindEvents() {
     const box = document.getElementById("cgpt-nav");
     if (!box) return;
@@ -24,6 +57,7 @@
 
       // 1. 電源スイッチ (ON/OFF)
       // events.ts (電源スイッチの部分)
+      /*
       if (t.id === "cgtn-power-toggle") {
         const on = t.checked;
 
@@ -46,6 +80,60 @@
             SH.saveSettingsPatch({ navEnabled: false }); // ★ power を navEnabled に！
           }
           if (typeof app?.stop === "function") app.stop("toggle-off");
+        }
+      }
+*/
+      if (t.id === "cgtn-power-toggle") {
+        const toggle = t; // HTMLInputElement
+        const on = toggle.checked;
+
+        // ★操作ロック（連打・二重イベントを物理的に封じる）
+        const myGen = ++powerToggleGen;
+        toggle.disabled = true;
+        toggle.setAttribute("aria-busy", "true");
+
+        const app = (window as any).CGTN_APP;
+
+        // ★飛び出し対策：状態遷移や重い処理より先に「即クランプ」
+        try {
+          UI?.clampPanelWithinViewport?.();
+          requestAnimationFrame(() => UI?.clampPanelWithinViewport?.());
+        } catch {}
+
+        if (on) {
+          try {
+            SH.saveSettingsPatch?.({ navEnabled: true });
+          } catch {}
+
+          // ★体感優先：すぐLOADING表示にして「反応してる感」を出す
+          try {
+            app?.changeState?.("LOADING", "toggle-on", "Loading...");
+          } catch {}
+
+          try {
+            app?.start?.("toggle-on");
+          } catch {}
+
+          // ★展開後にももう一回だけクランプ（高さ確定待ち）
+          setTimeout(() => {
+            try {
+              UI?.clampPanelWithinViewport?.();
+            } catch {}
+          }, 150);
+
+          // ★LOADINGが抜けたらロック解除（rAFで軽く待つだけ）
+          unlockWhenSettled(myGen, toggle);
+        } else {
+          try {
+            SH.saveSettingsPatch?.({ navEnabled: false });
+          } catch {}
+
+          try {
+            app?.stop?.("toggle-off");
+          } catch {}
+
+          // OFFはだいたい即落ち着くけど、念のため同じ解除ルートへ
+          unlockWhenSettled(myGen, toggle);
         }
       }
       // ▼ 一覧表示トグル (#cgpt-list-toggle)
