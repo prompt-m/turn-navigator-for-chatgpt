@@ -4,7 +4,7 @@
     "description": "The name of the extension"
   },
   "appDesc": {
-    "message": "Jump instantly to any turn. Turn-by-turn navigation, preview, pins, and send-key option (Ctrl+Enter).",
+    "message": "Jump to the turn you need-instantly. Navigate ChatGPT conversations turn by turn, preview messages, and pin what matters.",
     "description": "The description of the extension"
   }
 }

@@ -16,9 +16,10 @@ const version = pkg.version; // ここが唯一の正
 
 // 日付は “今日” を自動で入れる（version_name用）
 const now = new Date();
-const yyyy = now.getFullYear();
-const mm = String(now.getMonth() + 1).padStart(2, "0");
-const dd = String(now.getDate()).padStart(2, "0");
+const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+const yyyy = jst.getFullYear();
+const mm = String(jst.getMonth() + 1).padStart(2, "0");
+const dd = String(jst.getDate()).padStart(2, "0");
 const dateTag = `${yyyy}-${mm}-${dd}`;
 
 // public/manifest.json を読み→書き換え
@@ -53,8 +54,11 @@ const copyDir = (srcDir, dstDir) => {
   for (const ent of fs.readdirSync(srcDir, { withFileTypes: true })) {
     const s = path.join(srcDir, ent.name);
     const d = path.join(dstDir, ent.name);
-    if (ent.isDirectory()) copyDir(s, d);
-    else copy(s, d);
+    if (ent.isDirectory()) {
+      copyDir(s, d);
+    } else if (!ent.name.toLowerCase().endsWith(".map")) {
+      copy(s, d);
+    }
   }
 };
 

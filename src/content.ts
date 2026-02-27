@@ -9,6 +9,8 @@
     (window as any).__CGTN_RUNNING__ = true;
   }
 
+  const CGTN_BUILD = "1.1.0-20260227";
+
   const SH = window.CGTN_SHARED;
   const UI = window.CGTN_UI;
   const EV = window.CGTN_EVENTS;
@@ -246,19 +248,32 @@
         if (kind === "chat" && turnsCount > 0) {
           RUN.changeState("ACTIVE", "rebuild-complete");
           // =========================================================
-          // ★追加: 初回ロードでもチャット切替でも、必ず最後に通る「最強の念押し」
+          // ★軽量化: レイアウト安定後に「表示だけ」念押し（rebuildはしない）
+          // 目的: 1/15 や 2/15 に戻る表示ゆらぎを抑える
           // =========================================================
           setTimeout(() => {
-            if (
-              RUN.state === "ACTIVE" &&
-              typeof window.CGTN_LOGIC?.rebuild === "function"
-            ) {
-              window.CGTN_LOGIC.rebuild();
-              window.CGTN_LOGIC.updateStatus?.();
+            if (RUN.state === "ACTIVE") {
+              window.CGTN_LOGIC?.updateStatus?.();
             }
           }, 1500);
         } else {
           RUN.changeState("STANDBY", "rebuild-complete-empty");
+
+          // =========================================================
+          // ★新規タブ直開き対策（ワンショット）
+          // 初回rebuildが早すぎてターンDOMが未完成の場合があるため、
+          // STANDBYのままなら一度だけ再計測する（setIntervalは使わない）
+          // =========================================================
+          const retryBuildGen = myBuildGen;
+          const retryAppGen = myAppGen;
+
+          setTimeout(() => {
+            if (RUN.state === "OFF") return;
+            if (__buildGen !== retryBuildGen) return; // 別のrebuildが走ったら不要
+            if (RUN.state !== "STANDBY") return;
+
+            rebuildAndRenderSafely({ appGen: retryAppGen }).catch(() => {});
+          }, 700);
         }
 
         try {
@@ -1242,6 +1257,10 @@
         await SH.migrateStorageIfNeeded?.();
       } catch (e) {}
       await SH.loadSettings();
+
+      try {
+        SH.addLog?.(`[INIT] build=${CGTN_BUILD}`);
+      } catch {}
 
       const cfg = SH.getCFG?.() || {};
       const isEnabled = cfg.navEnabled !== false;
