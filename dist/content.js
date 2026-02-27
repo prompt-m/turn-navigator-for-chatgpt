@@ -397,6 +397,60 @@
         document.body.appendChild(park);
     }
     // 2026.1.22 解除できる形に置き換え
+    /*
+    function installFocusStealGuard() {
+      const nav = document.getElementById("cgpt-nav");
+      const list = document.getElementById("cgpt-list-panel");
+      const inUI = (el: any) =>
+        !!(el && ((nav && nav.contains(el)) || (list && list.contains(el))));
+  
+      let fromUI = false;
+      let to = 0;
+  
+      const onDown = (e: MouseEvent) => {
+        fromUI = inUI((e as any).target);
+      };
+  
+      const onUp = () => {
+        if (!fromUI) return;
+        fromUI = false;
+  
+        try {
+          const sel = getSelection();
+          sel && sel.removeAllRanges();
+        } catch {}
+  
+        const park = document.getElementById("cgtn-focus-park") as any;
+        if (!park) return;
+  
+        try {
+          if (to) window.clearTimeout(to);
+        } catch {}
+        to = window.setTimeout(() => {
+          try {
+            park.focus({ preventScroll: true });
+          } catch {}
+        }, 0);
+      };
+  
+      document.addEventListener("mousedown", onDown, { capture: true });
+      document.addEventListener("mouseup", onUp, { capture: true });
+  
+      RUN.bag.add(() => {
+        try {
+          document.removeEventListener("mousedown", onDown, {
+            capture: true,
+          } as any);
+        } catch {}
+        try {
+          document.removeEventListener("mouseup", onUp, { capture: true } as any);
+        } catch {}
+        try {
+          if (to) window.clearTimeout(to);
+        } catch {}
+      });
+    }
+  */
     function installFocusStealGuard() {
         const nav = document.getElementById("cgpt-nav");
         const list = document.getElementById("cgpt-list-panel");
@@ -418,6 +472,19 @@
             const park = document.getElementById("cgtn-focus-park");
             if (!park)
                 return;
+            // ★追加：すでに park にフォーカスがあるなら何もしない（無駄focus削減）
+            try {
+                if (document.activeElement === park)
+                    return;
+            }
+            catch { }
+            // ★追加：UI要素がフォーカス中なら、無理に奪わない（好み。嫌なら消してOK）
+            try {
+                const ae = document.activeElement;
+                if (ae && (nav?.contains(ae) || list?.contains(ae)))
+                    return;
+            }
+            catch { }
             try {
                 if (to)
                     window.clearTimeout(to);
@@ -425,7 +492,8 @@
             catch { }
             to = window.setTimeout(() => {
                 try {
-                    park.focus({ preventScroll: true });
+                    // ★変更：まず preventScroll を外して reflow を減らす
+                    park.focus();
                 }
                 catch { }
             }, 0);
