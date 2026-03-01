@@ -104,7 +104,7 @@
     prevListEnabled: null as null | boolean,
     // ★ 追加：STANDBYフォールバックを初回だけにするフラグ
     didStandbyFallback: false,
-
+    standbyRetryCount: 0,
     _state: "OFF" as AppState,
     _loadingMsg: "Loading...", // ★ 追加：LOADING中の表示文字
 
@@ -200,14 +200,10 @@
     const myBuildGen = ++__buildGen;
     const myAppGen = appGen ?? RUN.gen;
 
-    SH.addLog?.("[rebuild] start", {
-      state: RUN.state,
-      myBuildGen,
-      currentBuildGen: __buildGen,
-      myAppGen,
-      currentAppGen: RUN.gen,
-      turns: window.CGTN_LOGIC?.ST?.all?.length || 0,
-    });
+    const turns = window.CGTN_LOGIC?.ST?.all?.length || 0;
+    SH.addLog?.(
+      `[rebuild] start state=${RUN.state} myBuildGen=${myBuildGen}/${__buildGen} myAppGen=${myAppGen}/${RUN.gen} turns=${turns} path=${location.pathname}`,
+    );
 
     const guard = (where?: string) => {
       const invalid =
@@ -216,14 +212,12 @@
         RUN.state === "OFF";
 
       if (invalid && where) {
-        SH.addLog?.("[rebuild] guard-return", {
-          where,
-          state: RUN.state,
-          myBuildGen,
-          currentBuildGen: __buildGen,
-          myAppGen,
-          currentAppGen: RUN.gen,
-        });
+        SH.addLog?.(
+          `[rebuild] guard-return where=${where} state=${RUN.state}` +
+            ` myBuildGen=${myBuildGen}/${__buildGen}` +
+            ` myAppGen=${myAppGen}/${RUN.gen}` +
+            ` path=${location.pathname}`,
+        );
       }
 
       return invalid;
@@ -274,10 +268,11 @@
 
         if (kind === "chat" && turnsCount > 0) {
           RUN.changeState("ACTIVE", "rebuild-complete");
+          RUN.standbyRetryCount = 0;
 
-          SH.addLog?.("[rebuild] ACTIVE", {
-            turns: turnsCount,
-          });
+          SH.addLog?.(
+            `[rebuild] ACTIVE turns=${turnsCount} kind=${kind} path=${location.pathname}`,
+          );
 
           setTimeout(() => {
             if (RUN.state === "ACTIVE") {
@@ -285,36 +280,44 @@
             }
           }, 1500);
         } else {
+          // ★ここは必ず先にSTANDBYへ
           RUN.changeState("STANDBY", "rebuild-complete-empty");
-
-          SH.addLog?.("[rebuild] STANDBY", {
-            turns: turnsCount,
-          });
-
+          SH.addLog?.(
+            `[rebuild] STANDBY turns=${turnsCount} retryCount=${RUN.standbyRetryCount} kind=${kind} path=${location.pathname}`,
+          );
           const retryBuildGen = myBuildGen;
           const retryAppGen = myAppGen;
 
-          SH.addLog?.("[standby-retry] scheduled", {
-            retryBuildGen,
-            retryAppGen,
-          });
+          // ★ chat 以外はここで終了（retry しない）
+          if (kind !== "chat") {
+            SH.addLog?.(`[standby-retry] skipped: kind=${kind}`);
+            return;
+          }
+          // ここから先が retry ロジック
+          if (RUN.standbyRetryCount >= 4) {
+            SH.addLog?.(
+              `[standby-retry] skipped: retry limit count=${RUN.standbyRetryCount}`,
+            );
+          } else {
+            RUN.standbyRetryCount++;
 
-          setTimeout(() => {
-            SH.addLog?.("[standby-retry] fired", {
-              state: RUN.state,
-              currentBuildGen: __buildGen,
-              retryBuildGen,
-              turns: window.CGTN_LOGIC?.ST?.all?.length || 0,
-            });
+            const delays = [200, 700, 1500, 2500, 3500];
+            const delay =
+              delays[RUN.standbyRetryCount - 1] ?? delays[delays.length - 1];
+            SH.addLog?.(
+              `[standby-retry] scheduled count=${RUN.standbyRetryCount} delay=${delay}`,
+            );
 
-            if (RUN.state === "OFF") return;
-            if (__buildGen !== retryBuildGen) return;
-            if (RUN.state !== "STANDBY") return;
+            setTimeout(() => {
+              if (RUN.state === "OFF") return;
+              if (__buildGen !== retryBuildGen) return;
+              if (RUN.gen !== retryAppGen) return;
+              if (RUN.state !== "STANDBY") return;
 
-            rebuildAndRenderSafely({ appGen: retryAppGen }).catch(() => {});
-          }, 700);
+              rebuildAndRenderSafely({ appGen: retryAppGen }).catch(() => {});
+            }, delay);
+          }
         }
-
         try {
           if (typeof LG.detachTurnObserver === "function")
             LG.detachTurnObserver();
@@ -326,10 +329,10 @@
         }
       }
 
-      SH.addLog?.("[rebuild] exit", {
-        state: RUN.state,
-        turns: window.CGTN_LOGIC?.ST?.all?.length || 0,
-      });
+      const turns2 = window.CGTN_LOGIC?.ST?.all?.length || 0;
+      SH.addLog?.(
+        `[rebuild] exit state=${RUN.state} turns=${turns2} path=${location.pathname}`,
+      );
     } catch (e) {
       SH.logError("rebuild failed", e);
       if (forceList) {
@@ -1256,7 +1259,7 @@
       SH.logError("injectUrlChangeHook failed", e);
     }
   }
-
+  /*
   // ★追加：ページ情報を能動的に初期化するヘルパー 2026.01.26
   // ロード時OFF→ONの場合、onMessageによる通知がまだ来ていない（または逃した）可能性があるため
   function manualInitPageInfo() {
@@ -1272,6 +1275,37 @@
 
       // SHにセット（onMessageが来るまでの仮の値として機能する）
       SH.setPageInfo?.({ kind, cid, hasTurns: true });
+    } catch (e) {
+      SH.logError("[cgtn] manualInitPageInfo failed", e);
+    }
+  }
+*/
+
+  function manualInitPageInfo() {
+    try {
+      const p = location.pathname || "/";
+
+      // /c/<cid> または /g/<gptId>/c/<cid> を chat 扱いにする
+      let kind: "chat" | "new" | "other" = "other";
+      let cid = "";
+
+      let m = p.match(/^\/c\/([^/?#]+)/);
+      if (m) {
+        kind = "chat";
+        cid = m[1];
+      } else {
+        m = p.match(/^\/g\/[^/]+\/c\/([^/?#]+)/);
+        if (m) {
+          kind = "chat";
+          cid = m[1];
+        } else if (p === "/" || p === "/new") {
+          kind = "new"; // or home
+        }
+      }
+
+      // hasTurns は「仮」なので、ここは false の方が筋が良い（任意）
+      // ※true固定だと誤解を生むので、私は false 推奨
+      SH.setPageInfo?.({ kind, cid, hasTurns: false });
     } catch (e) {
       SH.logError("[cgtn] manualInitPageInfo failed", e);
     }
@@ -1469,6 +1503,7 @@
   // =================================================================
   // content.ts
   async function startApp(reason: string = "start") {
+    RUN.standbyRetryCount = 0;
     if (!__isInitialized && __initPromise) await __initPromise;
     else if (!__isInitialized) await initialize();
 
@@ -1512,11 +1547,9 @@
       RUN.timer = 0;
     }
 
-    SH.addLog?.("[startApp] schedule rebuild", {
-      reason,
-      myGen,
-      state: RUN.state,
-    });
+    SH.addLog?.(
+      `[startApp] schedule rebuild reason=${reason} gen=${myGen} state=${RUN.state} path=${location.pathname}`,
+    );
 
     RUN.timer = window.setTimeout(() => {
       RUN.timer = 0;

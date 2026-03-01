@@ -1124,7 +1124,7 @@
             SH.addLog(`${msg} ${text}${stack}`, "ERROR");
         }
         else {
-            SH.logError(msg, err);
+            console.error(`[CGTN] ${msg}`, err);
         }
         // トースト通知 (UIモジュールがいれば)
         window.CGTN_UI?.toast?.(`Error: ${msg}`, "error");

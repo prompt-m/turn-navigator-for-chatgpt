@@ -1243,7 +1243,7 @@
     if (SH.addLog) {
       SH.addLog(`${msg} ${text}${stack}`, "ERROR");
     } else {
-      SH.logError(msg, err);
+      console.error(`[CGTN] ${msg}`, err);
     }
 
     // トースト通知 (UIモジュールがいれば)
