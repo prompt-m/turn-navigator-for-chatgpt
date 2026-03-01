@@ -511,9 +511,6 @@
             return "";
         }
     }
-    // ★ 調べたいターン番号（例: 81）
-    //   ログを一切出したくないときは null にしておく
-    const DEBUG_ATTACH_TURN = 81;
     // 添付ファイル名をまとめて抽出
     // - a[download], a[href] … 通常のリンク
     // - a.cursor-pointer      … ChatGPT の「Download XXX」ボタン
@@ -972,7 +969,7 @@
     // --- 付箋一括 ON / OFF ---
     // 1) ST.* に基づいて pinsArr を更新
     // 2) DOM(.row) 側の data-pin / 🔖 を同期
-    async function bulkSetPins(mode) {
+    async function bulkSetPins(mode, opts) {
         const SH = window.CGTN_SHARED || {};
         const ST = NS.ST || {};
         const cid = SH.getChatId?.();
@@ -1010,6 +1007,8 @@
         let pinsArr = await SH.getPinsArrAsync?.(cid);
         if (!Array.isArray(pinsArr))
             pinsArr = [];
+        // ★ 付箋データが 1件以上ある時のみ confirm 対象
+        const hasAnyPin = pinsArr.some(Boolean);
         const maxIdx = Math.max(...targets);
         if (pinsArr.length < maxIdx) {
             const oldLen = pinsArr.length;
@@ -1017,6 +1016,28 @@
             //      pinsArr.fill(false, oldLen);
             // ★修正: false ではなく 0 で埋める 2026.02.07
             pinsArr.fill(0, oldLen);
+        }
+        // ★ 変更が発生するか（no-op 判定）
+        const willChange = targets.some((idx1) => {
+            const idx0 = idx1 - 1;
+            const cur = !!pinsArr[idx0];
+            return doPinOn ? !cur : cur;
+        });
+        // 変更がないなら何もしない（保存・DOM更新も無し）
+        if (!willChange) {
+            SH.addLog?.(`[bulkSetPins] no-op (role=${role}, mode=${doPinOn ? "on" : "off"})`, "DEBUG");
+            return;
+        }
+        // ★ confirm（要求：pinsが1件以上ある時だけ）
+        if (opts?.confirm && hasAnyPin) {
+            const I18N = window.CGTN_I18N || {};
+            const msg = doPinOn
+                ? I18N.t?.("confirmAllPinsOn") || "Enable all pins?"
+                : I18N.t?.("confirmAllPinsOff") || "Disable all pins?";
+            const ok = window.confirm(msg);
+            SH.addLog?.(`bulkPins confirm ${doPinOn ? "ON" : "OFF"} -> ${ok ? "OK" : "Cancel"}`);
+            if (!ok)
+                return;
         }
         for (const idx1 of targets) {
             const idx0 = idx1 - 1;
@@ -1635,7 +1656,7 @@
                     ev.preventDefault();
                     ev.stopPropagation();
                     try {
-                        NS.bulkSetPins?.(true);
+                        NS.bulkSetPins?.(true, { confirm: true });
                     }
                     catch (e) {
                         SH.logError("[bulkPins on]", e);
@@ -1647,7 +1668,7 @@
                     ev.preventDefault();
                     ev.stopPropagation();
                     try {
-                        NS.bulkSetPins?.(false);
+                        NS.bulkSetPins?.(false, { confirm: true });
                     }
                     catch (e) {
                         SH.logError("[bulkPins off]", e);
@@ -2277,30 +2298,20 @@
                 .querySelector("#btn-rescue-orphan")
                 ?.addEventListener("click", async () => {
                 const arr = await SH.getPinsArrAsync(chatId);
+                const rescueCount = orphanPins.length; // ★孤児ONの件数
                 arr.length = totalTurnsForOrphan;
-                if (totalTurnsForOrphan > 0)
-                    arr[totalTurnsForOrphan - 1] = 1;
+                if (totalTurnsForOrphan > 0 && rescueCount > 0) {
+                    const n = Math.min(rescueCount, totalTurnsForOrphan);
+                    for (let i = 0; i < n; i++) {
+                        arr[totalTurnsForOrphan - 1 - i] = 1; // 末尾からn件ON
+                    }
+                }
                 await SH.savePinsArrAsync(arr, chatId);
                 NS.syncPinCounts?.(); // ★バッジ即時更新
                 NS.renderList(true);
             });
             body.appendChild(orphanDiv);
         }
-        // ============================================================
-        /*
-        // 空チェック
-        let madeRows = body.querySelectorAll(".row").length;
-        if (madeRows === 0 && pinOnly) {
-          const empty = document.createElement("div");
-          empty.className = "cgtn-empty";
-          empty.style.cssText = "padding:16px;opacity:.85;font-size:13px;";
-    
-          empty.innerHTML = `
-            <div class="msg" data-kind="msg">${T("list.noPins")}</div>
-          `;
-          body.appendChild(empty);
-        }
-    */
         // ★ `if` の条件判定を完全に削除し、常に empty を追加する！
         const empty = document.createElement("div");
         empty.className = "cgtn-empty";

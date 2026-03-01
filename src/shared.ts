@@ -391,7 +391,6 @@
   // 件数
   SH.countPinsForChat = function (chatId = SH.getChatId()) {
     const cur = SH.getPinsForChat(chatId);
-    //console.debug('[getPinsForChat] chat=%s count=%d',chatId, Object.keys((CFG.pinsByChat?.[chatId]?.pins)||{}).length);
     return Object.keys(cur).length;
   };
 
@@ -411,7 +410,7 @@
     const oldTitle = rec.title || "";
     //const picked   = oldTitle || title || '(No Title)';
     const picked = (title && title.trim()) || oldTitle || "(No Title)";
-
+    /*
     // ★計測ログ：上書き検知
     if (picked !== oldTitle) {
       console.debug(
@@ -429,7 +428,7 @@
     } else {
       console.debug("[touchChatMeta] keep title", { chatId, oldTitle });
     }
-
+*/
     map[chatId] = {
       pins: rec.pins || {},
       title: picked,
@@ -653,7 +652,7 @@
       return [];
     }
   };
-
+  /*
   // 付箋データ保存
   SH.savePinsArr = async function savePinsArr(arr, chatId = SH.getChatId?.()) {
     if (!chatId) return { ok: false, err: "no-chat-id" };
@@ -695,7 +694,7 @@
       return { ok: false, err };
     }
   };
-
+*/
   // 付箋データ保存
   SH.savePinsArrAsync = async (arr, chatId = SH.getChatId?.()) => {
     if (!chatId) return { ok: false };

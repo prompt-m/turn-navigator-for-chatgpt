@@ -342,7 +342,6 @@
     // 件数
     SH.countPinsForChat = function (chatId = SH.getChatId()) {
         const cur = SH.getPinsForChat(chatId);
-        //console.debug('[getPinsForChat] chat=%s count=%d',chatId, Object.keys((CFG.pinsByChat?.[chatId]?.pins)||{}).length);
         return Object.keys(cur).length;
     };
     // メタだけ更新（タイトル刷新等）
@@ -357,20 +356,25 @@
         const oldTitle = rec.title || "";
         //const picked   = oldTitle || title || '(No Title)';
         const picked = (title && title.trim()) || oldTitle || "(No Title)";
+        /*
         // ★計測ログ：上書き検知
         if (picked !== oldTitle) {
-            console.debug("[touchChatMeta] title change intent", {
-                chatId,
-                oldTitle,
-                titleCandidate: title,
-                result: picked,
-                path: location.pathname,
-                time: new Date().toISOString(),
-            }, new Error("trace").stack?.split("\n").slice(1, 4).join("\n"));
+          console.debug(
+            "[touchChatMeta] title change intent",
+            {
+              chatId,
+              oldTitle,
+              titleCandidate: title,
+              result: picked,
+              path: location.pathname,
+              time: new Date().toISOString(),
+            },
+            new Error("trace").stack?.split("\n").slice(1, 4).join("\n"),
+          );
+        } else {
+          console.debug("[touchChatMeta] keep title", { chatId, oldTitle });
         }
-        else {
-            console.debug("[touchChatMeta] keep title", { chatId, oldTitle });
-        }
+    */
         map[chatId] = {
             pins: rec.pins || {},
             title: picked,
@@ -575,41 +579,49 @@
             return [];
         }
     };
+    /*
     // 付箋データ保存
     SH.savePinsArr = async function savePinsArr(arr, chatId = SH.getChatId?.()) {
-        if (!chatId)
-            return { ok: false, err: "no-chat-id" };
-        const pins = Array.isArray(arr) ? arr.slice() : [];
-        const title = await SH.resolveTitleFor(chatId);
-        await syncSet({
-            [pinKeyOf(chatId)]: { pins, updatedAt: Date.now(), title },
-        });
-        try {
-            await syncSet({ [pinKeyOf(chatId)]: { pins } });
-            // インデックスの pinCount だけ更新
-            const cfg = SH.getCFG() || {};
-            const cnt = pins.filter(Boolean).length;
-            const idx = cfg.chatIndex?.map || (cfg.chatIndex = { ids: [], map: {} }).map;
-            idx[chatId] = {
-                ...(idx[chatId] || {}),
-                pinCount: cnt,
-                updated: Date.now(),
-            };
-            await syncSet({ cgNavSettings: cfg });
-            // ★計測ログ
-            console.debug("[savePinsArr] about to save", {
-                chatId,
-                pinsCount: cnt,
-                path: location.pathname,
-                time: new Date().toISOString(),
-            }, new Error("trace").stack?.split("\n").slice(1, 4).join("\n"));
-            return { ok: true };
-        }
-        catch (err) {
-            SH.logError("[savePinsArr] failed:", err);
-            return { ok: false, err };
-        }
+      if (!chatId) return { ok: false, err: "no-chat-id" };
+      const pins = Array.isArray(arr) ? arr.slice() : [];
+      const title = await SH.resolveTitleFor(chatId);
+      await syncSet({
+        [pinKeyOf(chatId)]: { pins, updatedAt: Date.now(), title },
+      });
+  
+      try {
+        await syncSet({ [pinKeyOf(chatId)]: { pins } });
+        // インデックスの pinCount だけ更新
+        const cfg = SH.getCFG() || {};
+        const cnt = pins.filter(Boolean).length;
+        const idx =
+          cfg.chatIndex?.map || (cfg.chatIndex = { ids: [], map: {} }).map;
+        idx[chatId] = {
+          ...(idx[chatId] || {}),
+          pinCount: cnt,
+          updated: Date.now(),
+        };
+        await syncSet({ cgNavSettings: cfg });
+  
+        // ★計測ログ
+        console.debug(
+          "[savePinsArr] about to save",
+          {
+            chatId,
+            pinsCount: cnt,
+            path: location.pathname,
+            time: new Date().toISOString(),
+          },
+          new Error("trace").stack?.split("\n").slice(1, 4).join("\n"),
+        );
+  
+        return { ok: true };
+      } catch (err) {
+        SH.logError("[savePinsArr] failed:", err);
+        return { ok: false, err };
+      }
     };
+  */
     // 付箋データ保存
     SH.savePinsArrAsync = async (arr, chatId = SH.getChatId?.()) => {
         if (!chatId)

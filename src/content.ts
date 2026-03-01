@@ -102,6 +102,8 @@
     timer: 0 as number,
     bag: makeBag(),
     prevListEnabled: null as null | boolean,
+    // ★ 追加：STANDBYフォールバックを初回だけにするフラグ
+    didStandbyFallback: false,
 
     _state: "OFF" as AppState,
     _loadingMsg: "Loading...", // ★ 追加：LOADING中の表示文字
@@ -198,11 +200,35 @@
     const myBuildGen = ++__buildGen;
     const myAppGen = appGen ?? RUN.gen;
 
-    // ★修正: RUN.idle を RUN.state === "OFF" に置き換え
-    const guard = () =>
-      myBuildGen !== __buildGen || myAppGen !== RUN.gen || RUN.state === "OFF";
+    SH.addLog?.("[rebuild] start", {
+      state: RUN.state,
+      myBuildGen,
+      currentBuildGen: __buildGen,
+      myAppGen,
+      currentAppGen: RUN.gen,
+      turns: window.CGTN_LOGIC?.ST?.all?.length || 0,
+    });
 
-    // ★修正: RUN.idle を state 判定に置き換え
+    const guard = (where?: string) => {
+      const invalid =
+        myBuildGen !== __buildGen ||
+        myAppGen !== RUN.gen ||
+        RUN.state === "OFF";
+
+      if (invalid && where) {
+        SH.addLog?.("[rebuild] guard-return", {
+          where,
+          state: RUN.state,
+          myBuildGen,
+          currentBuildGen: __buildGen,
+          myAppGen,
+          currentAppGen: RUN.gen,
+        });
+      }
+
+      return invalid;
+    };
+
     if (RUN.state !== "OFF") {
       RUN.changeState("LOADING", "rebuild-start", "Loading...");
     }
@@ -212,45 +238,47 @@
       if (kind === "chat") {
         await waitForChatSettled({ mustNotMatch: oldSig });
       }
-      if (guard()) return;
+      if (guard("after waitForChatSettled")) return;
     }
 
     try {
-      if (guard()) return;
+      if (guard("before LG.rebuild")) return;
+
       LG.rebuild?.();
 
       const kind = SH.getPageInfo?.()?.kind || "other";
-      const cfg = SH.getCFG?.() || {};
 
-      // 修正後: ストレージ(cfg)は見ず、実際のスイッチの状態を見る
       const listToggle = document.getElementById(
         "cgpt-list-toggle",
       ) as HTMLInputElement;
+
       const isListToggleOn = listToggle ? listToggle.checked : false;
 
       const needList =
         RUN.state !== "OFF" && kind === "chat" && (forceList || isListToggleOn);
+
       if (needList) {
         await new Promise((r) => requestAnimationFrame(r));
-        if (guard()) return;
+        if (guard("after RAF before renderList")) return;
+
         await LG.renderList?.(true);
-        if (guard()) return;
+        if (guard("after renderList")) return;
       }
 
-      if (guard()) return;
+      if (guard("before state resolution")) return;
 
       if (RUN.state === "OFF") {
         UI?.setPanelOffState?.();
       } else {
-        const kind = SH.getPageInfo?.()?.kind || "other";
         const turnsCount = window.CGTN_LOGIC?.ST?.all?.length || 0;
 
         if (kind === "chat" && turnsCount > 0) {
           RUN.changeState("ACTIVE", "rebuild-complete");
-          // =========================================================
-          // ★軽量化: レイアウト安定後に「表示だけ」念押し（rebuildはしない）
-          // 目的: 1/15 や 2/15 に戻る表示ゆらぎを抑える
-          // =========================================================
+
+          SH.addLog?.("[rebuild] ACTIVE", {
+            turns: turnsCount,
+          });
+
           setTimeout(() => {
             if (RUN.state === "ACTIVE") {
               window.CGTN_LOGIC?.updateStatus?.();
@@ -259,17 +287,28 @@
         } else {
           RUN.changeState("STANDBY", "rebuild-complete-empty");
 
-          // =========================================================
-          // ★新規タブ直開き対策（ワンショット）
-          // 初回rebuildが早すぎてターンDOMが未完成の場合があるため、
-          // STANDBYのままなら一度だけ再計測する（setIntervalは使わない）
-          // =========================================================
+          SH.addLog?.("[rebuild] STANDBY", {
+            turns: turnsCount,
+          });
+
           const retryBuildGen = myBuildGen;
           const retryAppGen = myAppGen;
 
+          SH.addLog?.("[standby-retry] scheduled", {
+            retryBuildGen,
+            retryAppGen,
+          });
+
           setTimeout(() => {
+            SH.addLog?.("[standby-retry] fired", {
+              state: RUN.state,
+              currentBuildGen: __buildGen,
+              retryBuildGen,
+              turns: window.CGTN_LOGIC?.ST?.all?.length || 0,
+            });
+
             if (RUN.state === "OFF") return;
-            if (__buildGen !== retryBuildGen) return; // 別のrebuildが走ったら不要
+            if (__buildGen !== retryBuildGen) return;
             if (RUN.state !== "STANDBY") return;
 
             rebuildAndRenderSafely({ appGen: retryAppGen }).catch(() => {});
@@ -286,6 +325,11 @@
           SH.logError("Observer re-attach failed", err);
         }
       }
+
+      SH.addLog?.("[rebuild] exit", {
+        state: RUN.state,
+        turns: window.CGTN_LOGIC?.ST?.all?.length || 0,
+      });
     } catch (e) {
       SH.logError("rebuild failed", e);
       if (forceList) {
@@ -693,7 +737,7 @@
               btn.textContent = "📋";
             }, 1500);
           } catch (err) {
-            console.error("Copy failed", err);
+            SH.logError("Copy failed", err);
           }
         });
 
@@ -1467,6 +1511,12 @@
       clearTimeout(RUN.timer);
       RUN.timer = 0;
     }
+
+    SH.addLog?.("[startApp] schedule rebuild", {
+      reason,
+      myGen,
+      state: RUN.state,
+    });
 
     RUN.timer = window.setTimeout(() => {
       RUN.timer = 0;
