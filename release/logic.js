@@ -2075,9 +2075,22 @@
         }
         // forceOn または スイッチがONなら描画する
         // 2026.02.22 isListToggleOn
+        /*
         const enabled = forceOn ? true : SH.isListToggleOn?.();
         if (!enabled) {
+          NS._panelOpen = false;
+          return;
+        }
+    */
+        // 2026.03.04 isListToggleOn
+        const toggleOn = !!SH.isListToggleOn?.();
+        const enabled = forceOn ? true : toggleOn;
+        if (!enabled) {
             NS._panelOpen = false;
+            return;
+        }
+        // ★ 追加：トグルOFFのときはパネル再表示は禁止
+        if (!toggleOn) {
             return;
         }
         // 2) UI準備
@@ -3045,7 +3058,7 @@
                     const open = typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
                     if (open) {
                         if (typeof NS.renderList === "function") {
-                            NS.renderList(true);
+                            NS.renderList(false); // 2026.03.04 true -> false
                         }
                     }
                     else {
@@ -3107,27 +3120,6 @@
         }
         catch (e) {
             SH.logError("[auto-sync] observe failed", e);
-        }
-    };
-    // ==========================================================================
-    // ★ カラーテーマの適用と監視 (2026.02.24)
-    // ==========================================================================
-    // 1. テーマ適用関数
-    NS.applyTheme = function (themeObj) {
-        const mode = themeObj?.mode || "auto";
-        let isDark = false;
-        if (mode === "dark") {
-            isDark = true;
-        }
-        else if (mode === "auto") {
-            // OSの設定がダークモードかどうかを判定
-            isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        }
-        if (isDark) {
-            document.body.setAttribute("data-cgtn-theme", "dark");
-        }
-        else {
-            document.body.removeAttribute("data-cgtn-theme");
         }
     };
     // 2. 初期化時に一度テーマを適用する（少し遅延させて設定ロードを待つ）

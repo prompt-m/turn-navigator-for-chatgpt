@@ -24,7 +24,9 @@
     .cgtn-preview-btn { cursor: url(${prvCurURL}), pointer !important; }
   `;
     document.head.appendChild(style);
-    // ★ 追加: テーマ適用関数
+    // ==========================================================================
+    // ★ カラーテーマの適用と監視 (2026.02.24)
+    // ==========================================================================
     NS.applyTheme = function (themeObj) {
         const mode = themeObj?.mode || "auto";
         let isDark = false;

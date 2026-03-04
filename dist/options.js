@@ -152,6 +152,8 @@
                         }
                         chrome.tabs.sendMessage(id, payload, (res) => {
                             const err = chrome.runtime.lastError;
+                            if (err)
+                                console.log("sendMessage lastError:", err.message);
                             // 受信側がいないタブは lastError になるので無視
                             if (!err && res) {
                                 clearTimeout(timer);

@@ -2355,9 +2355,24 @@
 
     // forceOn または スイッチがONなら描画する
     // 2026.02.22 isListToggleOn
+    /*
     const enabled = forceOn ? true : SH.isListToggleOn?.();
     if (!enabled) {
       NS._panelOpen = false;
+      return;
+    }
+*/
+    // 2026.03.04 isListToggleOn
+    const toggleOn = !!SH.isListToggleOn?.();
+    const enabled = forceOn ? true : toggleOn;
+
+    if (!enabled) {
+      NS._panelOpen = false;
+      return;
+    }
+
+    // ★ 追加：トグルOFFのときはパネル再表示は禁止
+    if (!toggleOn) {
       return;
     }
 
@@ -3413,7 +3428,7 @@
             typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
           if (open) {
             if (typeof NS.renderList === "function") {
-              NS.renderList(true);
+              NS.renderList(false); // 2026.03.04 true -> false
             }
           } else {
             if (typeof NS.updateStatus === "function") {
