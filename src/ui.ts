@@ -32,7 +32,9 @@
   `;
   document.head.appendChild(style);
 
-  // ★ 追加: テーマ適用関数
+  // ==========================================================================
+  // ★ カラーテーマの適用と監視 (2026.02.24)
+  // ==========================================================================
   NS.applyTheme = function (themeObj?: { mode?: "auto" | "light" | "dark" }) {
     const mode = themeObj?.mode || "auto";
     let isDark = false;

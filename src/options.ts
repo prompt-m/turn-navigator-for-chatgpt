@@ -150,9 +150,59 @@
     if (btn.dataset.base) btn.textContent = btn.dataset.base;
   }
 
-  function sendToActive(payload) {
+  function sendToActive(payload: any): Promise<any | null> {
     return new Promise((resolve) => {
-      const urls = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
+      let done = false;
+      const finish = (v: any | null) => {
+        if (done) return;
+        done = true;
+        resolve(v);
+      };
+
+      // 「永遠に待つ」を絶対に防ぐ
+      const timer = window.setTimeout(() => finish(null), 800);
+
+      try {
+        chrome.tabs.query({ currentWindow: true }, (tabs) => {
+          const list = Array.isArray(tabs) ? tabs : [];
+          if (!list.length) {
+            clearTimeout(timer);
+            return finish(null);
+          }
+
+          let pending = list.length;
+
+          list.forEach((t) => {
+            const id = (t as any)?.id;
+            if (!id) {
+              pending--;
+              if (pending <= 0) {
+                clearTimeout(timer);
+                finish(null);
+              }
+              return;
+            }
+
+            chrome.tabs.sendMessage(id, payload, (res) => {
+              const err = chrome.runtime.lastError;
+              if (err) console.log("sendMessage lastError:", err.message);
+              // 受信側がいないタブは lastError になるので無視
+              if (!err && res) {
+                clearTimeout(timer);
+                return finish(res);
+              }
+              pending--;
+              if (pending <= 0) {
+                clearTimeout(timer);
+                finish(null);
+              }
+            });
+          });
+        });
+      } catch {
+        clearTimeout(timer);
+        finish(null);
+      }
     });
   }
 
@@ -591,9 +641,21 @@
 
     if (ok) {
       try {
-        const targets = ["*://chatgpt.com/*", "*://chat.openai.com/*"];
+        chrome.tabs.query({ currentWindow: true }, (tabs) => {
+          (tabs || []).forEach((t) => {
+            const id = (t as any)?.id;
+            if (!id) return;
+            chrome.tabs.sendMessage(
+              id,
+              { type: "cgtn:pins-deleted", chatId },
+              () => {
+                // 受信側がいないタブは lastError。無視でOK
+                void chrome.runtime.lastError;
+              },
+            );
+          });
+        });
       } catch {}
-
       await renderPinsManager();
 
       try {

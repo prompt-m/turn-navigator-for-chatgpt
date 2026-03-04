@@ -3480,29 +3480,6 @@
     }
   };
 
-  // ==========================================================================
-  // ★ カラーテーマの適用と監視 (2026.02.24)
-  // ==========================================================================
-
-  // 1. テーマ適用関数
-  NS.applyTheme = function (themeObj?: { mode?: string }) {
-    const mode = themeObj?.mode || "auto";
-    let isDark = false;
-
-    if (mode === "dark") {
-      isDark = true;
-    } else if (mode === "auto") {
-      // OSの設定がダークモードかどうかを判定
-      isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    }
-
-    if (isDark) {
-      document.body.setAttribute("data-cgtn-theme", "dark");
-    } else {
-      document.body.removeAttribute("data-cgtn-theme");
-    }
-  };
-
   // 2. 初期化時に一度テーマを適用する（少し遅延させて設定ロードを待つ）
   setTimeout(() => {
     try {
