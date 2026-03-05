@@ -12,7 +12,7 @@
   const TNDBG = true;
   function dbg(...a: any[]) {
     if (!TNDBG) return;
-    console.log("[TNDBG]", ...a);
+    //    console.log("[TNDBG]", ...a);
   }
   function now() {
     return Math.floor(performance.now());
@@ -2343,11 +2343,7 @@
     forceOn = false,
     opts: RenderListOptions = {},
   ) {
-    console.log("[TN] renderList start", {
-      time: Date.now(),
-      forceOn,
-      ticket: _renderTicket + 1,
-    });
+    //    console.log("[TN] renderList start", {time: Date.now(),forceOn,ticket: _renderTicket + 1,});
     const SH = window.CGTN_SHARED,
       LG = window.CGTN_LOGIC;
 
@@ -3478,7 +3474,7 @@
     let to = 0;
 
     // ★: これを true にすると理由ログが出る（普段は false 推奨）
-    const DBG = true;
+    const DBG = false;
     const now = () => Date.now();
     const dbg = (...a: any[]) => {
       if (DBG) console.log(...a);
@@ -3508,30 +3504,120 @@
       );
     };
 
-    // ★ 理由付きkick
-    const kick = (reason: string, detail?: any) => {
+    // ★ 追加：ストリーミング判定（ここはkickの外に置いてもOK）
+    // ★ ストリーミング判定（UIに一本化できている前提でOK）
+    const isStreamingNow = () =>
+      !!document.querySelector(
+        "button[data-testid='stop-button'], button[aria-label*='Stop']",
+      );
+
+    // ---- timers/state
+    let kickTo: number | null = null; // 通常debounce用
+    let streamTo: number | null = null; // streaming待ち用（1本）
+    let streamingGuard = false; // streaming待ち中フラグ
+    let kickTicket = 0; // 古いkickを捨てる
+
+    let pendingReason = "";
+    let pendingDetail: any = null;
+
+    const KICK_DEBOUNCE_MS = 250; // MO連打をまとめる
+    const STREAM_POLL_MS = 350; // stop-button消える待ち
+    const STREAM_MAX_MS = 30_000; // 保険（止まらない時）
+
+    const doRender = () => {
+      try {
+        if (typeof NS.rebuild === "function") NS.rebuild();
+
+        const open =
+          typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
+        dbg("[TN] list open =", open);
+
+        if (open) {
+          if (typeof NS.renderList === "function") NS.renderList(false);
+        } else {
+          if (typeof NS.updateStatus === "function") NS.updateStatus();
+        }
+      } catch (e) {
+        SH.logError("auto-sync kick failed", e);
+      }
+    };
+
+    const startStreamingWait = () => {
+      if (streamingGuard) return; // ★ すでに待ってるなら増やさない
+      streamingGuard = true;
+      const since = now();
+
+      dbg("[TN] streaming wait start", { t: since });
+
+      const poll = () => {
+        // streaming継続中
+        if (isStreamingNow()) {
+          if (now() - since > STREAM_MAX_MS) {
+            dbg("[TN] streaming wait timeout -> render anyway", {
+              waited: now() - since,
+            });
+            streamingGuard = false;
+            streamTo = null;
+            // ここは安全側で一回だけ描画
+            requestAnimationFrame(doRender);
+            return;
+          }
+          streamTo = window.setTimeout(poll, STREAM_POLL_MS);
+          return;
+        }
+
+        // streaming終了
+        dbg("[TN] streaming end -> render", {
+          t: now(),
+          waited: now() - since,
+        });
+        streamingGuard = false;
+        streamTo = null;
+
+        // 終了直後のDOMがもう1拍動くので、ちょい待ってから描画
+        window.setTimeout(() => requestAnimationFrame(doRender), 120);
+      };
+
+      streamTo = window.setTimeout(poll, STREAM_POLL_MS);
+    };
+
+    const scheduleKick = (reason: string, detail?: any) => {
+      pendingReason = reason;
+      pendingDetail = detail ?? pendingDetail;
+
       dbg("[TN] kick scheduled", { t: now(), reason, detail });
 
-      clearTimeout(to);
-      to = window.setTimeout(() => {
-        dbg("[TN] kick fired", { t: now(), reason });
+      if (kickTo) window.clearTimeout(kickTo);
+      const myTicket = ++kickTicket;
 
-        try {
-          if (typeof NS.rebuild === "function") NS.rebuild();
+      kickTo = window.setTimeout(() => {
+        if (myTicket !== kickTicket) return;
+        kickTo = null;
 
-          const open =
-            typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
-          dbg("[TN] list open =", open);
-
-          if (open) {
-            if (typeof NS.renderList === "function") NS.renderList(false);
-          } else {
-            if (typeof NS.updateStatus === "function") NS.updateStatus();
-          }
-        } catch (e) {
-          SH.logError("auto-sync kick failed", e);
+        // 発火時点で streaming なら “待ち” に入る（renderしない）
+        if (isStreamingNow()) {
+          dbg("[TN] kick postponed (still streaming)", {
+            t: now(),
+            reason: pendingReason,
+          });
+          startStreamingWait();
+          return;
         }
-      }, 300);
+
+        dbg("[TN] kick fired", { t: now(), reason: pendingReason });
+        requestAnimationFrame(doRender);
+      }, KICK_DEBOUNCE_MS);
+    };
+
+    // kick入口：streaming待ち中はスケジュール増やさず、情報だけ更新
+    const kick = (reason: string, detail?: any) => {
+      if (streamingGuard) {
+        pendingReason = reason;
+        pendingDetail = detail ?? pendingDetail;
+        dbg("[TN] kick ignored (streamingGuard)", { t: now(), reason });
+        return;
+      }
+      scheduleKick(reason, detail);
     };
 
     _turnObs = new MutationObserver((muts) => {
@@ -3664,7 +3750,7 @@
       const sendKeyChanged = oldSend !== newSend;
 
       // 即時反映（必要なものだけ）
-      if (themeChanged) window.CGTN_UI.applyLang({ mode: newThemeMode });
+      if (themeChanged) window.CGTN_UI.applyTheme({ mode: newThemeMode });
       if (widthChanged && typeof newMaxChars === "number")
         LG?.applyPanelWidthByChars?.(newMaxChars);
       if (vizChanged && typeof newVal.showViz === "boolean")
