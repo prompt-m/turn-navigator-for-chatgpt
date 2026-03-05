@@ -8,16 +8,6 @@
   const TURN_SEL = "article"; // 1 <article> = 1 turn
   const SHOW_UNKNOWN_ATTACH = false; // trueにすると従来表示
 
-  // ===== debug =====
-  const TNDBG = true;
-  function dbg(...a: any[]) {
-    if (!TNDBG) return;
-    console.log("[TNDBG]", ...a);
-  }
-  function now() {
-    return Math.floor(performance.now());
-  }
-
   const titleEscape = SH.titleEscape;
   let uploads = 0,
     downloads = 0; // ダウンロードターン数・アップロードターン数
@@ -2333,8 +2323,6 @@
     ' stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' +
     "</svg>";
   let _renderTicket = 0;
-  // 最後に描画したチャットID（チャット遷移時のST使い回し事故を防ぐ）
-  let _lastRenderedChatId = "";
   type RenderListOptions = {
     pinOnlyOverride?: boolean;
   };
@@ -2350,9 +2338,6 @@
     });
     const SH = window.CGTN_SHARED,
       LG = window.CGTN_LOGIC;
-
-    // ★現在のチャットID（遷移検知に使う）
-    const cid = SH?.getChatId?.() || "";
 
     // 0) Shared 初期化待ち（最大4秒で打ち切り）
     if (SH?.whenLoaded) {
@@ -2422,168 +2407,156 @@
     }
     (NS as any)._listRendering = true;
 
-    // ★重要：ここから先は try/finally で _listRendering を必ず解除する
-    try {
-      // ★チャット遷移検知：ST を使い回さない（前チャットの一覧が出る事故防止）
-      if (cid && _lastRenderedChatId && cid !== _lastRenderedChatId) {
-        try {
-          // ST はこのファイルの module-scope の const ST を指す
-          ST.all.length = 0;
-          ST.user.length = 0;
-          ST.assistant.length = 0;
-        } catch {}
-      }
+    // ★ 今回は「ジャンプ位置のズレ」を防ぐため、完了まで隠す
+    console.log("[TN] panel hidden");
+    panel.style.visibility = "hidden";
 
-      // ★ 今回は「ジャンプ位置のズレ」を防ぐため、完了まで隠す
-      //      panel.style.visibility = "hidden";
+    // 3) 競合キャンセル用チケット
+    const my = ++_renderTicket;
 
-      // 3) 競合キャンセル用チケット
-      const my = ++_renderTicket;
+    // 4) ST が空なら再構築
+    if (!LG?.ST?.all?.length) {
+      LG?.rebuild?.();
+      if (!LG?.ST?.all?.length) return;
+    }
 
-      // 4) ST が空なら再構築（チャット遷移後は上で ST を空にしているので必ず入る）
-      if (!LG?.ST?.all?.length) {
-        LG?.rebuild?.();
-        if (!LG?.ST?.all?.length) return;
-      }
+    const cidAtStart = SH.getChatId?.();
+    const body = panel.querySelector("#cgpt-list-body");
+    body.style.maxHeight = "min(75vh, 700px)";
+    body.style.overflowY = "auto";
+    body.innerHTML = ""; // クリア
 
-      const cidAtStart = cid || SH.getChatId?.();
-      const body = panel.querySelector("#cgpt-list-body") as HTMLElement;
-      body.style.maxHeight = "min(75vh, 700px)";
-      body.style.overflowY = "auto";
-      //body.innerHTML = ""; // クリア
-      body.replaceChildren(); // クリア
+    const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
+    // pinOnly 判定
+    const pinOnly =
+      opts && Object.prototype.hasOwnProperty.call(opts, "pinOnlyOverride")
+        ? !!opts.pinOnlyOverride
+        : !!cfg.list?.pinOnly;
 
-      const cfg = SH.getCFG?.() || SH?.DEFAULTS || {};
-      // pinOnly 判定
-      const pinOnly =
-        opts && Object.prototype.hasOwnProperty.call(opts, "pinOnlyOverride")
-          ? !!opts.pinOnlyOverride
-          : !!cfg.list?.pinOnly;
+    const chatId = SH.getChatId?.();
+    const pinsArr = (await SH.getPinsArrAsync(chatId)) || [];
 
-      const chatId = cid || SH.getChatId?.();
-      const pinsArr = (await SH.getPinsArrAsync(chatId)) || [];
+    // キャンセルチェック (await明け)
+    if (my !== _renderTicket) return;
 
-      // キャンセルチェック (await明け)
+    let turns = ST.all.slice();
+    // 2026.02.24
+    //if (pinOnly) turns = turns.filter((_, i) => !!pinsArr[i]);
+
+    const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
+    const fontPx = (cfg.list?.fontSize || 12) + "px";
+
+    // カウンタリセット
+    ((uploads = 0), (downloads = 0));
+
+    // ============================================================
+    // ★ Time Slicing (コマ切れ実行) の実装
+    // ============================================================
+    const CHUNK_SIZE = 50; // 1回に処理する件数 (PC性能に合わせて調整可)
+    const totalItems = turns.length;
+
+    for (let i = 0; i < totalItems; i += CHUNK_SIZE) {
+      // 1. 割り込みチェック
       if (my !== _renderTicket) return;
+      if (cidAtStart !== SH.getChatId?.()) return;
 
-      let turns = ST.all.slice();
-      // 2026.02.24
-      //if (pinOnly) turns = turns.filter((_, i) => !!pinsArr[i]);
+      // 2. チャンク切り出し
+      const chunk = turns.slice(i, i + CHUNK_SIZE);
+      const fragment = document.createDocumentFragment(); // 高速化のためフラグメント使用
 
-      const maxChars = Math.max(10, Number(cfg.list?.maxChars) || 60);
-      const fontPx = (cfg.list?.fontSize || 12) + "px";
+      // 3. チャンク内ループ (同期処理)
+      for (const art of chunk) {
+        // --- 既存の行生成ロジック ---
+        const index1 = ST.all.indexOf(art) + 1;
+        const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
+        const attachLine = buildAttachmentLine(art, maxChars);
+        let bodyLine = extractBodySnippet(head, maxChars);
+        const hasRealAttach = !!attachLine;
+        const showClipOnAttach = hasRealAttach;
+        let showClipOnBody = !hasRealAttach && !!bodyLine;
 
-      // カウンタリセット
-      ((uploads = 0), (downloads = 0));
+        const PREVIEW_MAX = Math.max(
+          600,
+          Math.min(2000, SH?.getCFG?.()?.list?.previewMax || 1200),
+        );
+        const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || "";
+        let bodyPreview = extractBodySnippet(head, PREVIEW_MAX) || "";
+        let previewText = (bodyPreview || attachPreview)
+          .replace(/\s+\n/g, "\n")
+          .trim();
 
-      // ============================================================
-      // ★ Time Slicing (コマ切れ実行) の実装
-      // ============================================================
-      const CHUNK_SIZE = 50; // 1回に処理する件数 (PC性能に合わせて調整可)
-      const totalItems = turns.length;
+        if (!attachLine && !bodyLine) {
+          const nf = T("row.notFound") || "(not found)";
+          bodyLine = nf;
+          bodyPreview = nf;
+          previewText = nf;
+          showClipOnBody = false;
+        }
 
-      for (let i = 0; i < totalItems; i += CHUNK_SIZE) {
-        // 1. 割り込みチェック
-        if (my !== _renderTicket) return;
-        if (cidAtStart !== SH.getChatId?.()) return;
+        const roleHint = art?.dataset?.turn;
+        const isUser = roleHint
+          ? roleHint === "user"
+          : art.matches(
+              '[data-message-author-role="user"], div [data-message-author-role="user"]',
+            );
+        const isAsst = roleHint
+          ? roleHint === "assistant"
+          : art.matches(
+              '[data-message-author-role="assistant"], div [data-message-author-role="assistant"]',
+            );
 
-        // 2. チャンク切り出し
-        const chunk = turns.slice(i, i + CHUNK_SIZE);
-        const fragment = document.createDocumentFragment(); // 高速化のためフラグメント使用
+        let anchored = false;
 
-        // 3. チャンク内ループ (同期処理)
-        for (const art of chunk) {
-          // --- 既存の行生成ロジック ---
-          const index1 = ST.all.indexOf(art) + 1;
-          const head = listHeadNodeOf ? listHeadNodeOf(art) : headNodeOf(art);
-          const attachLine = buildAttachmentLine(art, maxChars);
-          let bodyLine = extractBodySnippet(head, maxChars);
-          const hasRealAttach = !!attachLine;
-          const showClipOnAttach = hasRealAttach;
-          let showClipOnBody = !hasRealAttach && !!bodyLine;
-
-          const PREVIEW_MAX = Math.max(
-            600,
-            Math.min(2000, SH?.getCFG?.()?.list?.previewMax || 1200),
-          );
-          const attachPreview = buildAttachmentLine(art, PREVIEW_MAX) || "";
-          let bodyPreview = extractBodySnippet(head, PREVIEW_MAX) || "";
-          let previewText = (bodyPreview || attachPreview)
-            .replace(/\s+\n/g, "\n")
-            .trim();
-
-          if (!attachLine && !bodyLine) {
-            const nf = T("row.notFound") || "(not found)";
-            bodyLine = nf;
-            bodyPreview = nf;
-            previewText = nf;
-            showClipOnBody = false;
+        // 添付行
+        if (hasRealAttach) {
+          isUser ? uploads++ : downloads++;
+          const row = document.createElement("div");
+          row.className = "row";
+          row.style.fontSize = fontPx;
+          row.dataset.idx = String(index1);
+          row.dataset.kind = "attach";
+          if (!anchored) {
+            row.classList.add("turn-idx-anchor");
+            anchored = true;
           }
+          if (isUser) row.classList.add("user-turn");
+          if (isAsst) row.classList.add("asst-turn");
 
-          const roleHint = art?.dataset?.turn;
-          const isUser = roleHint
-            ? roleHint === "user"
-            : art.matches(
-                '[data-message-author-role="user"], div [data-message-author-role="user"]',
-              );
-          const isAsst = roleHint
-            ? roleHint === "assistant"
-            : art.matches(
-                '[data-message-author-role="assistant"], div [data-message-author-role="assistant"]',
-              );
-
-          let anchored = false;
-
-          // 添付行
-          if (hasRealAttach) {
-            isUser ? uploads++ : downloads++;
-            const row = document.createElement("div");
-            row.className = "row";
-            row.style.fontSize = fontPx;
-            row.dataset.idx = String(index1);
-            row.dataset.kind = "attach";
-            if (!anchored) {
-              row.classList.add("turn-idx-anchor");
-              anchored = true;
-            }
-            if (isUser) row.classList.add("user-turn");
-            if (isAsst) row.classList.add("asst-turn");
-
-            row.innerHTML = `
+          row.innerHTML = `
             <div class="txt"></div>
             <div class="ops">
               <button class="cgtn-clip-pin cgtn-iconbtn off" title="${T("row.pin")}" aria-pressed="false" aria-label="${T("row.pin")}">${PIN_ICON_SVG}</button>
               <button class="cgtn-preview-btn cgtn-iconbtn" title="${T("row.previewBtn")}" aria-label="${T("row.previewBtn")}">🔎\uFE0E</button>
             </div>
           `;
-            row.querySelector(".txt").textContent = attachLine;
-            row.dataset.preview = previewText || attachLine || "";
-            row.dataset.role = isUser ? "user" : "assistant";
-            const on = !!pinsArr[index1 - 1];
-            paintPinRow(row, on);
-            if (on) row.dataset.pin = "1";
-            else row.removeAttribute("data-pin");
+          row.querySelector(".txt").textContent = attachLine;
+          row.dataset.preview = previewText || attachLine || "";
+          row.dataset.role = isUser ? "user" : "assistant";
+          const on = !!pinsArr[index1 - 1];
+          paintPinRow(row, on);
+          if (on) row.dataset.pin = "1";
+          else row.removeAttribute("data-pin");
 
-            fragment.appendChild(row); // fragmentへ
+          fragment.appendChild(row); // fragmentへ
+        }
+
+        // 本文行
+        if (bodyLine) {
+          const row2 = document.createElement("div");
+          row2.className = "row";
+          row2.style.fontSize = fontPx;
+          row2.dataset.idx = String(index1);
+          row2.dataset.kind = "body";
+          row2.dataset.role = isUser ? "user" : "assistant";
+          if (!anchored) {
+            row2.classList.add("turn-idx-anchor");
+            anchored = true;
           }
+          if (isPinned(art)) row2.dataset.pin = "1";
+          if (isUser) row2.classList.add("user-turn");
+          if (isAsst) row2.classList.add("asst-turn");
 
-          // 本文行
-          if (bodyLine) {
-            const row2 = document.createElement("div");
-            row2.className = "row";
-            row2.style.fontSize = fontPx;
-            row2.dataset.idx = String(index1);
-            row2.dataset.kind = "body";
-            row2.dataset.role = isUser ? "user" : "assistant";
-            if (!anchored) {
-              row2.classList.add("turn-idx-anchor");
-              anchored = true;
-            }
-            if (isPinned(art)) row2.dataset.pin = "1";
-            if (isUser) row2.classList.add("user-turn");
-            if (isAsst) row2.classList.add("asst-turn");
-
-            row2.innerHTML = `
+          row2.innerHTML = `
             <div class="txt"></div><span class="attach" aria-label="attachment"></span>
             <div class="ops">
               ${showClipOnBody ? `<button class="cgtn-clip-pin cgtn-iconbtn off" title="${T("row.pin")}" aria-pressed="false" aria-label="${T("row.pin")}">${PIN_ICON_SVG}</button>` : ``}
@@ -2591,58 +2564,58 @@
             </div>
           `;
 
-            row2.querySelector(".txt").textContent = bodyLine;
-            let attach = !hasRealAttach ? attachLine : "";
-            if (!attach && isAsst && SHOW_UNKNOWN_ATTACH) attach = "（不明）";
-            const attachEl = row2.querySelector(".attach");
-            if (attach && attachEl) {
-              attachEl.textContent = " " + attach;
-              if (isAsst) downloads++;
-            }
-            row2.dataset.preview = previewText || bodyLine || "";
-            const on2 = !!pinsArr[index1 - 1];
-            paintPinRow(row2, on2);
-            if (on2) row2.dataset.pin = "1";
-            else row2.removeAttribute("data-pin");
-
-            fragment.appendChild(row2); // fragmentへ
+          row2.querySelector(".txt").textContent = bodyLine;
+          let attach = !hasRealAttach ? attachLine : "";
+          if (!attach && isAsst && SHOW_UNKNOWN_ATTACH) attach = "（不明）";
+          const attachEl = row2.querySelector(".attach");
+          if (attach && attachEl) {
+            attachEl.textContent = " " + attach;
+            if (isAsst) downloads++;
           }
-        } // chunk loop end
+          row2.dataset.preview = previewText || bodyLine || "";
+          const on2 = !!pinsArr[index1 - 1];
+          paintPinRow(row2, on2);
+          if (on2) row2.dataset.pin = "1";
+          else row2.removeAttribute("data-pin");
 
-        // 4. まとめてDOMに追加
-        body.appendChild(fragment);
+          fragment.appendChild(row2); // fragmentへ
+        }
+      } // chunk loop end
 
-        // 5. ★休憩: UIスレッドをブロックしないよう、次のタスクへ譲る
-        await new Promise((r) => setTimeout(r, 0));
-      }
-      // ============================================================
-      // ============================================================
-      // ★修正：孤児付箋のレスキューUI生成
-      // ============================================================
-      // ★罠修正：turns.length ではなく、絶対的な総ターン数を使う！
-      const totalTurnsForOrphan = NS.ST?.all?.length || 0;
-      const orphanPins = [];
+      // 4. まとめてDOMに追加
+      body.appendChild(fragment);
 
-      for (let i = totalTurnsForOrphan; i < pinsArr.length; i++) {
-        if (pinsArr[i]) orphanPins.push(i + 1);
-      }
+      // 5. ★休憩: UIスレッドをブロックしないよう、次のタスクへ譲る
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    // ============================================================
+    // ============================================================
+    // ★修正：孤児付箋のレスキューUI生成
+    // ============================================================
+    // ★罠修正：turns.length ではなく、絶対的な総ターン数を使う！
+    const totalTurnsForOrphan = NS.ST?.all?.length || 0;
+    const orphanPins = [];
 
-      let validPinsCountForRender = 0;
-      for (let i = 0; i < totalTurnsForOrphan; i++) {
-        if (pinsArr[i]) validPinsCountForRender++;
-      }
+    for (let i = totalTurnsForOrphan; i < pinsArr.length; i++) {
+      if (pinsArr[i]) orphanPins.push(i + 1);
+    }
 
-      NS.validPinsCount = validPinsCountForRender;
-      NS.orphanPinsCount = orphanPins.length;
+    let validPinsCountForRender = 0;
+    for (let i = 0; i < totalTurnsForOrphan; i++) {
+      if (pinsArr[i]) validPinsCountForRender++;
+    }
 
-      // ★罠修正：pinOnly の時だけでなく、孤児がいればいつでも警告UIを出す！
-      if (orphanPins.length > 0) {
-        const orphanDiv = document.createElement("div");
-        orphanDiv.className = "cgtn-orphan-row";
-        orphanDiv.style.cssText =
-          "padding:12px; margin:8px; border:1px dashed #f57c00; background:#fff3e0; border-radius:6px;";
+    NS.validPinsCount = validPinsCountForRender;
+    NS.orphanPinsCount = orphanPins.length;
 
-        orphanDiv.innerHTML = `
+    // ★罠修正：pinOnly の時だけでなく、孤児がいればいつでも警告UIを出す！
+    if (orphanPins.length > 0) {
+      const orphanDiv = document.createElement("div");
+      orphanDiv.className = "cgtn-orphan-row";
+      orphanDiv.style.cssText =
+        "padding:12px; margin:8px; border:1px dashed #f57c00; background:#fff3e0; border-radius:6px;";
+
+      orphanDiv.innerHTML = `
         <div style="color:#e65100; font-weight:bold; font-size:12px; margin-bottom:8px;">
           ⚠ 見つからない付箋が ${orphanPins.length} 件保護されています
         </div>
@@ -2652,89 +2625,73 @@
         </div>
       `;
 
-        orphanDiv
-          .querySelector("#btn-delete-orphan")
-          ?.addEventListener("click", async () => {
-            const arr = await SH.getPinsArrAsync(chatId);
-            arr.length = totalTurnsForOrphan;
-            await SH.savePinsArrAsync(arr, chatId);
-            NS.syncPinCounts?.(); // ★バッジ即時更新
-            NS.renderList(true);
-          });
+      orphanDiv
+        .querySelector("#btn-delete-orphan")
+        ?.addEventListener("click", async () => {
+          const arr = await SH.getPinsArrAsync(chatId);
+          arr.length = totalTurnsForOrphan;
+          await SH.savePinsArrAsync(arr, chatId);
+          NS.syncPinCounts?.(); // ★バッジ即時更新
+          NS.renderList(true);
+        });
 
-        orphanDiv
-          .querySelector("#btn-rescue-orphan")
-          ?.addEventListener("click", async () => {
-            const arr = await SH.getPinsArrAsync(chatId);
+      orphanDiv
+        .querySelector("#btn-rescue-orphan")
+        ?.addEventListener("click", async () => {
+          const arr = await SH.getPinsArrAsync(chatId);
 
-            const rescueCount = orphanPins.length; // ★孤児ONの件数
-            arr.length = totalTurnsForOrphan;
+          const rescueCount = orphanPins.length; // ★孤児ONの件数
+          arr.length = totalTurnsForOrphan;
 
-            if (totalTurnsForOrphan > 0 && rescueCount > 0) {
-              const n = Math.min(rescueCount, totalTurnsForOrphan);
-              for (let i = 0; i < n; i++) {
-                arr[totalTurnsForOrphan - 1 - i] = 1; // 末尾からn件ON
-              }
+          if (totalTurnsForOrphan > 0 && rescueCount > 0) {
+            const n = Math.min(rescueCount, totalTurnsForOrphan);
+            for (let i = 0; i < n; i++) {
+              arr[totalTurnsForOrphan - 1 - i] = 1; // 末尾からn件ON
             }
+          }
 
-            await SH.savePinsArrAsync(arr, chatId);
-            NS.syncPinCounts?.(); // ★バッジ即時更新
-            NS.renderList(true);
-          });
+          await SH.savePinsArrAsync(arr, chatId);
+          NS.syncPinCounts?.(); // ★バッジ即時更新
+          NS.renderList(true);
+        });
 
-        body.appendChild(orphanDiv);
-      }
+      body.appendChild(orphanDiv);
+    }
 
-      // ★ `if` の条件判定を完全に削除し、常に empty を追加する！
-      const empty = document.createElement("div");
-      empty.className = "cgtn-empty";
-      // ★ style に `display: none;` を追加して普段は隠しておく
-      empty.style.cssText =
-        "padding:16px;opacity:.85;font-size:13px; display:none;";
-      empty.innerHTML = `
+    // ★ `if` の条件判定を完全に削除し、常に empty を追加する！
+    const empty = document.createElement("div");
+    empty.className = "cgtn-empty";
+    // ★ style に `display: none;` を追加して普段は隠しておく
+    empty.style.cssText =
+      "padding:16px;opacity:.85;font-size:13px; display:none;";
+    empty.innerHTML = `
       <div class="msg" data-kind="msg">${T("list.noPins")}</div>
     `;
-      body.appendChild(empty);
+    body.appendChild(empty);
 
-      const rowsCount = body.querySelectorAll(".row").length;
-      NS._lastVisibleRows = rowsCount;
+    const rowsCount = body.querySelectorAll(".row").length;
+    NS._lastVisibleRows = rowsCount;
 
-      const box = pinOnly ? NS.metrics.pins : NS.metrics.all;
-      box.uploads = uploads;
-      box.downloads = downloads;
-      NS.uploads = uploads;
-      NS.downloads = downloads;
-      NS.pinsCount = Object.values(pinsArr).filter(Boolean).length;
-      updateListFooterInfo();
-      NS.updatePinOnlyBadge?.();
-      NS.updateListChatTitle?.();
+    const box = pinOnly ? NS.metrics.pins : NS.metrics.all;
+    box.uploads = uploads;
+    box.downloads = downloads;
+    NS.uploads = uploads;
+    NS.downloads = downloads;
+    NS.pinsCount = Object.values(pinsArr).filter(Boolean).length;
+    updateListFooterInfo();
+    NS.updatePinOnlyBadge?.();
+    NS.updateListChatTitle?.();
 
-      if (my !== _renderTicket) return;
-      if (cidAtStart !== SH.getChatId?.()) return;
+    if (my !== _renderTicket) return;
+    if (cidAtStart !== SH.getChatId?.()) return;
 
-      if (my === _renderTicket && NS._panelOpen) {
-        panel.style.display = "flex";
-        // 計測可能になったのでスクロール
-        scrollListToTurn(NS._currentTurnKey);
-        // 最後に表示！
-        //        panel.style.visibility = "visible";
-
-        // ★この描画が有効に完了したチャットIDを記録
-        if (cidAtStart) _lastRenderedChatId = String(cidAtStart);
-      }
-    } finally {
-      // ★描画中フラグを必ず解除
-      (NS as any)._listRendering = false;
-      // ★保留が立っていたら 1回だけ追いかける
-      if ((NS as any)._listRenderPending) {
-        (NS as any)._listRenderPending = false;
-        setTimeout(() => {
-          try {
-            // トグル状態は renderList 内で確認される
-            void NS.renderList(false);
-          } catch {}
-        }, 0);
-      }
+    if (my === _renderTicket && NS._panelOpen) {
+      panel.style.display = "flex";
+      // 計測可能になったのでスクロール
+      scrollListToTurn(NS._currentTurnKey);
+      // 最後に表示！
+      console.log("[TN] panel visible");
+      panel.style.visibility = "visible";
     }
   };
   // renderList ここまで
@@ -3476,57 +3433,34 @@
     NS.detachTurnObserver();
 
     let to = 0;
+    let safetyTo = 0; // ★追加: Mikiさん考案の「念押しタイマー」
 
-    // ★: これを true にすると理由ログが出る（普段は false 推奨）
-    const DBG = true;
-    const now = () => Date.now();
-    const dbg = (...a: any[]) => {
-      if (DBG) console.log(...a);
-    };
-
-    // ★ composer(入力欄周り) を雑に除外
-    const inComposer = (node: Node | null) => {
-      if (!node) return false;
-      const el =
-        node.nodeType === 1
-          ? (node as Element)
-          : (node.parentElement as Element | null);
-      if (!el) return false;
-
-      // ChatGPTのUI差し替えに強めに対応（ゆるく広めに弾く）
-      return !!el.closest(
-        [
-          "form", // 入力フォーム配下
-          "#composer", // ある環境
-          "[data-testid='composer']", // ある環境
-          "[data-testid='composer-footer']",
-          "#prompt-textarea",
-          "[contenteditable='true']",
-          "button#composer-submit-button",
-          "[data-state]", // 送信/音声切替がこれ系を触ることが多い
-        ].join(","),
-      );
-    };
-
-    // ★ 理由付きkick
-    const kick = (reason: string, detail?: any) => {
-      dbg("[TN] kick scheduled", { t: now(), reason, detail });
-
+    const kick = () => {
+      console.log("[TN] kick scheduled", Date.now());
+      // --------------------------------------------------
+      // ① 最初の更新 (300ms後)
+      // --------------------------------------------------
       clearTimeout(to);
       to = window.setTimeout(() => {
-        dbg("[TN] kick fired", { t: now(), reason });
-
+        console.log("[TN] kick fired");
         try {
-          if (typeof NS.rebuild === "function") NS.rebuild();
-
+          if (typeof NS.rebuild === "function") {
+            NS.rebuild();
+          }
+          // 2026.02.22 isListOpen
           const open =
             typeof SH.isListOpen === "function" ? SH.isListOpen() : false;
-          dbg("[TN] list open =", open);
+
+          console.log("[TN] list open =", open);
 
           if (open) {
-            if (typeof NS.renderList === "function") NS.renderList(false);
+            if (typeof NS.renderList === "function") {
+              NS.renderList(false); // 2026.03.04 true -> false
+            }
           } else {
-            if (typeof NS.updateStatus === "function") NS.updateStatus();
+            if (typeof NS.updateStatus === "function") {
+              NS.updateStatus();
+            }
           }
         } catch (e) {
           SH.logError("auto-sync kick failed", e);
@@ -3536,55 +3470,42 @@
 
     _turnObs = new MutationObserver((muts) => {
       for (const m of muts) {
-        // 自前UIは無視
         if (inOwnUI(m.target)) continue;
-
-        // ★ composer周りの変化は丸ごと無視（typingノイズを止める）
-        if (inComposer(m.target)) continue;
-
         if (m.type === "childList") {
-          // 追加ノードを軽く見る
           let hit = false;
-          let why: string | null = null;
-
-          const added = m.addedNodes?.length || 0;
-
-          for (let i = 0; i < added; i++) {
+          // =========================================================
+          // ★爆速化: querySelectorを使わず、追加された要素自身だけを軽く見る！
+          // =========================================================
+          for (let i = 0; i < m.addedNodes.length; i++) {
             const n = m.addedNodes[i];
-            if (n.nodeType !== 1) continue;
-
-            const el = n as Element;
-
-            // ★ composer由来の追加は除外（added側も念押し）
-            if (inComposer(el)) continue;
-
-            if (el.tagName === "ARTICLE") {
+            if (n.nodeType !== 1) continue; // Elementのみ
+            const el = n as HTMLElement;
+            // 自身が article か、専用属性を持っているかだけを判定
+            if (
+              el.tagName === "ARTICLE" ||
+              el.hasAttribute("data-message-author-role")
+            ) {
               hit = true;
-              why = "added ARTICLE";
               break;
             }
-            if (el.hasAttribute("data-message-author-role")) {
-              hit = true;
-              why = "added [data-message-author-role]";
-              break;
-            }
-
-            // ★ 追加された要素の配下に article がいるケース（必要なら）
-            // if (el.querySelector?.("article,[data-message-author-role]")) { ... }
           }
-
           if (hit) {
-            dbg("[TNDBG] MO hit(childList)", { t: now(), added, why });
-            kick("MO childList", { added, why });
+            kick();
             break;
           }
+        } else if (m.type === "characterData" || m.type === "attributes") {
+          const host =
+            m.target.nodeType === 3 ? m.target.parentElement : m.target;
 
-          // ★ hitしてないときはログ出さない（ここがノイズ削減の肝）
-          continue;
+          // ★修正: selという変数を使わず、直接セレクタの文字列を渡す
+          if (
+            host instanceof Element &&
+            host.closest("article,[data-message-author-role]")
+          ) {
+            kick();
+            break;
+          }
         }
-
-        // あなたの observe 設定では characterData/attributes は false なのでここは基本来ない
-        // もし将来ONにしたら、ここも同様に inComposer 除外と reason を付ければOK
       }
     });
 
@@ -3600,6 +3521,7 @@
       SH.logError("[auto-sync] observe failed", e);
     }
   };
+
   // 2. 初期化時に一度テーマを適用する（少し遅延させて設定ロードを待つ）
   setTimeout(() => {
     try {
