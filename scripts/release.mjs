@@ -91,28 +91,6 @@ const findAndCopyCss = (searchDir) => {
 findAndCopyCss(path.join(root, "src"));
 // ==========================================
 
-/*
-// ZIP 名固定：release/TurnNavigator-<version>.zip（出力先も固定）
-const zipName = `TurnNavigator-${version}.zip`;
-const zipPath = path.join(root, "release", zipName);
-
-
-// PowerShell の Compress-Archive を使う（Windows想定）
-const cwd = root.replace(/\\/g, "/");
-const rel = "release";
-execSync(
-  `powershell -NoProfile -Command "if(Test-Path '${zipPath}') { Remove-Item -Force '${zipPath}' }; Compress-Archive -Path '${path.join(
-    root,
-    "release",
-    "*",
-  )}' -DestinationPath '${zipPath}'"`,
-  { stdio: "inherit" },
-);
-
-console.log(`✅ Release ready: ${releaseDir}`);
-console.log(`✅ Zip created : ${zipPath}`);
-*/
-
 import AdmZip from "adm-zip";
 
 // ZIP 名固定：release/TurnNavigator-<version>.zip
